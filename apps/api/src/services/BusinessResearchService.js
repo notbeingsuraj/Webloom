@@ -414,20 +414,26 @@ class BusinessResearchService {
     // --- LEVEL 2: Geoapify structured data (provider provenance) ---
     let geoapifyRecord = null;
     if (GeoapifyProvider.isAvailable()) {
-      const business = await GeoapifyProvider.getBusiness(hints);
-      if (business) {
-        geoapifyRecord = business;
-        this._mergeCanonical(profile, business, 'discovered', 'geoapify', sourceUrl);
+      const geoResult = await GeoapifyProvider.search(hints);
+      // Lossless contract: geoResult now has { provider, status, records, error, diagnostics }
+      if (geoResult.status === 'success' && geoResult.records.length > 0) {
+        geoapifyRecord = geoResult.records[0];
+        this._mergeCanonical(profile, geoapifyRecord, 'discovered', 'geoapify', sourceUrl);
+        providerTrace.geoapify = 'ok';
+        providerTrace.geoapifyDiagnostics = geoResult.diagnostics || null;
       } else {
-        // Log the not-configured / no-result case softly (never secrets)
-        const status = (await GeoapifyProvider.search(hints)).status;
-        providerTrace.geoapify = status;
+        // Lossless: preserve the exact failure details
+        providerTrace.geoapify = geoResult.status;
+        providerTrace.geoapifyError = geoResult.error || null;
+        providerTrace.geoapifyDiagnostics = geoResult.diagnostics || null;
+        if (config?.debugBusinessAnalysis) {
+          console.log(`[Geoapify] status=${geoResult.status}, error=${geoResult.error?.safeMessage || 'none'}`);
+        }
       }
     } else {
       console.error('Geoapify provider unavailable; using fallback extraction.');
       providerTrace.geoapify = 'not_configured';
     }
-    if (geoapifyRecord) providerTrace.geoapify = 'ok';
 
     // --- LEVEL 3: web-extraction fallback / completion of gaps ---
     let webRecord = null;

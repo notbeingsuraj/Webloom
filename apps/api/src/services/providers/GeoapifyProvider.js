@@ -16,12 +16,22 @@
  * Uses the backend-only GEOAPIFY_API_KEY from config/env.js. Never exposed to
  * the frontend. Any non-2xx / credential failure makes the provider report
  * unavailable so the calling pipeline can fall back safely.
+ *
+ * LOSSLESS ERROR CONTRACT (Phase 20):
+ * Every search() result is a structured object describing WHAT happened:
+ *   { provider, status, records, error?, diagnostics, source, retrieval }
+ * Provider failures must NEVER silently destroy error information.
+ * The provider category, safe message, HTTP status, timing are preserved.
  */
 
 import axios from 'axios';
 import { config } from '../../config/env.js';
 import BusinessDataProvider from './BusinessDataProvider.js';
 import { mapGeoapifyFeatureToProfile } from './ProviderAdapter.js';
+import {
+  createAcquisitionResult,
+  ACQUISITION_STATUS,
+} from '../AcquisitionResult.js';
 
 // Provider-status sentinels so callers can reason about WHY no result returned
 export const GEOAPIFY_STATUS = Object.freeze({
@@ -34,6 +44,18 @@ export const GEOAPIFY_STATUS = Object.freeze({
   NO_RESULT: 'no_result',
   INVALID_RESPONSE: 'invalid_response',
 });
+
+// Map provider-specific statuses to canonical ACQUISITION_STATUS
+const STATUS_TO_ACQUISITION = {
+  [GEOAPIFY_STATUS.OK]: ACQUISITION_STATUS.SUCCESS,
+  [GEOAPIFY_STATUS.NO_RESULT]: ACQUISITION_STATUS.EMPTY_RESULT,
+  [GEOAPIFY_STATUS.INVALID_RESPONSE]: ACQUISITION_STATUS.EXTRACTION_FAILED,
+  [GEOAPIFY_STATUS.NOT_CONFIGURED]: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+  [GEOAPIFY_STATUS.AUTH_FAILED]: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+  [GEOAPIFY_STATUS.RATE_LIMITED]: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+  [GEOAPIFY_STATUS.TIMEOUT]: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+  [GEOAPIFY_STATUS.NETWORK_ERROR]: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+};
 
 class GeoapifyProvider extends BusinessDataProvider {
   constructor() {
@@ -80,12 +102,23 @@ class GeoapifyProvider extends BusinessDataProvider {
    *
    * @param {Object} hints - { name, city, state, country, latitude, longitude, query }
    * @param {Object} options
-   * @returns {Promise<{ status, records, error? }>}
+   * @returns {Promise<Object>} structured result: { provider, status, records, error, diagnostics, source }
    */
   async search(hints = {}, options = {}) {
+    const startedAt = Date.now();
+    const sourceUrl = config.geoapify?.geocodeUrl || 'geoapify://search';
+
     // Guard: no credential configured → report gracefully
     if (!this.isAvailable()) {
-      return { status: GEOAPIFY_STATUS.NOT_CONFIGURED, records: [] };
+      const latencyMs = Date.now() - startedAt;
+      return {
+        provider: 'geoapify',
+        status: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+        records: [],
+        error: { category: 'NOT_CONFIGURED', safeMessage: 'Geoapify API key not configured.' },
+        diagnostics: { httpStatus: null, errorCode: 'provider_unavailable', retryCount: 0, latencyMs },
+        source: { url: sourceUrl, retrieval: new Date().toISOString() },
+      };
     }
 
     const text = (hints && (hints.query || hints.name)) || null;
@@ -103,16 +136,32 @@ class GeoapifyProvider extends BusinessDataProvider {
 
     // Must have at least a text query OR coordinates to search
     if (!params.text && (lat == null || lng == null)) {
-      return { status: GEOAPIFY_STATUS.NO_RESULT, records: [] };
+      const latencyMs = Date.now() - startedAt;
+      return {
+        provider: 'geoapify',
+        status: ACQUISITION_STATUS.EMPTY_RESULT,
+        records: [],
+        error: { category: 'UNSUPPORTED_URL', safeMessage: 'No search query or coordinates provided.' },
+        diagnostics: { httpStatus: null, errorCode: 'empty_result', retryCount: 0, latencyMs },
+        source: { url: sourceUrl, retrieval: new Date().toISOString() },
+      };
     }
 
     try {
       const client = this._getClient();
       const response = await client.get(config.geoapify.geocodeUrl, { params });
+      const latencyMs = Date.now() - startedAt;
 
       const features = response.data?.features;
       if (!Array.isArray(features) || features.length === 0) {
-        return { status: GEOAPIFY_STATUS.NO_RESULT, records: [] };
+        return {
+          provider: 'geoapify',
+          status: ACQUISITION_STATUS.EMPTY_RESULT,
+          records: [],
+          error: { category: 'NO_RESULT', safeMessage: 'No businesses found matching the search criteria.' },
+          diagnostics: { httpStatus: response.status, errorCode: 'empty_result', retryCount: 0, latencyMs },
+          source: { url: sourceUrl, retrieval: new Date().toISOString() },
+        };
       }
 
       const records = features
@@ -126,15 +175,61 @@ class GeoapifyProvider extends BusinessDataProvider {
         .filter((r) => r !== null);
 
       if (records.length === 0) {
-        return { status: GEOAPIFY_STATUS.INVALID_RESPONSE, records: [] };
+        return {
+          provider: 'geoapify',
+          status: ACQUISITION_STATUS.EXTRACTION_FAILED,
+          records: [],
+          error: { category: 'INVALID_RESPONSE', safeMessage: 'Geoapify response could not be parsed into a profile.' },
+          diagnostics: { httpStatus: response.status, errorCode: 'extraction_failed', retryCount: 0, latencyMs },
+          source: { url: sourceUrl, retrieval: new Date().toISOString() },
+        };
       }
 
-      return { status: GEOAPIFY_STATUS.OK, records };
+      return {
+        provider: 'geoapify',
+        status: ACQUISITION_STATUS.SUCCESS,
+        records,
+        error: null,
+        diagnostics: { httpStatus: response.status, errorCode: null, retryCount: 0, latencyMs },
+        source: { url: sourceUrl, retrieval: new Date().toISOString() },
+      };
     } catch (error) {
+      const latencyMs = Date.now() - startedAt;
       const status = this._classifyError(error);
+      const safeMessage = this._safeErrorMessage(error);
+      const httpStatus = error?.response?.status || null;
       this._logSafe(status, error);
-      return { status, records: [] };
+      return {
+        provider: 'geoapify',
+        status: STATUS_TO_ACQUISITION[status] || ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+        records: [],
+        error: { category: status, safeMessage, httpStatus },
+        diagnostics: { httpStatus, errorCode: STATUS_TO_ACQUISITION[status] || 'provider_unavailable', retryCount: 0, latencyMs },
+        source: { url: sourceUrl, retrieval: new Date().toISOString() },
+      };
     }
+  }
+
+  /**
+   * Extract a safe error message from an axios/GEOAPIFY error.
+   * Never exposes the API key, request headers, or internal details.
+   * @param {Error} error
+   * @returns {string}
+   */
+  _safeErrorMessage(error) {
+    if (error?.response?.status === 401 || error?.response?.status === 403) {
+      return 'Geoapify authentication failed.';
+    }
+    if (error?.response?.status === 429) {
+      return 'Geoapify rate limit exceeded.';
+    }
+    if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
+      return 'Geoapify request timed out.';
+    }
+    if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND') {
+      return 'Geoapify service unreachable.';
+    }
+    return 'Geoapify request failed.';
   }
 
   /**
