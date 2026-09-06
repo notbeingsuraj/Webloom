@@ -1,42 +1,68 @@
 /**
- * AcquisitionResult — Phase 20
+ * AcquisitionResult — Phase 20 Authoritative Contract
  *
- * Explicit internal result contract for business-data acquisition.
+ * Explicit single-authority internal result contract for business-data acquisition.
  *
  * Every acquisition attempt reports WHAT happened — provider, source URL,
- * status, extracted fields, completeness, confidence, errors, warnings,
- * timing, and whether data is structured or inferred — so the pipeline can
- * honestly distinguish:
+ * status, records, error, diagnostics, source, extracted fields, completeness,
+ * identity strength, confidence, errors, warnings, timing, and whether data is
+ * structured or inferred.
  *
- *   - provider unavailable      (the source never responded)
- *   - extraction failed         (the source responded but we could not parse it)
- *   - empty result              (no usable business evidence was extracted)
- *   - invalid/unsupported URL   (the input is not a valid business URL)
- *   - insufficient evidence     (some data, but not enough to identify a business)
- *   - persistence failure       (identity layer failed)
- *   - AI enrichment failure     (optional enhancement failed)
- *   - internal failure          (unexpected)
+ * Statuses honestly distinguish:
+ *   - success                  (usable business evidence acquired)
+ *   - partial                  (some evidence, insufficient for complete identity)
+ *   - empty_result             (source responded, but no business evidence was present)
+ *   - insufficient_evidence    (too little to associate with an identity)
+ *   - invalid_url              (malformed URL format)
+ *   - unsupported_url          (URL not supported by this provider)
+ *   - provider_unavailable     (the provider service could not be reached)
+ *   - extraction_failed        (the source responded but could not be parsed)
+ *   - authentication_failed    (401/403 or invalid API key)
+ *   - rate_limited             (429 rate limit exceeded)
+ *   - quota_exhausted          (provider quota/billing limit reached)
+ *   - timeout                  (request exceeded timeout deadline)
+ *   - ai_enrichment_failed     (optional AI enrichment failed)
+ *   - persistence_failure      (identity repository write failed)
+ *   - internal_failure         (unexpected exception)
  *
- * The system must be able to say "I found nothing" instead of converting that
- * into "I found a business called Unknown Business."
+ * Error objects strictly preserve:
+ *   - category
+ *   - safeMessage (sanitized, zero secrets)
+ *   - httpStatus (when available)
+ *   - retryable (boolean)
+ *   - provider
+ *   - model (when relevant)
+ *   - retryCount
+ *   - latencyMs
  */
 
 export const ACQUISITION_STATUS = Object.freeze({
-  SUCCESS: 'success',                 // usable business evidence acquired
-  PARTIAL: 'partial',                 // some evidence, insufficient for identity
-  INSUFFICIENT_EVIDENCE: 'insufficient_evidence', // too little to identify
-  EMPTY_RESULT: 'empty_result',       // nothing usable extracted
-  PROVIDER_UNAVAILABLE: 'provider_unavailable',
-  EXTRACTION_FAILED: 'extraction_failed',
-  INVALID_URL: 'invalid_url',
-  UNSUPPORTED_URL: 'unsupported_url',
+  SUCCESS: 'success',                             // usable business evidence acquired
+  PARTIAL: 'partial',                             // some evidence, insufficient for complete identity
+  EMPTY_RESULT: 'empty_result',                   // nothing usable extracted
+  INSUFFICIENT_EVIDENCE: 'insufficient_evidence', // too little to identify business
+  INVALID_URL: 'invalid_url',                     // URL is malformed or invalid
+  UNSUPPORTED_URL: 'unsupported_url',             // URL format not supported by provider
+  PROVIDER_UNAVAILABLE: 'provider_unavailable',   // provider service is offline/unreachable
+  EXTRACTION_FAILED: 'extraction_failed',         // parsing / extraction could not proceed
+  AUTHENTICATION_FAILED: 'authentication_failed', // credentials rejected
+  RATE_LIMITED: 'rate_limited',                   // 429 too many requests
+  QUOTA_EXHAUSTED: 'quota_exhausted',             // provider quota reached
+  TIMEOUT: 'timeout',                             // request exceeded timeout
   AI_ENRICHMENT_FAILED: 'ai_enrichment_failed',
   PERSISTENCE_FAILURE: 'persistence_failure',
   INTERNAL_FAILURE: 'internal_failure',
 });
 
+export const IDENTITY_EVIDENCE_STRENGTH = Object.freeze({
+  INSUFFICIENT: 'insufficient', // nothing identifiable or contradictory
+  WEAK: 'weak',                 // e.g. name only, or generic directory name
+  MODERATE: 'moderate',         // e.g. name + city/address or phone only
+  STRONG: 'strong',             // e.g. name + phone or name + website
+  VERY_STRONG: 'very_strong',   // e.g. name + address + phone, or stable provider ID + corroborating fields
+});
+
 // Fields that count toward "meaningful business evidence" (identity-critical).
-// A result must have at least one of these to be considered a real observation.
 const IDENTITY_EVIDENCE_FIELDS = [
   'identity.name',
   'contact.phone',
@@ -46,69 +72,275 @@ const IDENTITY_EVIDENCE_FIELDS = [
 ];
 
 /**
- * Create a normalized AcquisitionResult.
+ * Sanitize any secret tokens, keys, cookies, or auth headers from text.
+ * @param {string} value
+ * @returns {string}
+ */
+export function sanitizeSecretText(value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [REDACTED]')
+    .replace(/Authorization\s*:\s*Bearer\s*[A-Za-z0-9._-]+/gi, 'Authorization: Bearer [REDACTED]')
+    .replace(/api[_-]?key\s*[:=]\s*['"]?[A-Za-z0-9._-]+/gi, 'api_key=[REDACTED]')
+    .replace(/x-api-key\s*[:=]\s*['"]?[A-Za-z0-9._-]+/gi, 'x-api-key=[REDACTED]')
+    .replace(/sk-[A-Za-z0-9]{8,}/gi, '[REDACTED]')
+    .replace(/cookie\s*[:=]\s*[^;\n]+/gi, 'cookie=[REDACTED]')
+    .replace(/set-cookie\s*[:=]\s*[^;\n]+/gi, 'set-cookie=[REDACTED]');
+}
+
+/**
+ * Determine if an error category / status is transient / retryable.
+ */
+export function isRetryableCategory(category, httpStatus = null) {
+  if (httpStatus === 429 || httpStatus === 408 || httpStatus === 500 || httpStatus === 502 || httpStatus === 503 || httpStatus === 504) {
+    return true;
+  }
+  return category === ACQUISITION_STATUS.RATE_LIMITED ||
+    category === ACQUISITION_STATUS.TIMEOUT ||
+    category === ACQUISITION_STATUS.PROVIDER_UNAVAILABLE ||
+    category === 'RATE_LIMITED' ||
+    category === 'TIMEOUT' ||
+    category === 'NETWORK_ERROR';
+}
+
+/**
+ * Construct a standardized, sanitized provider error object.
+ */
+export function createProviderError({
+  category = ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+  safeMessage = 'Provider error occurred.',
+  httpStatus = null,
+  retryable = null,
+  provider = null,
+  model = null,
+  retryCount = 0,
+  latencyMs = null,
+} = {}) {
+  const sanitizedMsg = sanitizeSecretText(safeMessage || 'Provider error occurred.');
+  return Object.freeze({
+    category,
+    safeMessage: sanitizedMsg,
+    httpStatus: httpStatus != null ? Number(httpStatus) : null,
+    retryable: retryable != null ? Boolean(retryable) : isRetryableCategory(category, httpStatus),
+    provider: provider || null,
+    model: model || null,
+    retryCount: Number(retryCount) || 0,
+    latencyMs: latencyMs != null ? Math.round(latencyMs) : null,
+  });
+}
+
+/**
+ * Calculate the identity evidence strength tier from a flat fields map or record.
+ * Replaces boolean-only evidence checks with a tiered strength model (#5).
+ *
+ * @param {Object} fieldsOrRecord - flat dot-path fields map or structured record
+ * @returns {{ strength: string, score: number, details: string[], hasName: boolean, hasHardIdentifier: boolean }}
+ */
+export function calculateIdentityStrength(fieldsOrRecord) {
+  if (!fieldsOrRecord || typeof fieldsOrRecord !== 'object') {
+    return { strength: IDENTITY_EVIDENCE_STRENGTH.INSUFFICIENT, score: 0, details: [], hasName: false, hasHardIdentifier: false };
+  }
+
+  const name = fieldsOrRecord['identity.name'] ?? fieldsOrRecord.identity?.name ?? fieldsOrRecord.business?.name ?? fieldsOrRecord.name ?? null;
+  const phone = fieldsOrRecord['contact.phone'] ?? fieldsOrRecord.contact?.phone ?? fieldsOrRecord.phone ?? null;
+  const website = fieldsOrRecord['contact.website'] ?? fieldsOrRecord.contact?.website ?? fieldsOrRecord.website ?? null;
+  const address = fieldsOrRecord['location.full_address'] ?? fieldsOrRecord.location?.full_address ?? fieldsOrRecord.location?.address ?? fieldsOrRecord.address ?? null;
+  const city = fieldsOrRecord['location.city'] ?? fieldsOrRecord.location?.city ?? fieldsOrRecord.city ?? null;
+  const coords = fieldsOrRecord['location.coordinates'] ?? fieldsOrRecord.location?.coordinates ?? fieldsOrRecord.coordinates ?? null;
+  const placeId = fieldsOrRecord['provider.placeId'] ?? fieldsOrRecord.provider?.placeId ?? fieldsOrRecord.placeId ?? null;
+
+  const hasName = typeof name === 'string' && name.trim().length > 0;
+  const hasPhone = typeof phone === 'string' && phone.trim().length >= 7;
+  const hasWebsite = typeof website === 'string' && website.trim().length > 0;
+  const hasAddress = typeof address === 'string' && address.trim().length > 0;
+  const hasCity = typeof city === 'string' && city.trim().length > 0;
+  const hasCoords = coords && typeof coords === 'object' && typeof coords.lat === 'number' && typeof coords.lng === 'number';
+  const hasPlaceId = typeof placeId === 'string' && placeId.trim().length > 0;
+
+  // Generic/noise names that don't constitute strong identity on their own
+  const isGenericName = hasName && /^(unknown|business|store|restaurant|shop|coffee shop|cafe|unnamed business|n\/a)$/i.test(name.trim());
+
+  let score = 0;
+  const details = [];
+
+  if (hasName) {
+    if (isGenericName) {
+      score += 0.1;
+      details.push('generic_name');
+    } else {
+      score += 0.35;
+      details.push('name');
+    }
+  }
+
+  if (hasPhone) {
+    score += 0.30;
+    details.push('phone');
+  }
+
+  if (hasWebsite) {
+    score += 0.25;
+    details.push('website');
+  }
+
+  if (hasAddress) {
+    score += 0.25;
+    details.push('address');
+  } else if (hasCity) {
+    score += 0.10;
+    details.push('city');
+  }
+
+  if (hasCoords) {
+    score += 0.20;
+    details.push('coordinates');
+  }
+
+  if (hasPlaceId) {
+    score += 0.30;
+    details.push('place_id');
+  }
+
+  let strength;
+  if (score >= 0.85 || (hasPlaceId && hasName && (hasPhone || hasAddress || hasWebsite))) {
+    strength = IDENTITY_EVIDENCE_STRENGTH.VERY_STRONG;
+  } else if (score >= 0.60 || (hasName && (hasPhone || hasWebsite))) {
+    strength = IDENTITY_EVIDENCE_STRENGTH.STRONG;
+  } else if (score >= 0.35 || (hasName && (hasAddress || hasCity))) {
+    strength = IDENTITY_EVIDENCE_STRENGTH.MODERATE;
+  } else if (score >= 0.20 || (hasName && !isGenericName)) {
+    strength = IDENTITY_EVIDENCE_STRENGTH.WEAK;
+  } else {
+    strength = IDENTITY_EVIDENCE_STRENGTH.INSUFFICIENT;
+  }
+
+  return {
+    strength,
+    score: Math.min(1.0, parseFloat(score.toFixed(2))),
+    details,
+    hasName: hasName && !isGenericName,
+    hasHardIdentifier: Boolean(hasPhone || hasWebsite || hasCoords || hasPlaceId),
+  };
+}
+
+/**
+ * Backward-compatible identity check. Returns true when identity evidence
+ * meets at least WEAK threshold (not INSUFFICIENT).
+ */
+export function hasIdentityEvidence(fields) {
+  if (!fields || typeof fields !== 'object') return false;
+  const { strength } = calculateIdentityStrength(fields);
+  return strength !== IDENTITY_EVIDENCE_STRENGTH.INSUFFICIENT;
+}
+
+/**
+ * Single authoritative factory for AcquisitionResult across all providers.
+ *
+ * Enforces the canonical envelope:
+ * {
+ *   provider: string,
+ *   status: ACQUISITION_STATUS,
+ *   records: Array<Object>,
+ *   error: Object|null,
+ *   diagnostics: { httpStatus, errorCode, retryCount, latencyMs, gateway, model, success },
+ *   source: { url, retrieval }
+ * }
  *
  * @param {Object}  init
- * @param {string}  init.provider           - provider/source label (e.g. 'web_extraction')
- * @param {string}  init.sourceUrl          - URL that was acquired
+ * @param {string}  init.provider           - provider label (e.g. 'geoapify', 'web_extraction')
+ * @param {string}  [init.sourceUrl]        - URL or resource queried
  * @param {string}  init.status             - one of ACQUISITION_STATUS
- * @param {Object}  [init.fields]           - flat/dot-path extracted field values
- * @param {number}  [init.completeness]     - 0..1
- * @param {number}  [init.confidence]       - 0..1
+ * @param {Array}   [init.records]          - canonical profile records
+ * @param {Object}  [init.fields]           - flat dot-path extracted field values
+ * @param {Object}  [init.error]            - primary structured error object
+ * @param {Array}   [init.errors]           - list of error objects
+ * @param {Array}   [init.warnings]         - non-fatal warning descriptors
+ * @param {Object}  [init.diagnostics]      - diagnostic performance / gateway metadata
+ * @param {Object}  [init.source]           - { url, retrieval }
+ * @param {number}  [init.completeness]     - 0..1 completeness
+ * @param {number}  [init.confidence]       - 0..1 confidence
  * @param {string}  [init.dataKind]         - 'structured' | 'inferred' | 'identified' | 'mixed'
- * @param {Array}   [init.errors]           - structured error records
- * @param {Array}   [init.warnings]         - non-fatal warnings
- * @param {number}  [init.latencyMs]        - acquisition duration
+ * @param {number}  [init.latencyMs]        - latency in milliseconds
  * @param {Object}  [init.metadata]         - provider-specific metadata
  * @param {string}  [init.errorCode]        - machine-readable error code
- * @param {string}  [init.message]          - human-readable result message
- * @returns {Object} an AcquisitionResult
+ * @param {string}  [init.message]          - human-readable message
+ * @returns {Object} frozen canonical AcquisitionResult
  */
 export function createAcquisitionResult({
   provider,
-  sourceUrl,
-  status,
+  sourceUrl = null,
+  status = ACQUISITION_STATUS.SUCCESS,
+  records = [],
   fields = {},
+  error = null,
+  errors = [],
+  warnings = [],
+  diagnostics = {},
+  source = null,
   completeness = 0,
   confidence = 0,
   dataKind = 'structured',
-  errors = [],
-  warnings = [],
   latencyMs = null,
   metadata = {},
   errorCode = null,
   message = null,
 } = {}) {
+  const normErrors = Array.isArray(errors)
+    ? (error && !errors.includes(error) ? [error, ...errors] : errors)
+    : (error ? [error] : []);
+
+  const primaryError = error || normErrors[0] || null;
+  const primaryErrorObj = primaryError
+    ? (typeof primaryError === 'string'
+        ? createProviderError({ category: status, safeMessage: primaryError, provider, latencyMs })
+        : createProviderError({ ...primaryError, provider: primaryError.provider || provider, latencyMs: primaryError.latencyMs ?? latencyMs }))
+    : null;
+
+  const url = sourceUrl || source?.url || null;
+  const retrieval = source?.retrieval || new Date().toISOString();
+  const dur = latencyMs != null ? Math.round(latencyMs) : (diagnostics?.latencyMs != null ? Math.round(diagnostics.latencyMs) : null);
+
+  const diag = {
+    httpStatus: diagnostics?.httpStatus ?? primaryErrorObj?.httpStatus ?? null,
+    errorCode: errorCode || diagnostics?.errorCode || primaryErrorObj?.category || (status === ACQUISITION_STATUS.SUCCESS ? null : status),
+    retryCount: diagnostics?.retryCount ?? primaryErrorObj?.retryCount ?? 0,
+    latencyMs: dur,
+    gateway: diagnostics?.gateway || null,
+    model: diagnostics?.model || primaryErrorObj?.model || null,
+    success: status === ACQUISITION_STATUS.SUCCESS || status === ACQUISITION_STATUS.PARTIAL,
+  };
+
+  const identityInfo = calculateIdentityStrength(fields || (records[0] ?? {}));
+
   const result = {
     provider,
-    sourceUrl: sourceUrl || null,
     status,
+    records: Array.isArray(records) ? records : (records ? [records] : []),
+    error: primaryErrorObj,
+    diagnostics: diag,
+    source: { url, retrieval },
+    // Extended canonical fields for pipeline consumers:
+    sourceUrl: url,
     fields: { ...fields },
     completeness: clamp01(completeness),
     confidence: clamp01(confidence),
     dataKind,
-    errors: Array.isArray(errors) ? errors : [errors],
+    identityStrength: identityInfo.strength,
+    identityScore: identityInfo.score,
+    errors: normErrors.map((e) => typeof e === 'string' ? createProviderError({ category: status, safeMessage: e, provider }) : e),
     warnings: Array.isArray(warnings) ? warnings : [warnings],
-    latencyMs: latencyMs != null ? Math.round(latencyMs) : null,
+    latencyMs: dur,
     metadata: { ...metadata },
-    errorCode,
-    message,
+    errorCode: diag.errorCode,
+    message: message || primaryErrorObj?.safeMessage || (status === ACQUISITION_STATUS.SUCCESS ? 'Acquisition succeeded.' : 'Acquisition returned no usable data.'),
   };
+
   return Object.freeze(result);
 }
 
 /**
  * Build an empty-result AcquisitionResult and decide whether the outcome is a
  * plain empty result or a provider failure, based on what the provider did.
- *
- * @param {Object} opts
- * @param {string} opts.provider
- * @param {string} opts.sourceUrl
- * @param {Object} opts.record            - the raw extracted record (may be empty)
- * @param {Object} [opts.providerError]   - structured provider error, if any
- * @param {string} [opts.httpStatus]      - HTTP status from the fetch
- * @param {number} [opts.latencyMs]
- * @returns {Object} AcquisitionResult
  */
 export function classifyEmptyAcquisition({
   provider,
@@ -118,40 +350,66 @@ export function classifyEmptyAcquisition({
   httpStatus = null,
   latencyMs = null,
 } = {}) {
-  const errors = [];
   const warnings = [];
 
-  // If the provider explicitly reported a failure, that's not an empty result.
+  // If the provider explicitly reported a failure, classify appropriately
   if (providerError) {
-    const code = providerError.category || 'PROVIDER_UNAVAILABLE';
+    const rawCat = providerError.category || 'PROVIDER_UNAVAILABLE';
+    let status = ACQUISITION_STATUS.PROVIDER_UNAVAILABLE;
+    if (rawCat === 'AUTHENTICATION' || rawCat === 'AUTH_FAILED' || httpStatus === 401 || httpStatus === 403) {
+      status = ACQUISITION_STATUS.AUTHENTICATION_FAILED;
+    } else if (rawCat === 'RATE_LIMITED' || httpStatus === 429) {
+      status = ACQUISITION_STATUS.RATE_LIMITED;
+    } else if (rawCat === 'QUOTA_EXHAUSTED') {
+      status = ACQUISITION_STATUS.QUOTA_EXHAUSTED;
+    } else if (rawCat === 'TIMEOUT' || httpStatus === 408) {
+      status = ACQUISITION_STATUS.TIMEOUT;
+    } else if (rawCat === 'INVALID_RESPONSE' || rawCat === 'HTTP_ERROR') {
+      status = ACQUISITION_STATUS.EXTRACTION_FAILED;
+    }
+
+    const err = createProviderError({
+      category: status,
+      safeMessage: providerError.safeMessage || 'Provider returned an error.',
+      httpStatus: httpStatus || providerError.httpStatus || null,
+      provider,
+      latencyMs,
+    });
+
     return createAcquisitionResult({
       provider,
       sourceUrl,
-      status: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+      status,
+      records: [],
       fields: {},
-      completeness: 0,
-      confidence: 0,
-      dataKind: 'structured',
-      errors: [providerError],
-      errorCode: normalizeErrorCode(code),
-      message: providerError.safeMessage || 'Provider returned an error.',
+      error: err,
       latencyMs,
     });
   }
 
   // HTTP-level failure (non-2xx) is an extraction/provider failure, not empty.
   if (httpStatus != null && (httpStatus < 200 || httpStatus >= 400)) {
+    let status = ACQUISITION_STATUS.EXTRACTION_FAILED;
+    if (httpStatus === 401 || httpStatus === 403) status = ACQUISITION_STATUS.AUTHENTICATION_FAILED;
+    if (httpStatus === 429) status = ACQUISITION_STATUS.RATE_LIMITED;
+    if (httpStatus === 408 || httpStatus === 504) status = ACQUISITION_STATUS.TIMEOUT;
+    if (httpStatus === 502 || httpStatus === 503) status = ACQUISITION_STATUS.PROVIDER_UNAVAILABLE;
+
+    const err = createProviderError({
+      category: status,
+      safeMessage: `Source returned HTTP ${httpStatus}.`,
+      httpStatus,
+      provider,
+      latencyMs,
+    });
+
     return createAcquisitionResult({
       provider,
       sourceUrl,
-      status: ACQUISITION_STATUS.EXTRACTION_FAILED,
+      status,
+      records: [],
       fields: {},
-      completeness: 0,
-      confidence: 0,
-      dataKind: 'structured',
-      errors: [{ category: 'HTTP_ERROR', httpStatus, safeMessage: `HTTP ${httpStatus}` }],
-      errorCode: 'extraction_failed',
-      message: `Source returned HTTP ${httpStatus}.`,
+      error: err,
       latencyMs,
     });
   }
@@ -166,13 +424,9 @@ export function classifyEmptyAcquisition({
     provider,
     sourceUrl,
     status: ACQUISITION_STATUS.EMPTY_RESULT,
+    records: [],
     fields: {},
-    completeness: 0,
-    confidence: 0,
-    dataKind: 'structured',
-    errors: warnings.length ? [] : [{ category: 'EMPTY_RESULT', safeMessage: 'No business evidence extracted.' }],
     warnings,
-    errorCode: 'empty_result',
     message: warnings[0]?.message || 'No business evidence extracted from the source.',
     latencyMs,
   });
@@ -204,23 +458,6 @@ export function detectNoiseContent(record = {}) {
 }
 
 /**
- * Decide whether an extracted fields map contains any identity-critical evidence.
- *
- * @param {Object} fields - dot-path value map
- * @returns {boolean}
- */
-export function hasIdentityEvidence(fields) {
-  return IDENTITY_EVIDENCE_FIELDS.some((f) => {
-    const v = fields[f];
-    if (v == null || v === '') return false;
-    if (typeof v === 'object') {
-      return Object.keys(v).length > 0;
-    }
-    return true;
-  });
-}
-
-/**
  * Summarize the field evidence (keys with non-empty values).
  * @param {Object} fields
  * @returns {string[]}
@@ -231,34 +468,35 @@ export function summarizeFields(fields) {
     .map(([k]) => k);
 }
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
 export function clamp01(n) {
   if (typeof n !== 'number' || Number.isNaN(n)) return 0;
   return Math.max(0, Math.min(1, n));
 }
 
 const ERROR_CODE_MAP = {
-  AUTHENTICATION: 'provider_unavailable',
-  QUOTA_EXHAUSTED: 'provider_unavailable',
-  RATE_LIMITED: 'provider_unavailable',
-  PROVIDER_UNAVAILABLE: 'provider_unavailable',
-  TIMEOUT: 'provider_unavailable',
-  INVALID_RESPONSE: 'extraction_failed',
-  HTTP_ERROR: 'extraction_failed',
-  EMPTY_RESULT: 'empty_result',
+  AUTHENTICATION: ACQUISITION_STATUS.AUTHENTICATION_FAILED,
+  AUTH_FAILED: ACQUISITION_STATUS.AUTHENTICATION_FAILED,
+  QUOTA_EXHAUSTED: ACQUISITION_STATUS.QUOTA_EXHAUSTED,
+  RATE_LIMITED: ACQUISITION_STATUS.RATE_LIMITED,
+  PROVIDER_UNAVAILABLE: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+  TIMEOUT: ACQUISITION_STATUS.TIMEOUT,
+  INVALID_RESPONSE: ACQUISITION_STATUS.EXTRACTION_FAILED,
+  HTTP_ERROR: ACQUISITION_STATUS.EXTRACTION_FAILED,
+  EMPTY_RESULT: ACQUISITION_STATUS.EMPTY_RESULT,
 };
 
 export function normalizeErrorCode(category) {
-  return ERROR_CODE_MAP[category] || 'internal_failure';
+  return ERROR_CODE_MAP[category] || ACQUISITION_STATUS.INTERNAL_FAILURE;
 }
 
 export default {
   ACQUISITION_STATUS,
+  IDENTITY_EVIDENCE_STRENGTH,
   createAcquisitionResult,
+  createProviderError,
   classifyEmptyAcquisition,
+  calculateIdentityStrength,
   hasIdentityEvidence,
+  sanitizeSecretText,
   summarizeFields,
 };
