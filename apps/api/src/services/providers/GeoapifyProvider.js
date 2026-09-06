@@ -270,10 +270,12 @@ class GeoapifyProvider extends BusinessDataProvider {
    * @returns {Promise<Object|null>}
    */
   async getBusiness(hints, options = {}) {
-    const { status, records } = await this.search(hints, options);
-    if (status !== GEOAPIFY_STATUS.OK || records.length === 0) {
+    const result = await this.search(hints, options);
+    // Lossless contract: result.status is a canonical ACQUISITION_STATUS
+    if (result.status !== ACQUISITION_STATUS.SUCCESS || result.records.length === 0) {
       return null;
     }
+    const records = result.records;
 
     // If coordinates were supplied, prefer the record closest to them;
     // otherwise take the top-ranked record from the API.

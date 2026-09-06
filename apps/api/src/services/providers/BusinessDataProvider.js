@@ -38,11 +38,27 @@ export class BusinessDataProvider {
   }
 
   /**
-   * Search for a business using deterministic hints (name, city, coords).
-   * @param {Object} hints - { name, city, state, country, latitude, longitude, query }
-   * @param {Object} options
-   * @returns {Promise<Array>} list of normalized business records (canonical shape)
-   */
+ * Search for a business using deterministic hints (name, city, coords).
+ *
+ * PHASE 20 LOSSLESS CONTRACT:
+ * Concrete providers MUST return a structured result object, never a bare
+ * array. The canonical shape is:
+ *
+ *   {
+ *     provider: string,
+ *     status: ACQUISITION_STATUS,   // success | partial | empty_result |
+ *                                   // provider_unavailable | extraction_failed | ...
+ *     records: Array<Object>,       // canonical business records
+ *     error: Object|null,           // { category, safeMessage, httpStatus? }
+ *     diagnostics: { httpStatus, errorCode, retryCount, latencyMs },
+ *     source: { url, retrieval }    // source URL + ISO retrieval timestamp
+ *   }
+ *
+ * Provider failures must NEVER silently become { status:'error', records:[] }.
+ * @param {Object} hints - { name, city, state, country, latitude, longitude, query }
+ * @param {Object} options
+ * @returns {Promise<Object>} structured result (see contract above)
+ */
   async search(hints, options = {}) {
     throw new Error('BusinessDataProvider.search() must be implemented by a concrete provider');
   }
@@ -54,9 +70,12 @@ export class BusinessDataProvider {
    * @returns {Promise<Object|null>} normalized business record or null
    */
   async getBusiness(hints, options = {}) {
-    const results = await this.search(hints, options);
-    if (!Array.isArray(results) || results.length === 0) return null;
-    return results[0];
+    const result = await this.search(hints, options);
+    // Lossless contract: result is a structured object, not a bare array.
+    if (result && Array.isArray(result.records) && result.records.length > 0) {
+      return result.records[0];
+    }
+    return null;
   }
 }
 

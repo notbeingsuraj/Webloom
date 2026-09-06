@@ -36,7 +36,16 @@ const differentRecord = {
 function configureProvider(record) {
   GeoapifyProvider.isAvailable = () => true;
   GeoapifyProvider.getBusiness = async () => record;
-  WebExtractionProvider.search = async () => ({ status: 'ok', records: [secondaryRecord] });
+  // Phase 20 lossless contract: WebExtractionProvider.search returns a
+  // structured result with canonical ACQUISITION_STATUS values.
+  WebExtractionProvider.search = async () => ({
+    provider: 'web_extraction',
+    status: 'success',
+    records: [secondaryRecord],
+    error: null,
+    diagnostics: { httpStatus: 200, errorCode: null, retryCount: 0, latencyMs: 1 },
+    source: { url: secondProviderRecordId, retrieval: new Date().toISOString() },
+  });
 }
 
 async function runProcessA() {
@@ -72,7 +81,14 @@ async function runProcessA() {
   assert.equal(secondaryMapping.entityId, firstEntityId);
 
   configureProvider(differentRecord);
-  WebExtractionProvider.search = async () => ({ status: 'no_result', records: [] });
+  WebExtractionProvider.search = async () => ({
+    provider: 'web_extraction',
+    status: 'no_result',
+    records: [],
+    error: { category: 'EMPTY_RESULT', safeMessage: 'No business evidence extracted.' },
+    diagnostics: { httpStatus: null, errorCode: 'empty_result', retryCount: 0, latencyMs: 1 },
+    source: { url: null, retrieval: new Date().toISOString() },
+  });
   const different = await BusinessResearchService.extractBusinessIntelligenceWithProviders({ name: 'Different Phase Ten Shop' });
   assert.notEqual(different.persistence.entityId, firstEntityId);
   assert.equal(repo.getObservations(different.persistence.entityId, 'identity.name').length, 1);

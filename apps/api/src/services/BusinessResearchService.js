@@ -412,17 +412,20 @@ class BusinessResearchService {
     }
 
     // --- LEVEL 2: Geoapify structured data (provider provenance) ---
+    // getBusiness() performs search + place-details enrichment (phone/website/
+    // hours) and returns the best single record. When it returns null, we call
+    // search() once more to capture the LOSS LESS diagnostic details (status,
+    // error category, safe message, latency) so failures are never silent.
     let geoapifyRecord = null;
     if (GeoapifyProvider.isAvailable()) {
-      const geoResult = await GeoapifyProvider.search(hints);
-      // Lossless contract: geoResult now has { provider, status, records, error, diagnostics }
-      if (geoResult.status === 'success' && geoResult.records.length > 0) {
-        geoapifyRecord = geoResult.records[0];
+      const business = await GeoapifyProvider.getBusiness(hints);
+      if (business) {
+        geoapifyRecord = business;
         this._mergeCanonical(profile, geoapifyRecord, 'discovered', 'geoapify', sourceUrl);
         providerTrace.geoapify = 'ok';
-        providerTrace.geoapifyDiagnostics = geoResult.diagnostics || null;
       } else {
-        // Lossless: preserve the exact failure details
+        // Lossless: preserve the exact failure details from the structured result
+        const geoResult = await GeoapifyProvider.search(hints);
         providerTrace.geoapify = geoResult.status;
         providerTrace.geoapifyError = geoResult.error || null;
         providerTrace.geoapifyDiagnostics = geoResult.diagnostics || null;

@@ -246,8 +246,12 @@ await checkAsync('search without key returns NOT_CONFIGURED', async () => {
   config.geoapify.apiKey = null;
   try {
     const result = await GeoapifyProvider.search({ name: 'X' });
-    assert.strictEqual(result.status, GEOAPIFY_STATUS.NOT_CONFIGURED);
+    // PHASE 20: lossless contract returns canonical ACQUISITION_STATUS
+    assert.strictEqual(result.status, 'provider_unavailable');
     assert.deepStrictEqual(result.records, []);
+    assert.strictEqual(result.provider, 'geoapify');
+    assert.ok(result.error, 'should include error details');
+    assert.ok(result.diagnostics, 'should include diagnostics');
   } finally {
     config.geoapify.apiKey = originalKey;
   }
@@ -259,7 +263,10 @@ await checkAsync('search without key returns NOT_CONFIGURED', async () => {
 console.log('\n[2] GeoapifyProvider — no-result handling');
 check('search with no name and no coords returns NO_RESULT', async () => {
   const result = await GeoapifyProvider.search({});
-  assert.strictEqual(result.status, GEOAPIFY_STATUS.NO_RESULT);
+  // PHASE 20: lossless contract returns canonical EMPTY_RESULT status
+  assert.strictEqual(result.status, 'empty_result');
+  assert.ok(result.error, 'should include error details');
+  assert.ok(result.diagnostics, 'should include diagnostics');
 });
 
 /* ================================================================== *
