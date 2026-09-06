@@ -8,6 +8,14 @@
  */
 
 import { SourceIndependenceAnalyzer } from './EvidenceModels.js';
+import {
+  normalizePhone as canonicalNormalizePhone,
+  normalizeDomain as canonicalNormalizeDomain,
+  normalizeWebsite as canonicalNormalizeWebsite,
+  normalizeAddressTokens as canonicalNormalizeAddressTokens,
+  normalizeCoordinates as canonicalNormalizeCoordinates,
+  STREET_TYPE_EXPANSIONS as CANONICAL_STREET_EXPANSIONS,
+} from './FieldNormalizer.js';
 
 // Exported constants
 export const ENTITY_RESOLUTION_STATUS = Object.freeze({
@@ -88,107 +96,33 @@ const CLASSIFICATION = {
 // the evidence-coverage confidence multiplier.
 const CORE_IDENTITY_FIELDS = ['name', 'phone', 'website', 'address'];
 
-// Common US street-type abbreviations, expanded before address comparison so
-// that "600 Guerrero St" and "600 Guerrero Street" are recognised as the same
-// place. This is normalization for the *location comparison only* — it does not
-// change the address scoring signal.
-const STREET_TYPE_EXPANSIONS = {
-  st: 'street', str: 'street',
-  ave: 'avenue', av: 'avenue',
-  blvd: 'boulevard',
-  rd: 'road',
-  dr: 'drive',
-  ln: 'lane',
-  ct: 'court',
-  pl: 'place',
-  sq: 'square',
-  ste: 'suite',
-  fl: 'floor',
-  hwy: 'highway',
-  pkwy: 'parkway',
-  ter: 'terrace',
-  cir: 'circle',
-};
+// Backward-compatible export of street type expansions from FieldNormalizer (#3)
+export const STREET_TYPE_EXPANSIONS = CANONICAL_STREET_EXPANSIONS;
 
-// Helper functions (defined once, exported)
-export function normalizePhone(phone) {
-  if (!phone) return null;
-  let digits = phone.replace(/[^\d+]/g, '');
-  if (digits.startsWith('+')) {
-    digits = digits.slice(1);
-  }
-  if (digits.startsWith('1') && digits.length === 11) {
-    return '+' + digits;
-  }
-  if (digits.length === 10) {
-    return '+1' + digits;
-  }
-  if (digits.length >= 9 && digits.length <= 15) {
-    return '+' + digits;
-  }
-  return null;
-}
-
-export function normalizeWebsite(website) {
-  if (!website) return null;
-  try {
-    const url = new URL(website.startsWith('http') ? website : `https://${website}`);
-    let hostname = url.hostname.toLowerCase();
-    if (hostname.startsWith('www.')) hostname = hostname.slice(4);
-    hostname = hostname.replace(/\/$/, '');
-    return hostname;
-  } catch {
-    return null;
-  }
-}
-
-function calculateDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371000;
-  const φ1 = lat1 * Math.PI / 180;
-  const φ2 = lat2 * Math.PI / 180;
-  const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-          Math.cos(φ1) * Math.cos(φ2) *
-          Math.sin(Δλ/2) * Math.sin(Δλ/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
-
-export function fuzzySimilarity(str1, str2) {
-  if (!str1 || !str2) return 0;
-  const s1 = str1.toLowerCase().trim();
-  const s2 = str2.toLowerCase().trim();
-  if (s1 === s2) return 1.0;
-
-  const longer = s1.length > s2.length ? s1 : s2;
-  const shorter = s1.length > s2.length ? s2 : s1;
-  if (longer.length === 0) return 1.0;
-
-  const prefixLen = Math.min(3, shorter.length);
-  if (longer.startsWith(shorter.slice(0, prefixLen))) {
-    return 0.8 + 0.2 * (shorter.length / longer.length);
-  }
-
-  const set1 = new Set(s1.split(''));
-  const set2 = new Set(s2.split(''));
-  const intersection = new Set([...set1].filter(x => set2.has(x)));
-  const union = new Set([...set1, ...set2]);
-  return intersection.size / union.size;
+/**
+ * Backward-compatible phone normalizer delegation to FieldNormalizer (#3, #4).
+ * Accepts optional country context (e.g. 'US', 'IN', 'GB').
+ */
+export function normalizePhone(phone, countryHint = null) {
+  return canonicalNormalizePhone(phone, countryHint);
 }
 
 /**
- * Tokenize an address, lower-casing, stripping punctuation and expanding common
- * street-type abbreviations. Used only for location comparison (not scoring).
+ * Backward-compatible website/domain normalizer delegation to FieldNormalizer (#3).
+ * Returns the normalized hostname/domain.
  */
-function normalizeAddressTokens(addr) {
-  return addr
-    .toLowerCase()
-    .replace(/[.,#]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((t) => STREET_TYPE_EXPANSIONS[t] || t);
+export function normalizeWebsite(website) {
+  return canonicalNormalizeDomain(website);
 }
+
+/**
+ * Backward-compatible address tokenization delegation to FieldNormalizer (#3).
+ */
+export function normalizeAddressTokens(addr) {
+  return canonicalNormalizeAddressTokens(addr);
+}
+
+function calculateDistance(lat1, lng1, lat2, lng2) {
 
 /**
  * Decide whether two records describe the SAME physical location, a DIFFERENT

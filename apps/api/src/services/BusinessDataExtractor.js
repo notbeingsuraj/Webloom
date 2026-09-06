@@ -36,6 +36,7 @@ import {
 } from './AcquisitionResult.js';
 import { normalizeField, stripObjectToString } from './FieldNormalizer.js';
 import { getSourceCache } from '../db/SourceCache.js';
+import { validateFetchUrl } from '../utils/ssrfValidator.js';
 
 // PHASE 20: in-memory extraction cache replaced by persistent SQLite SourceCache.
 // Survives process restart, supports TTL, and keeps SOURCE cache identity
@@ -159,45 +160,8 @@ class BusinessDataExtractor {
    * Fetch page content with retries using r.jina.ai proxy
    */
   async fetchPage(url, retryCount = 0) {
-    // Validate URL to prevent SSRF
-    try {
-      const parsed = new URL(url);
-      
-      // Only allow HTTPS
-      if (parsed.protocol !== "https:") {
-        throw new Error("Only HTTPS URLs are allowed");
-      }
-      
-      // Block private/internal IPs
-      const hostname = parsed.hostname.toLowerCase();
-      const blockedHostnames = ["localhost", "localhost.localdomain", "local"];
-      if (blockedHostnames.includes(hostname)) {
-        throw new Error("Localhost URLs are not allowed");
-      }
-      
-      const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-      if (ipv4Regex.test(hostname)) {
-        const parts = hostname.split(".").map(Number);
-        if (
-          parts[0] === 10 ||
-          parts[0] === 127 ||
-          (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
-          (parts[0] === 192 && parts[1] === 168) ||
-          (parts[0] === 169 && parts[1] === 254)
-        ) {
-          throw new Error("Private IP addresses are not allowed");
-        }
-      }
-      
-      if (hostname === "::1" || hostname.startsWith("fe80:")) {
-        throw new Error("IPv6 internal addresses are not allowed");
-      }
-    } catch (error) {
-      if (error.message.includes("not allowed") || error.message.includes("Only HTTPS")) {
-        throw error;
-      }
-      throw new Error("Invalid URL format");
-    }
+    // Validate URL against centralized SSRF policy
+    validateFetchUrl(url);
 
     // Use jina.ai proxy to extract content from JavaScript-rendered pages
     const proxyUrl = `https://r.jina.ai/http://${url.replace(/^https?:\/\//, '')}`;

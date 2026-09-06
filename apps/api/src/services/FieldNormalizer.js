@@ -18,6 +18,8 @@
  *    comparison boundaries
  */
 
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
+
 // ---------------------------------------------------------------------------
 // Primitive helpers
 // ---------------------------------------------------------------------------
@@ -174,27 +176,109 @@ export function normalizeSocialLinks(value) {
 }
 
 // ---------------------------------------------------------------------------
-// Phone / URL
+// Phone / URL / Address — Centralized Authoritative Normalization
 // ---------------------------------------------------------------------------
 
+const COUNTRY_MAP = {
+  us: 'US', usa: 'US', 'united states': 'US', 'united states of america': 'US',
+  in: 'IN', ind: 'IN', india: 'IN',
+  gb: 'GB', uk: 'GB', gbr: 'GB', 'united kingdom': 'GB', britain: 'GB', 'great britain': 'GB',
+  ca: 'CA', can: 'CA', canada: 'CA',
+  au: 'AU', aus: 'AU', australia: 'AU',
+  de: 'DE', deu: 'DE', germany: 'DE',
+  fr: 'FR', fra: 'FR', france: 'FR',
+  it: 'IT', ita: 'IT', italy: 'IT',
+  es: 'ES', esp: 'ES', spain: 'ES',
+  mx: 'MX', mex: 'MX', mexico: 'MX',
+  br: 'BR', bra: 'BR', brazil: 'BR',
+  sg: 'SG', sgp: 'SG', singapore: 'SG',
+  ae: 'AE', uae: 'AE', 'united arab emirates': 'AE',
+  jp: 'JP', jpn: 'JP', japan: 'JP',
+  nz: 'NZ', nzl: 'NZ', 'new zealand': 'NZ',
+};
+
 /**
- * Normalize phone to a canonical E.164-ish string (+1XXXXXXXXXX).
- * When the value is not parseable, return null (never persist junk).
+ * Resolve country string (e.g. 'US', 'India', 'United Kingdom') to ISO2 code ('US', 'IN', 'GB').
  */
-export function normalizePhone(value) {
+export function resolveCountryCode(countryHint) {
+  if (!countryHint || typeof countryHint !== 'string') return null;
+  const clean = countryHint.trim().toLowerCase();
+  if (COUNTRY_MAP[clean]) return COUNTRY_MAP[clean];
+  if (clean.length === 2 && /^[a-z]{2}$/i.test(clean)) return clean.toUpperCase();
+  return null;
+}
+
+/**
+ * Normalize phone to canonical E.164 string with international country awareness.
+ *
+ * Requirements (#4):
+ *  - E.164 format (+XXXXXXXXXXX) when confidently resolvable
+ *  - Supports country context (India, US, UK, etc.)
+ *  - If country context is missing and number is ambiguous (e.g. local 10-digit without +),
+ *    DO NOT invent a country; return null (unresolved).
+ *
+ * @param {*} value - raw phone string/number
+ * @param {string} [countryHint] - optional country name/code (e.g. 'IN', 'US', 'GB', 'India')
+ * @returns {string|null} canonical E.164 phone or null
+ */
+export function normalizePhone(value, countryHint = null) {
   if (!value) return null;
   const parsed = parseStringifiedStructure(value);
-  const raw = typeof parsed === 'string' ? parsed : String(value);
+  const raw = typeof parsed === 'string' ? parsed.trim() : String(value).trim();
+  if (!raw) return null;
+
+  const defaultCountry = resolveCountryCode(countryHint);
+
+  // 1. Explicit international '+' format (e.g. +91 9876543210, +1 415 555-0123)
+  if (raw.startsWith('+')) {
+    try {
+      const phoneNumber = parsePhoneNumberFromString(raw);
+      if (phoneNumber && (phoneNumber.isValid() || phoneNumber.isPossible())) {
+        return phoneNumber.format('E.164');
+      }
+    } catch {}
+  }
+
+  // 2. With country context hint
+  if (defaultCountry) {
+    try {
+      const phoneNumber = parsePhoneNumberFromString(raw, defaultCountry);
+      if (phoneNumber && (phoneNumber.isValid() || phoneNumber.isPossible())) {
+        return phoneNumber.format('E.164');
+      }
+    } catch {}
+  }
+
+  // 3. International prefix '00'
+  if (raw.startsWith('00')) {
+    try {
+      const phoneNumber = parsePhoneNumberFromString('+' + raw.slice(2));
+      if (phoneNumber && phoneNumber.isPossible()) {
+        return phoneNumber.format('E.164');
+      }
+    } catch {}
+  }
+
+  // 4. Digits check
   const digits = raw.replace(/[^\d+]/g, '');
   if (!digits) return null;
+
   if (digits.startsWith('+')) {
-    const d = digits.slice(1);
-    if (d.length >= 9 && d.length <= 15) return '+' + d;
-    return null;
+    try {
+      const p = parsePhoneNumberFromString(digits);
+      if (p) return p.format('E.164');
+    } catch {}
   }
-  if (digits.length === 10) return '+1' + digits;
-  if (digits.length === 11 && digits.startsWith('1')) return '+' + digits;
-  if (digits.length >= 9 && digits.length <= 15) return '+' + digits;
+
+  // 5. 11-digit starting with 1 (standard US/NANP with international code 1)
+  if (digits.length === 11 && digits.startsWith('1')) {
+    try {
+      const p = parsePhoneNumberFromString('+' + digits);
+      if (p && p.isPossible()) return p.format('E.164');
+    } catch {}
+  }
+
+  // 6. Ambiguous local number without country context -> do not invent country
   return null;
 }
 
@@ -204,7 +288,7 @@ export function normalizePhone(value) {
 export function normalizeWebsite(value) {
   if (!value) return null;
   const parsed = parseStringifiedStructure(value);
-  const raw = typeof parsed === 'string' ? parsed.trim() : String(value);
+  const raw = typeof parsed === 'string' ? parsed.trim() : String(value).trim();
   if (!raw) return null;
   try {
     const url = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
@@ -214,6 +298,73 @@ export function normalizeWebsite(value) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Normalize a website to its canonical hostname / domain (lowercase, stripped of www and trailing slash).
+ */
+export function normalizeDomain(value) {
+  if (!value) return null;
+  const parsed = parseStringifiedStructure(value);
+  const raw = typeof parsed === 'string' ? parsed.trim() : String(value).trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+    let hostname = url.hostname.toLowerCase();
+    if (hostname.startsWith('www.')) hostname = hostname.slice(4);
+    return hostname.replace(/\/$/, '');
+  } catch {
+    let clean = raw.toLowerCase().split('/')[0].trim();
+    if (clean.startsWith('www.')) clean = clean.slice(4);
+    if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(clean)) return clean;
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Address — Centralized Tokenization and Expansions
+// ---------------------------------------------------------------------------
+
+export const STREET_TYPE_EXPANSIONS = Object.freeze({
+  st: 'street', str: 'street',
+  ave: 'avenue', av: 'avenue',
+  blvd: 'boulevard',
+  rd: 'road',
+  dr: 'drive',
+  ln: 'lane',
+  ct: 'court',
+  pl: 'place',
+  sq: 'square',
+  ste: 'suite',
+  fl: 'floor',
+  hwy: 'highway',
+  pkwy: 'parkway',
+  ter: 'terrace',
+  cir: 'circle',
+});
+
+/**
+ * Tokenize an address, lower-casing, stripping punctuation and expanding common
+ * street-type abbreviations. Single authoritative implementation (#3).
+ */
+export function normalizeAddressTokens(addr) {
+  if (!addr) return [];
+  const parsed = parseStringifiedStructure(addr);
+  const raw = typeof parsed === 'string' ? parsed : String(addr);
+  return raw
+    .toLowerCase()
+    .replace(/[.,#]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((t) => STREET_TYPE_EXPANSIONS[t] || t);
+}
+
+/**
+ * Canonical normalized address string.
+ */
+export function normalizeAddress(addr) {
+  const tokens = normalizeAddressTokens(addr);
+  return tokens.length ? tokens.join(' ') : null;
 }
 
 // ---------------------------------------------------------------------------

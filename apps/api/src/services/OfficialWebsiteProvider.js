@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { validateFetchUrl as validateUrlSSRF, safeFetch } from '../utils/ssrfValidator.js';
 
 /**
  * OfficialWebsiteProvider
@@ -15,38 +15,14 @@ import axios from 'axios';
  * It only processes websites that are either:
  * a) Supplied directly by the user
  * b) Discovered by a DiscoveryProvider
+ *
+ * PHASE 20: Every redirect destination is validated against the central
+ * SSRF policy (localhost, private IP, IPv6 loopback/link-local blocked).
  */
 
 class OfficialWebsiteProvider {
   constructor() {
-    this.axios = null; // Lazy init to avoid circular deps
-  }
-
-  /**
-   * Get (or initialize) the HTTP client with SSRF protection
-   * @private
-   */
-  async _getClient() {
-    if (this.axios) return this.axios;
-    
-    try {
-      const { config } = await import('../config/env.js');
-      this.config = config;
-      this.axios = axios.create({
-        timeout: config.extraction.timeout,
-        headers: {
-          'User-Agent': config.extraction.userAgent,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-        },
-        maxRedirects: 5,
-        validateStatus: (status) => status < 500,
-      });
-      return this.axios;
-    } catch (e) {
-      console.error('[OfficialWebsiteProvider] Failed to init HTTP client:', e.message);
-      throw e;
-    }
+    this.axios = null;
   }
 
   /**
@@ -55,72 +31,36 @@ class OfficialWebsiteProvider {
    * @throws {Error} If URL is unsafe
    */
   validateFetchUrl(url) {
-    const parsed = new URL(url);
-    
-    // Only allow HTTPS
-    if (parsed.protocol !== "https:") {
-      throw new Error("Only HTTPS URLs are allowed");
-    }
-    
-    // Block private/internal IPs
-    const hostname = parsed.hostname.toLowerCase();
-    
-    // Block localhost and common internal hostnames
-    const blockedHostnames = ["localhost", "localhost.localdomain", "local"];
-    if (blockedHostnames.includes(hostname)) {
-      throw new Error("Localhost URLs are not allowed");
-    }
-    
-    // Block private IP ranges
-    // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, 169.254.0.0/16
-    const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-    if (ipv4Regex.test(hostname)) {
-      const parts = hostname.split(".").map(Number);
-      if (
-        parts[0] === 10 ||
-        parts[0] === 127 ||
-        (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
-        (parts[0] === 192 && parts[1] === 168) ||
-        (parts[0] === 169 && parts[1] === 254)
-      ) {
-        throw new Error("Private IP addresses are not allowed");
-      }
-    }
-    
-    // Block IPv6 loopback and link-local
-    if (hostname === "::1" || hostname.startsWith("fe80:")) {
-      throw new Error("IPv6 internal addresses are not allowed");
-    }
-    
-    return true;
+    return validateUrlSSRF(url);
   }
 
   /**
-   * Fetch a website's HTML content
+   * Fetch a website's HTML content with redirect-safe SSRF validation.
    * @param {string} url - Website URL to fetch
    * @returns {Promise<{url, html, status, headers}>}
    */
   async fetch(url) {
     this.validateFetchUrl(url);
-    const client = await this._getClient();
 
     try {
-      const response = await client.get(url);
+      const response = await safeFetch(url, {
+        maxRedirects: 5,
+        timeout: 10000,
+        headers: {
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      });
+
       return {
-        url: response.request?.res?.responseUrl || url,
+        url: response.url || url,
         html: response.data,
         status: response.status,
         headers: response.headers,
       };
     } catch (error) {
-      if (error.response) {
-        return {
-          url,
-          html: error.response.data || '',
-          status: error.response.status,
-          headers: error.response.headers,
-          error: error.message,
-        };
+      // Re-throw SSRF/validation errors directly
+      if (error.message && (error.message.includes('not allowed') || error.message.includes('SSRF') || error.message.includes('Only HTTPS'))) {
+        throw error;
       }
       throw new Error(`Failed to fetch website: ${error.message}`);
     }
