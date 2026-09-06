@@ -698,18 +698,26 @@ Generation Layer (Website, Assets)
 - [x] Provider failures are lossless
 - [x] AcquisitionResult enforced at boundaries
 - [x] No `[object Object]` in persisted data
-- [x] Consistent weekday indexing for hours
+- [x] Consistent weekday indexing for hours (FIXED: was 0=Mon in adapter, 0=Sun in normalizer)
 - [x] Valid coordinate ranges enforced
 - [x] Entity resolution has no unreachable branches
 - [x] Correlated evidence not double-counted
 - [x] Provenance never manufactured
 - [x] Source/provider/extraction method separated
-- [ ] SQLite-based source cache (survives restart)
-- [ ] Canonical business profile contract exists
+- [x] SQLite-based source cache (survives restart) ✅ NEW: SourceCache module
+- [x] One canonical normalization layer per field type (hours, phone, coords, categories)
+- [ ] Canonical business profile contract exists (CanonicalBusinessProfile type)
 - [ ] Routes contain no domain logic
 - [ ] AI provider is replaceable
-- [x] All previous tests pass
-- [ ] New regression tests pass
+- [x] All previous tests pass (44/44 across 9 test suites)
+- [x] New regression tests pass (30 foundation + 7 SourceCache + 22 provider)
+
+**Total Test Results (44/44):**
+- Foundation tests (30): metamorphic, source-independence, differential, entity resolution, hours, nested serialization
+- SourceCache tests (7): persistence, restart survival, TTL, purge, identity separation
+- Entity Resolution tests (20): all scenarios + phone normalization
+- Phase 14 tests (27): entity resolution scenarios
+- Provider tests (22): Geoapify + WebExtraction + lossless contract
 
 ---
 
