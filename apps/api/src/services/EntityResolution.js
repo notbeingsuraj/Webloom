@@ -334,24 +334,32 @@ export function calculateMatchScore(record1, record2) {
   }
 
   // Address matching
+  // FIXED: Use the same normalizeAddressTokens (with street-type expansion)
+  // as compareLocations, so "St" vs "Street" matches instead of contradicting.
   const addr1 = record1?.location?.full_address || record1?.address;
   const addr2 = record2?.location?.full_address || record2?.address;
   if (addr1 && addr2) {
-    const set1 = new Set(addr1.toLowerCase().split(' '));
-    const set2 = new Set(addr2.toLowerCase().split(' '));
+    const tokens1 = normalizeAddressTokens(addr1);
+    const tokens2 = normalizeAddressTokens(addr2);
+    const set1 = new Set(tokens1);
+    const set2 = new Set(tokens2);
     const intersection = new Set([...set1].filter(x => set2.has(x)));
-    const union = new Set([...set1, ...set2]);
-    const addrSim = intersection.size / union.size;
+    const union = new Set([...tokens1, ...tokens2]);
+    const addrSim = union.size > 0 ? intersection.size / union.size : 0;
 
     if (addrSim >= 0.9) {
-      score += 0.30;
+      score += MATCH_SIGNAL_WEIGHTS.address_exact;
       signals.address_exact = true;
     } else if (addrSim >= 0.7) {
-      score += 0.15;
+      score += MATCH_SIGNAL_WEIGHTS.address_partial;
       signals.address_partial = true;
     } else if (addrSim < 0.3) {
       contradictions.push({ field: 'address', v1: addr1, v2: addr2 });
-      score -= 0.25;
+      score += MATCH_SIGNAL_WEIGHTS.address_contradiction;
+    } else {
+      // 0.3 <= addrSim < 0.7: some overlap but not enough for partial match.
+      // Not a hard contradiction (abbreviations / formatting differences may
+      // explain the gap) — leave the location verdict to compareLocations().
     }
   }
 
