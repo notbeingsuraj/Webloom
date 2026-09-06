@@ -35,9 +35,13 @@ import {
   normalizeErrorCode
 } from './AcquisitionResult.js';
 import { normalizeField, stripObjectToString } from './FieldNormalizer.js';
+import { getSourceCache } from '../db/SourceCache.js';
 
-// In-memory cache (in production, use Redis or database)
-const extractionCache = new Map();
+// PHASE 20: in-memory extraction cache replaced by persistent SQLite SourceCache.
+// Survives process restart, supports TTL, and keeps SOURCE cache identity
+// separate from provider record identity and business entity identity (#17).
+// _sourceCache is lazily initialized to keep 'source-cache.db' out of the
+// way for tests that call getCacheKey/normalizeUrl without touching the cache.
 
 class BusinessDataExtractor {
   constructor() {
@@ -66,6 +70,15 @@ class BusinessDataExtractor {
     // Initialize providers
     this.websiteProvider = new OfficialWebsiteProvider();
     this.parser = GoogleMapsUrlParserProvider;
+    // Lazy SourceCache singleton (SQLite-backed, persistent across restarts)
+    this._cache = null;
+  }
+
+  _cacheInstance() {
+    if (!this._cache) {
+      this._cache = getSourceCache();
+    }
+    return this._cache;
   }
 
   /**
@@ -84,31 +97,41 @@ class BusinessDataExtractor {
   }
 
   /**
-   * Check cache for existing extraction
+   * Check cache for existing extraction (SQLite-backed, TTL-aware)
+   *
+   * @returns {Object|null} the stored extraction result (with cached flags),
+   *   or null on miss. Backward compatible with prior in-memory cache which
+   *   returned the extraction result object directly.
    */
   getCachedExtraction(url) {
-    const key = this.getCacheKey(url);
-    const cached = extractionCache.get(key);
-    if (cached) {
-      const age = Date.now() - cached.timestamp;
-      if (age < 24 * 60 * 60 * 1000) {
-        return cached.data;
+    const normalized = this.normalizeUrl(url);
+    const entry = this._cacheInstance().get(normalized);
+    if (entry) {
+      // entry.result is the stored wrapper { data, timestamp, normalizedUrl }.
+      // Spread the underlying data result and surface cached metadata.
+      const data = entry.result?.data || entry.result;
+      if (data && typeof data === 'object') {
+        return {
+          ...data,
+          cached: true,
+          cachedAt: entry.retrievedAt,
+        };
       }
-      extractionCache.delete(key);
     }
     return null;
   }
 
   /**
-   * Store extraction in cache
+   * Store extraction in cache (SQLite-backed, TTL-aware)
    */
   setCachedExtraction(url, data) {
-    const key = this.getCacheKey(url);
-    extractionCache.set(key, {
+    const normalized = this.normalizeUrl(url);
+    const wrap = {
       data,
-      timestamp: Date.now(),
-      normalizedUrl: this.normalizeUrl(url),
-    });
+      timestamp: new Date().toISOString(),
+      normalizedUrl: normalized,
+    };
+    this._cacheInstance().set(normalized, wrap, { provider: 'web_extraction' });
   }
 
   /**
@@ -1009,22 +1032,22 @@ Rules:
   }
 
   /**
-   * Clear cache (for testing/admin)
+   * Clear cache (SQLite: purge all source-cache rows) — for testing/admin
    */
   clearCache() {
-    extractionCache.clear();
+    this._cacheInstance().delete();
   }
 
   /**
-   * Get cache stats
+   * Get cache stats (SQLite-backed)
    */
   getCacheStats() {
+    const stats = this._cacheInstance().stats();
     return {
-      size: extractionCache.size,
-      entries: Array.from(extractionCache.entries()).map(([key, value]) => ({
-        key: key.substring(0, 16) + '...',
-        normalizedUrl: value.normalizedUrl,
-        timestamp: value.timestamp,
+      size: stats.total,
+      entries: stats.entries.map((e) => ({
+        normalizedUrl: e.sourceUrl,
+        timestamp: e.retrievedAt,
       })),
     };
   }
