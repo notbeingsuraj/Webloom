@@ -363,21 +363,22 @@ export function calculateMatchScore(record1, record2) {
     signals.state_match = true;
   }
 
-  // Name matching
+  // Name matching - FIXED: properly detect name contradictions
   const name1 = record1?.identity?.name || record1?.name;
   const name2 = record2?.identity?.name || record2?.name;
   let nameSim = 0;
   if (name1 && name2) {
     nameSim = fuzzySimilarity(name1, name2);
     if (name1.toLowerCase() === name2.toLowerCase()) {
-      score += 0.35;
+      score += MATCH_SIGNAL_WEIGHTS.name_exact;
       signals.name_exact = true;
     } else if (nameSim >= 0.8) {
-      score += 0.25;
+      score += MATCH_SIGNAL_WEIGHTS.name_fuzzy;
       signals.name_fuzzy = true;
     } else if (nameSim < 0.3) {
+      // Names are quite different - this is a contradiction
       contradictions.push({ field: 'name', v1: name1, v2: name2 });
-      score -= 0.30;
+      score += MATCH_SIGNAL_WEIGHTS.name_contradiction;
     }
   }
 
@@ -477,6 +478,7 @@ export function calculateMatchScore(record1, record2) {
 
   return {
     score: finalScore,
+    finalScore,
     signals,
     contradictions,
     matchType,

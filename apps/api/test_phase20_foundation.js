@@ -10,14 +10,8 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { calculateMatchScore, ENTITY_MATCH_TYPE } from '../src/services/EntityResolution.js';
-import {
-  normalizePhone,
-  normalizeCoordinates,
-  normalizeCategories,
-  normalizeServices,
-  normalizeSocialLinks,
-} from '../src/services/FieldNormalizer.js';
+import { calculateMatchScore, ENTITY_MATCH_TYPE, normalizePhone, fuzzySimilarity } from './src/services/EntityResolution.js';
+import { normalizeCoordinates, normalizeCategories } from './src/services/FieldNormalizer.js';
 
 // ============================================================================
 // TEST SUITE 1: Metamorphic Normalization
@@ -49,9 +43,10 @@ test('Coordinates normalization — equivalent formats normalize identically', a
   const formats = [
     { lat: 37.7749, lng: -122.4194 },
     { latitude: 37.7749, longitude: -122.4194 },
-    [−122.4194, 37.7749], // GeoJSON [lng, lat]
+    [-122.4194, 37.7749], // GeoJSON [lng, lat]
     '37.7749, -122.4194',
     '37.7749 -122.4194',
+    '37.7749,-122.4194',
   ];
   
   const normalized = formats.map(normalizeCoordinates);
