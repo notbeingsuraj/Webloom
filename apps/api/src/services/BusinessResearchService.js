@@ -251,27 +251,32 @@ class BusinessResearchService {
   buildTrustSignals(ratings, reviews) {
     const signals = [];
     if (ratings.rating !== null && ratings.rating !== undefined) {
-      signals.push({ type: 'rating', value: ratings.rating, source: 'google_maps_public', verified: true });
+      // PHASE 20 FIX: never manufacture verification status.
+      // This observation was extracted (discovered), not verified by Google.
+      signals.push({ type: 'rating', value: ratings.rating, source: 'google_maps_public', verified: false, verification: 'discovered', confidence: 0.6 });
     }
     if (ratings.review_count !== null && ratings.review_count !== undefined) {
-      signals.push({ type: 'review_count', value: ratings.review_count, source: 'google_maps_public', verified: true });
+      signals.push({ type: 'review_count', value: ratings.review_count, source: 'google_maps_public', verified: false, verification: 'discovered', confidence: 0.6 });
     }
     if (reviews && reviews.length > 0) {
-      signals.push({ type: 'reviews_available', value: reviews.length, source: 'google_maps_public', verified: true });
+      signals.push({ type: 'reviews_available', value: reviews.length, source: 'google_maps_public', verified: false, verification: 'discovered', confidence: 0.6 });
     }
     return signals;
   }
 
   buildVerifiedFacts(business, contact, location, ratings, metadata) {
     const facts = [];
-    if (business.name) facts.push({ claim: `Business name is ${business.name}`, source: 'google_maps_public', verified: true });
-    if (business.category) facts.push({ claim: `Business category is ${business.category}`, source: 'google_maps_public', verified: true });
-    if (ratings.rating) facts.push({ claim: `Has a rating of ${ratings.rating}/5`, source: 'google_maps_public', verified: true });
-    if (ratings.review_count) facts.push({ claim: `Has ${ratings.review_count} reviews`, source: 'google_maps_public', verified: true });
-    if (contact.website) facts.push({ claim: `Website: ${contact.website}`, source: 'google_maps_public', verified: true });
-    if (contact.phone) facts.push({ claim: `Phone: ${contact.phone}`, source: 'google_maps_public', verified: true });
-    if (location.full_address) facts.push({ claim: `Address: ${location.full_address}`, source: 'google_maps_public', verified: true });
-    if (metadata.hasJsonLd) facts.push({ claim: 'Structured data (JSON-LD) found on page', source: 'page_metadata', verified: true });
+    const source = 'acquisition';
+    // PHASE 20 FIX: these are EXTRACTED observations, not verified facts.
+    // The language mirrors what we can actually claim: observed/discovered.
+    if (business.name) facts.push({ claim: `Business name is ${business.name}`, source, verified: false, verification: 'discovered' });
+    if (business.category) facts.push({ claim: `Business category is ${business.category}`, source, verified: false, verification: 'discovered' });
+    if (ratings.rating) facts.push({ claim: `Has a rating of ${ratings.rating}/5`, source: 'google_maps_public', verified: false, verification: 'discovered' });
+    if (ratings.review_count) facts.push({ claim: `Has ${ratings.review_count} reviews`, source: 'google_maps_public', verified: false, verification: 'discovered' });
+    if (contact.website) facts.push({ claim: `Website: ${contact.website}`, source, verified: false, verification: 'discovered' });
+    if (contact.phone) facts.push({ claim: `Phone: ${contact.phone}`, source, verified: false, verification: 'discovered' });
+    if (location.full_address) facts.push({ claim: `Address: ${location.full_address}`, source, verified: false, verification: 'discovered' });
+    if (metadata.hasJsonLd) facts.push({ claim: 'Structured data (JSON-LD) found on page', source: 'page_metadata', verified: true, verification: 'identified' });
     return facts;
   }
 
@@ -428,7 +433,12 @@ class BusinessResearchService {
     let webRecord = null;
     if (sourceUrl) {
       const webResult = await WebExtractionProvider.search({ googleMapsUrl: sourceUrl });
-      if (webResult.status === 'ok' && webResult.records.length > 0) {
+      // Lossless contract: webResult.status is now one of ACQUISITION_STATUS.
+      // Only a SUCCESS (or PARTIAL with evidence) yields records.
+      if (
+        (webResult.status === 'success' || webResult.status === 'partial') &&
+        webResult.records.length > 0
+      ) {
         webRecord = webResult.records[0];
         providerTrace.webExtraction = 'ok';
         
@@ -478,7 +488,11 @@ class BusinessResearchService {
           this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ false);
         }
       } else {
-        providerTrace.webExtraction = webResult.status;
+        // Lossless: preserve the exact status + error, not a bare 'error'
+        providerTrace.webExtraction =
+          webResult.status === 'success' ? 'no_evidence' : webResult.status;
+        providerTrace.webExtractionError = webResult.error || null;
+        providerTrace.webExtractionDiagnostics = webResult.diagnostics || null;
       }
     }
 

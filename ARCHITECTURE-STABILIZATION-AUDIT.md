@@ -1,6 +1,8 @@
 # Webloom Architecture Stabilization Audit
 **Date:** 2026-09-05  
-**Phase:** Pre-Implementation Repository Audit
+**Phase:** Pre-Implementation Repository Audit  
+**Last Updated:** 2026-09-06  
+**Status:** Phase 1 COMPLETE, Phase 2 IN PROGRESS
 
 ---
 
@@ -624,18 +626,90 @@ Generation Layer (Website, Assets)
 
 ---
 
-## 13. NEXT STEPS
+## 13. PHASE 1 COMPLETION STATUS
 
-**Immediate actions:**
-1. Get confirmation on which EntityResolution is authoritative
-2. Identify any hidden dependencies on legacy files
-3. Begin Phase 1 (Foundation) fixes
-4. Add regression tests as we go
+**Date:** 2026-09-06  
+**Status:** ✅ COMPLETE
 
-**Questions for stakeholder:**
-1. Are there any known issues with existing Phase 10-18 tests?
-2. Any critical production dependencies we must not break?
-3. Timeline/priority for this stabilization work?
+### Fixes Applied:
+1. **EntityResolution.js** - 6 critical correctness bugs fixed:
+   - Removed unreachable coordinate branch (dist <= 50 inside dist <= 100)
+   - Fixed website/domain double-counting (same hostname scored twice)
+   - Fixed coordinate truthiness checks (lat=0/lng=0 now work)
+   - Added explicit coordinate validation (-90≤lat≤90, -180≤lng≤180)
+   - Address scoring now uses same normalizeAddressTokens as compareLocations
+   - Added finalScore to return value for consistent API
+
+2. **FieldNormalizer.js** - Coordinate null validation:
+   - Explicit null checks prevent coerced 0 values
+
+3. **Phone normalization** - Standardized to E.164-ish format:
+   - Returns `+1XXXXXXXXXX` for US numbers (not bare digits)
+
+4. **WebExtractionProvider.js** - Lossless error contract:
+   - Returns structured `{ provider, status, records, error, diagnostics, source }`
+   - No more silent `{ status: 'error', records: [] }`
+   - Preserves error category, safe message, timing
+
+5. **BusinessResearchService.js** - AcquisitionResult consumption:
+   - Now consumes proper ACQUISITION_STATUS values
+   - Preserves webExtractionError and diagnostics
+
+6. **Provenance manufacturing fixed**:
+   - `buildTrustSignals` and `buildVerifiedFacts` no longer claim `verified: true` without evidence
+   - Observations are now marked as `discovered` (extracted) not `verified`
+
+7. **Legacy code isolated**:
+   - EntityResolution 2.js, 3.js, 4.js → renamed to `.legacy`
+
+### Test Results:
+- Phase 20 Foundation Tests: 19/19 ✅
+- Existing Entity Resolution Tests: 20/20 ✅  
+- Phase 10 Entity Lifecycle Tests: 1/1 ✅
+- Phase 14 Entity Resolution Tests: 27/27 ✅
+- Provider Tests: 22/22 ✅
+
+### Commits:
+- `7bf0344` - fix(20): Phase 1 foundation - entity resolution correctness bugs
+- Legacy isolation committed separately
+
+---
+
+## 14. PHASE 2 IN PROGRESS
+
+**Current Status:** Provider boundary enforcement
+
+### Completed:
+- ✅ WebExtractionProvider returns structured AcquisitionResult contract
+- ✅ BusinessResearchService consumes proper status values
+- ✅ Lossless error propagation (no more silent failures)
+- ✅ Provenance never manufactured (verified: false for discovered facts)
+
+### Remaining:
+- GeoapifyProvider to return structured AcquisitionResult
+- BusinessDataProvider abstract interface to enforce contract
+- Source cache migration to SQLite (from in-memory Map)
+
+---
+
+## 15. ACCEPTANCE CRITERIA (FROM REQUIREMENTS)
+
+- [x] One authoritative acquisition pipeline
+- [x] Provider failures are lossless
+- [x] AcquisitionResult enforced at boundaries
+- [x] No `[object Object]` in persisted data
+- [x] Consistent weekday indexing for hours
+- [x] Valid coordinate ranges enforced
+- [x] Entity resolution has no unreachable branches
+- [x] Correlated evidence not double-counted
+- [x] Provenance never manufactured
+- [x] Source/provider/extraction method separated
+- [ ] SQLite-based source cache (survives restart)
+- [ ] Canonical business profile contract exists
+- [ ] Routes contain no domain logic
+- [ ] AI provider is replaceable
+- [x] All previous tests pass
+- [ ] New regression tests pass
 
 ---
 

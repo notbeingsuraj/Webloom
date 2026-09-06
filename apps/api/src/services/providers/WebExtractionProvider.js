@@ -9,9 +9,20 @@
  * structured provider like Geoapify). It preserves all existing Webloom
  * extraction/fallback behavior and returns data in the same canonical flat
  * profile shape the rest of the pipeline consumes.
+ *
+ * LOSSLESS ERROR CONTRACT (Phase 20):
+ * Every search() result is a structured object describing WHAT happened:
+ *   { provider, status, records, error?, diagnostics, source, retrieval }
+ * Provider failures must NEVER silently become { status:'error', records:[] }
+ * without preserving the error category, safe message, and timing.
  */
 
 import BusinessDataProvider from './BusinessDataProvider.js';
+import {
+  createAcquisitionResult,
+  classifyEmptyAcquisition,
+  ACQUISITION_STATUS,
+} from '../AcquisitionResult.js';
 
 class WebExtractionProvider extends BusinessDataProvider {
   constructor() {
@@ -45,22 +56,65 @@ class WebExtractionProvider extends BusinessDataProvider {
    *
    * @param {Object} hints - { googleMapsUrl } or forwarded extraction input
    * @param {Object} options
-   * @returns {Promise<{ status, records, error? }>}
+   * @returns {Promise<Object>} structured result:
+   *   {
+   *     provider: 'web_extraction',
+   *     status,             // one of ACQUISITION_STATUS
+   *     records,            // canonical profile records
+   *     error,              // safe error description (never secrets)
+   *     diagnostics,        // { httpStatus, errorCode, retryCount, latencyMs }
+   *     source,             // { url, retrieval }
+   *   }
    */
   async search(hints = {}) {
     // Web extraction is per-URL; supports Google Maps URLs primarily.
     // If no URL is provided, there's nothing authoritative to scrape.
     const url = hints?.googleMapsUrl || hints?.sourceUrl || null;
+    const startedAt = Date.now();
+
     if (!url) {
-      return { status: 'not_applicable', records: [] };
+      const result = createAcquisitionResult({
+        provider: 'web_extraction',
+        sourceUrl: null,
+        status: ACQUISITION_STATUS.UNSUPPORTED_URL,
+        fields: {},
+        completeness: 0,
+        confidence: 0,
+        errors: [{ category: 'UNSUPPORTED_URL', safeMessage: 'No URL provided for web extraction.' }],
+        errorCode: 'unsupported_url',
+        message: 'No URL provided for web extraction.',
+        latencyMs: 0,
+      });
+      return {
+        provider: 'web_extraction',
+        status: ACQUISITION_STATUS.UNSUPPORTED_URL,
+        records: [],
+        error: result.errors[0],
+        diagnostics: { httpStatus: null, errorCode: 'unsupported_url', retryCount: 0, latencyMs: 0 },
+        source: { url: null, retrieval: new Date().toISOString() },
+      };
     }
 
     try {
       const extractor = await this._getExtractor();
       const result = await extractor.extractFromGoogleMapsUrl(url);
+      const latencyMs = Date.now() - startedAt;
 
       if (!result || typeof result !== 'object') {
-        return { status: 'no_result', records: [] };
+        const acq = classifyEmptyAcquisition({
+          provider: 'web_extraction',
+          sourceUrl: url,
+          record: {},
+          latencyMs,
+        });
+        return {
+          provider: 'web_extraction',
+          status: acq.status,
+          records: [],
+          error: acq.errors[0] || null,
+          diagnostics: { httpStatus: null, errorCode: acq.errorCode, retryCount: 0, latencyMs },
+          source: { url, retrieval: new Date().toISOString() },
+        };
       }
 
       // BusinessDataExtractor returns the flattened canonical profile
@@ -78,19 +132,92 @@ class WebExtractionProvider extends BusinessDataProvider {
         record.location.longitude = record.location.coordinates.lng;
       }
       record.source = 'web_extraction';
-      return { status: 'ok', records: [record] };
+      record.retrieval = new Date().toISOString();
+
+      // Check whether the extracted profile contains identity evidence.
+      // A request that succeeded at the HTTP layer but produced no usable
+      // business evidence must NOT masquerade as success.
+      const fields = this._flattenIdentityFields(record);
+      const hasEvidence = Object.values(fields).some(
+        (v) => v != null && v !== '' && !(typeof v === 'object' && Object.keys(v).length === 0)
+      );
+
+      if (!hasEvidence) {
+        const acq = classifyEmptyAcquisition({
+          provider: 'web_extraction',
+          sourceUrl: url,
+          record,
+          latencyMs,
+        });
+        return {
+          provider: 'web_extraction',
+          status: acq.status, // empty_result / provider_unavailable / extraction_failed
+          records: [],
+          error: acq.errors[0] || null,
+          diagnostics: { httpStatus: null, errorCode: acq.errorCode, retryCount: 0, latencyMs },
+          source: { url, retrieval: record.retrieval },
+        };
+      }
+
+      return {
+        provider: 'web_extraction',
+        status: ACQUISITION_STATUS.SUCCESS,
+        records: [record],
+        error: null,
+        diagnostics: { httpStatus: 200, errorCode: null, retryCount: 0, latencyMs },
+        source: { url, retrieval: record.retrieval },
+      };
     } catch (error) {
-      console.error('[WebExtractionProvider] Web extraction failed:', error.message);
-      return { status: 'error', records: [] };
+      const latencyMs = Date.now() - startedAt;
+      // Lossless error: category + safe message + timing preserved
+      const safeMessage = error?.safeMessage || error?.message || 'Unknown web-extraction failure';
+      const category = error?.category || (error?.response ? 'HTTP_ERROR' : 'PROVIDER_UNAVAILABLE');
+      const httpStatus = error?.response?.status || null;
+      console.error(`[WebExtractionProvider] Web extraction failed: ${safeMessage}`);
+      const acq = createAcquisitionResult({
+        provider: 'web_extraction',
+        sourceUrl: url,
+        status: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+        fields: {},
+        completeness: 0,
+        confidence: 0,
+        errors: [{ category, safeMessage, httpStatus }],
+        errorCode: category === 'HTTP_ERROR' ? 'extraction_failed' : 'provider_unavailable',
+        message: safeMessage,
+        latencyMs,
+      });
+      return {
+        provider: 'web_extraction',
+        status: acq.status,
+        records: [],
+        error: acq.errors[0] || null,
+        diagnostics: { httpStatus, errorCode: acq.errorCode, retryCount: 0, latencyMs },
+        source: { url, retrieval: new Date().toISOString() },
+      };
     }
+  }
+
+  /**
+   * Extract identity-critical flat fields from a canonical record.
+   * @param {Object} record - canonical flat profile shape
+   * @returns {Object} dot-path field map
+   */
+  _flattenIdentityFields(record) {
+    const fields = {};
+    if (record.identity?.name) fields['identity.name'] = record.identity.name;
+    if (record.contact?.phone) fields['contact.phone'] = record.contact.phone;
+    if (record.contact?.website) fields['contact.website'] = record.contact.website;
+    if (record.location?.full_address) fields['location.full_address'] = record.location.full_address;
+    if (record.location?.coordinates) fields['location.coordinates'] = record.location.coordinates;
+    return fields;
   }
 
   /**
    * Best-matching record (web extraction returns a single resolved profile).
    */
   async getBusiness(hints, options = {}) {
-    const { status, records } = await this.search(hints, options);
-    if (status === 'ok' && records.length > 0) return records[0];
+    const result = await this.search(hints, options);
+    if (result.status === ACQUISITION_STATUS.SUCCESS && result.records.length > 0) return result.records[0];
     return null;
   }
 }
