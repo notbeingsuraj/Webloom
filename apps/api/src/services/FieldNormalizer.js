@@ -90,8 +90,10 @@ export function normalizeCoordinates(value) {
       lat = Number(value[1]);
     }
   } else if (typeof value === 'object') {
-    const latRaw = value.lat ?? value.latitude ?? null;
-    const lngRaw = value.lng ?? value.longitude ?? null;
+    const latRaw = value.lat ?? value.latitude;
+    const lngRaw = value.lng ?? value.longitude;
+    // Explicit null checks: don't coerce null to 0
+    if (latRaw == null || lngRaw == null) return null;
     lat = Number(latRaw);
     lng = Number(lngRaw);
   } else if (typeof value === 'string') {

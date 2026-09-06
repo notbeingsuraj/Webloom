@@ -118,9 +118,15 @@ export function normalizePhone(phone) {
     digits = digits.slice(1);
   }
   if (digits.startsWith('1') && digits.length === 11) {
-    return digits.slice(1);
+    return '+' + digits;
   }
-  return digits;
+  if (digits.length === 10) {
+    return '+1' + digits;
+  }
+  if (digits.length >= 9 && digits.length <= 15) {
+    return '+' + digits;
+  }
+  return null;
 }
 
 export function normalizeWebsite(website) {
