@@ -24,7 +24,19 @@
  *
  * Field-level confidence and provenance ("geoapify") are attached here so
  * downstream code can trust high-confidence structured data over AI guesses.
+ *
+ * PHASE 20: hours normalization is delegated to the ONE canonical
+ * implementation in FieldNormalizer (normalizeHours). This eliminates the
+ * duplicate adapter-level hours parser and ITS inconsistent weekday indexing
+ * (the adapter used 0=Monday while FieldNormalizer uses 0=Sunday). Numeric
+ * provider weekday values are converted ONCE here via the canonical
+ * normalizeHours (0=Sunday..6=Saturday; 7 is also accepted and mapped to
+ * Sunday for 1=Monday..7=Sunday provider conventions).
  */
+
+import { normalizeHours as normalizeHoursCanonical } from '../FieldNormalizer.js';
+
+/**
 
 /**
  * Map a single Geoapify Places feature into the canonical flat profile shape.
@@ -139,107 +151,87 @@ export function mapGeoapifyFeatureToProfile(feature) {
 }
 
 /**
- * Normalize Geoapify opening_hours (either day->range map or array form)
- * into Webloom's canonical { monday..sunday } map.
- */
-/**
- * Normalize Geoapify opening_hours into Webloom's canonical
- * { monday..sunday } map. Accepts three shapes:
- *   - string "Mo-Su 07:30-18:00"            (place-details format)
- *   - day->range map { monday: "09:00-17:00" } (places / geocode format)
- *   - array [{ day_of_week, start_time, end_time }]
+ * Normalize Geoapify opening_hours into the canonical { monday..sunday } map.
+ *
+ * PHASE 20: THIS IS A DELEGATION to the ONE authoritative implementation in
+ * FieldNormalizer (normalizeHours). The previous adapter-local implementation
+ * used 0=Monday indexing for array-form day_of_week while FieldNormalizer
+ * used 0=Sunday — an inconsistent weekday convention that could shift every
+ * day of the week. All provider hours now flow through the single canonical
+ * normalizer so weekday semantics are identical everywhere.
+ *
+ * Numeric day_of_week semantics (documented, canonical):
+ *   0 = Sunday, 1 = Monday, ..., 6 = Saturday, 7 = Sunday (1=Monday..7=Sunday)
+ *
+ * @param {*} openingHours - Geoapify opening_hours (string / map / array / JSON)
+ * @returns {Object} { monday..sunday } canonical map
  */
 export function normalizeHours(openingHours) {
-  const out = {};
-  if (!openingHours) return out;
-
-  // String form, e.g. "Mo-Su 07:30-18:00" (place-details)
-  if (typeof openingHours === 'string' && openingHours.trim()) {
-    return parseHoursString(openingHours);
-  }
-
-  // Map form: { monday: "09:00-17:00", ... }
-  if (typeof openingHours === 'object' && !Array.isArray(openingHours)) {
-    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    for (const day of days) {
-      const val = openingHours[day];
-      if (val) out[day] = typeof val === 'string' ? val : Array.isArray(val) ? val.join(', ') : String(val);
-    }
-    return out;
-  }
-
-  // Array form: [{ day_of_week: 1, start_time, end_time }]
+  // Geoapify numeric day_of_week convention: 0 = Monday .. 6 = Sunday.
+  // The canonical FieldNormalizer uses 0 = Sunday. Per Phase 20 requirement #9
+  // ("If numeric provider values are accepted, conversion must happen ONCE at
+  // the provider boundary"), convert Geoapify's numeric array form to named
+  // days HERE, then delegate the remaining shapes to the canonical normalizer.
   if (Array.isArray(openingHours)) {
-    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const can = { monday: null, tuesday: null, wednesday: null, thursday: null, friday: null, saturday: null, sunday: null };
+    const GEOPIFY_0_MONDAY = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     for (const entry of openingHours) {
       const idx = entry?.day_of_week;
-      if (idx == null || idx < 0 || idx > 6) continue;
-      const day = days[idx];
-      const range = `${entry.start_time || ''}${entry.end_time ? '-' + entry.end_time : ''}`;
-      if (range && !out[day]) out[day] = range;
-    }
-    return out;
-  }
-
-  return out;
-}
-
-/**
- * Day-abbreviation map for Geoapify's compact opening-hours strings.
- */
-const DAY_ABBR = {
-  Mo: 'monday', Tu: 'tuesday', We: 'wednesday', Th: 'thursday',
-  Fr: 'friday', Sa: 'saturday', Su: 'sunday',
-};
-const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-
-/**
- * Parse a compact Geoapify opening-hours string, e.g.
- *   "Mo-Su 07:30-18:00"
- *   "Mo-Fr 08:00-17:00, Sa 09:00-14:00"
- *   "Mo-Su 11:00-14:00, 18:00-22:00"
- * into a { monday..sunday } day->range map.
- */
-export function parseHoursString(str) {
-  const out = {};
-  // Split into comma-separated day groups
-  const groups = str.split(',').map((s) => s.trim()).filter(Boolean);
-  for (const group of groups) {
-    const m = group.match(/^([A-Za-z]{2}(?:\s*-\s*[A-Za-z]{2})?)\s+(.+)$/);
-    if (!m) continue;
-    const dayToken = m[1].replace(/\s+/g, '');
-    const timeRange = m[2].trim();
-    const days = expandDayToken(dayToken);
-    for (const day of days) {
-      // Keep first (most specific) value per day; merge second ranges if present
-      if (out[day] && timeRange && !out[day].includes(timeRange)) {
-        out[day] = `${out[day]}, ${timeRange}`;
-      } else if (!out[day]) {
-        out[day] = timeRange;
+      if (!Number.isInteger(idx) || idx < 0 || idx > 6) continue;
+      const day = GEOPIFY_0_MONDAY[idx]; // 0 = Monday (Geoapify)
+      const start = entry?.start_time ?? entry?.open ?? entry?.from ?? null;
+      const end = entry?.end_time ?? entry?.close ?? entry?.to ?? null;
+      if (start && end) {
+        const range = `${String(start).trim()}-${String(end).trim()}`;
+        can[day] = can[day] ? `${can[day]}, ${range}` : range;
+      } else if (start) {
+        can[day] = String(start).trim();
       }
     }
+    const named = {};
+    for (const [day, value] of Object.entries(can)) {
+      if (value != null) named[day] = value;
+    }
+    return named;
   }
-  return out;
+
+  // All other shapes (map / compact string / JSON) → canonical normalizer.
+  return normalizeHoursCanonical(openingHours);
 }
 
 /**
- * Expand a Geoapify day token ("Mo-Su", "Mo-Fr", "Sa-Su", "Mo", etc.)
- * into an ordered array of canonical day names.
+ * Parse a compact opening-hours string ("Mo-Su 07:30-18:00") into the
+ * canonical day map. Delegates to the canonical parser (backward-compatible
+ * alias).
+ */
+export function parseHoursString(str) {
+  return normalizeHoursCanonical(str);
+}
+
+/**
+ * Expand a day token ("Mo-Su", "Mo", "Sa-Su") into canonical day names.
+ * (Kept for backward compatibility; rarely needed now that FieldNormalizer
+ * handles compact strings directly.)
  */
 export function expandDayToken(token) {
+  const DAY_ABBR_LOCAL = {
+    Mo: 'monday', Tu: 'tuesday', We: 'wednesday', Th: 'thursday',
+    Fr: 'friday', Sa: 'saturday', Su: 'sunday',
+  };
+  const DAY_ORDER_LOCAL = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
   const dash = token.match(/^([A-Za-z]{2})-([A-Za-z]{2})$/);
   let days = [];
   if (dash) {
-    const start = DAY_ABBR[dash[1]];
-    const end = DAY_ABBR[dash[2]];
+    const start = DAY_ABBR_LOCAL[dash[1]];
+    const end = DAY_ABBR_LOCAL[dash[2]];
     if (start && end) {
-      const si = DAY_ORDER.indexOf(start);
-      const ei = DAY_ORDER.indexOf(end);
+      const si = DAY_ORDER_LOCAL.indexOf(start);
+      const ei = DAY_ORDER_LOCAL.indexOf(end);
       const step = si <= ei ? 1 : -1;
-      for (let i = si; step > 0 ? i <= ei : i >= ei; i += step) days.push(DAY_ORDER[i]);
+      for (let i = si; step > 0 ? i <= ei : i >= ei; i += step) days.push(DAY_ORDER_LOCAL[i]);
     }
-  } else if (DAY_ABBR[token]) {
-    days = [DAY_ABBR[token]];
+  } else if (DAY_ABBR_LOCAL[token]) {
+    days = [DAY_ABBR_LOCAL[token]];
   }
   return days;
 }

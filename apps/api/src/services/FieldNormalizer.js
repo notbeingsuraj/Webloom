@@ -398,7 +398,11 @@ export function normalizeHoursString(str) {
     const dayPart = segTrim.replace(rangeMatch[0], '').trim();
     const dayMatches = dayPart.match(/(Mo|Tu|We|Th|Fr|Sa|Su)(?:\s*-\s*(Mo|Tu|We|Th|Fr|Sa|Su))?/g) || [];
     for (const dm of dayMatches) {
-      const [d1, , d2] = dm.replace(/\s+/g, '').match(/^(Mo|Tu|We|Th|Fr|Sa|Su)(?:-([A-Za-z]{2}))?$/);
+      // match() = [fullMatch, group1, group2?]; use comma-skip to drop full match
+      const groups = dm.replace(/\s+/g, '').match(/^(Mo|Tu|We|Th|Fr|Sa|Su)(?:-([A-Za-z]{2}))?$/);
+      if (!groups) continue;
+      const d1 = groups[1];
+      const d2 = groups[2];
       const startIdx = DAY_ORDER.indexOf(DAY_ABBR[d1]);
       const endIdx = d2 ? DAY_ORDER.indexOf(DAY_ABBR[d2]) : startIdx;
       if (startIdx < 0 || endIdx < 0) continue;
