@@ -67,12 +67,14 @@ run(
     phone: '415-111-1111',
     website: 'peets.com',
     address: '100 Main St, San Francisco, CA 94105',
+    country: 'US',
   },
   {
     name: "Peet's Coffee",
     phone: '510-222-2222',
     website: 'peets.com',
     address: '200 Broadway, Oakland, CA 94607',
+    country: 'US',
   },
   (r) => {
     check('P14-1 classified same_brand_different_location', r.matchType === 'same_brand_different_location', r.matchType);
@@ -93,12 +95,14 @@ run(
     phone: '415-111-1111',
     website: 'peets.com',
     address: '100 Main St, San Francisco, CA 94105',
+    country: 'US',
   },
   {
     name: "Peet's Coffee",
     phone: '510-222-2222',
     website: 'peets-oakland.com',
     address: '200 Broadway, Oakland, CA 94607',
+    country: 'US',
   },
   (r) => {
     check('P14-2 not same_entity', r.matchType !== 'same_entity', r.matchType);
@@ -122,12 +126,14 @@ run(
     phone: '415-349-0942',
     website: 'dandelionchocolate.com',
     address: '740 Valencia St, San Francisco, CA 94110',
+    country: 'US',
   },
   {
     name: 'Dandelion Chocolate',
     phone: '415-349-0942',
     website: 'dandelionchocolate.com',
     address: '2600 16th St, San Francisco, CA 94103',
+    country: 'US',
   },
   (r) => {
     check('P14-3 classified relocated_entity', r.matchType === 'relocated_entity', r.matchType);
@@ -147,6 +153,7 @@ run(
     website: 'dandelionchocolate.com',
     address: '740 Valencia St, San Francisco, CA 94110',
     coordinates: { lat: 37.7599, lng: -122.4214 },
+    country: 'US',
   },
   {
     name: 'Dandelion Chocolate',
@@ -154,6 +161,7 @@ run(
     website: 'dandelionchocolate.com',
     address: '2600 16th St, San Francisco, CA 94103',
     coordinates: { lat: 37.7663, lng: -122.411 },
+    country: 'US',
   },
   (r) => {
     check('P14-4 classified relocated_entity', r.matchType === 'relocated_entity', r.matchType);
@@ -209,6 +217,7 @@ run(
     website: 'ritualcoffee.com',
     address: '1026 Valencia Street, San Francisco, CA 94110',
     coordinates: { lat: 37.7566, lng: -122.4213 },
+    country: 'US',
   },
   (r) => {
     check('P14-6 classified same_entity', r.matchType === 'same_entity', r.matchType);
@@ -227,12 +236,14 @@ run(
     name: 'Ritual Coffee',
     phone: '415-641-1011',
     address: '1026 Valencia Street, San Francisco, CA 94110',
+    country: 'US',
   },
   {
     name: 'Ritual Coffee',
     phone: '415-641-1011',
     website: 'ritualcoffee.com',
     address: '1026 Valencia Street, San Francisco, CA 94110',
+    country: 'US',
   },
   (r) => {
     check('P14-7 classified same_entity', r.matchType === 'same_entity', r.matchType);
@@ -253,11 +264,13 @@ run(
     name: 'Ritual Coffee',
     phone: '415-641-1011',
     website: 'ritualcoffee.com',
+    country: 'US',
   },
   {
     name: 'Ritual Coffee',
     phone: '415-641-1011',
     website: 'ritualcoffee.com',
+    country: 'US',
   },
   (r) => {
     check('P14-8 classified uncertain', r.matchType === 'uncertain', r.matchType);
@@ -276,12 +289,14 @@ run(
     phone: '415-111-1111',
     website: 'baybakery.com',
     address: '1 Alpha Street, San Francisco, CA 94105',
+    country: 'US',
   },
   {
     name: 'Bakery Bay Cafe',
     phone: '415-222-2222',
     website: 'bakerybaycafe.com',
     address: '2 Beta Avenue, Oakland, CA 94607',
+    country: 'US',
   },
   (r) => {
     check('P14-9 classified different_entity', r.matchType === 'different_entity', r.matchType);
@@ -301,6 +316,7 @@ run(
     website: 'souvla.com',
     address: '517 Hayes Street, San Francisco, CA 94102',
     coordinates: { lat: 37.7767, lng: -122.4244 },
+    country: 'US',
   },
   {
     name: 'Souvla',
@@ -308,6 +324,7 @@ run(
     website: 'souvla.com',
     address: '517 Hayes Street, San Francisco, CA 94102',
     coordinates: { lat: 37.7767, lng: -122.4244 },
+    country: 'US',
   },
   (r) => {
     check('P14-10 classified same_entity', r.matchType === 'same_entity', r.matchType);

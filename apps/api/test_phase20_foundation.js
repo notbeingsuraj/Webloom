@@ -77,7 +77,38 @@ test('Hours — interval object forms normalize identically', () => {
 // ============================================================================
 
 test('Phone normalization — equivalent formats normalize identically', async (t) => {
-  const formats = [
+  // Unambiguous NANP numbers: those with an explicit '+' country code or the
+  // NANP trunk-prefix '1'. These must all normalize to the same E.164 value.
+  const unambiguous = [
+    '+1 415 487 2600',
+    '+1-415-487-2600',
+    '1 415 487 2600',
+  ];
+  const normUnambiguous = unambiguous.map(normalizePhone);
+  const first = normUnambiguous[0];
+  assert(normUnambiguous.every((n) => n === first),
+    `Unambiguous NANP formats should normalize identically: ${normUnambiguous.join(', ')}`);
+  assert(first === '+14154872600', `Got: ${first}`);
+});
+
+test('Phone normalization — ambiguous 10-digit number without country does NOT invent +1', async (t) => {
+  // 10-digit NANP-looking numbers without '+' and without country context are
+  // ambiguous (a 10-digit number could be local in many countries). Per #4,
+  // we must NOT invent a country — return null (unresolved).
+  const ambiguous = [
+    '(415) 487-2600',
+    '4154872600',
+    '415.487.2600',
+  ];
+  for (const fmt of ambiguous) {
+    assert.strictEqual(normalizePhone(fmt), null,
+      `Ambiguous format without country context must remain unresolved: ${fmt}`);
+  }
+});
+
+test('Phone normalization — country hint resolves ambiguous local numbers', async (t) => {
+  // With an explicit US country hint, all NANP-looking formats resolve.
+  const withUS = [
     '+1 415 487 2600',
     '(415) 487-2600',
     '4154872600',
@@ -85,18 +116,9 @@ test('Phone normalization — equivalent formats normalize identically', async (
     '415.487.2600',
     '1 415 487 2600',
   ];
-  
-  const normalized = formats.map(normalizePhone);
-  const first = normalized[0];
-  
-  // All should normalize to the same value
-  assert(normalized.every(n => n === first), 
-    `Phone formats should normalize identically: ${normalized.join(', ')}`);
-  
-  // Should be E.164-ish format
-  assert(first !== null, 'Phone should not be null');
-  assert(first.startsWith('+'), `Phone should start with +, got: ${first}`);
-  assert(/^\+1\d{10}$/.test(first), `Phone should be +1XXXXXXXXXX, got: ${first}`);
+  const normalized = withUS.map((f) => normalizePhone(f, 'US'));
+  assert(normalized.every((n) => n === '+14154872600'),
+    `With US hint all should be +14154872600, got: ${normalized.join(', ')}`);
 });
 
 test('Coordinates normalization — equivalent formats normalize identically', async (t) => {

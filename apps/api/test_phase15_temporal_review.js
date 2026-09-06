@@ -80,8 +80,10 @@ function addr(value, observedAt, providerRecordId = null, normalizedValue = null
     providerRecordId,
   };
 }
-function phoneObs(value, observedAt) {
-  return { fieldPath: 'contact.phone', value, normalizedValue: null, observedAt, providerRecordId: null };
+function phoneObs(value, observedAt, normalizedValue = null) {
+  // Use provided normalizedValue, or derive E.164 from raw US number for test fixtures
+  const norm = normalizedValue || (value ? value.replace(/[^\d]/g, '').replace(/^1?/, '+1') : null);
+  return { fieldPath: 'contact.phone', value, normalizedValue: norm, observedAt, providerRecordId: null };
 }
 function webObs(value, observedAt) {
   return { fieldPath: 'contact.website', value, normalizedValue: null, observedAt, providerRecordId: null };

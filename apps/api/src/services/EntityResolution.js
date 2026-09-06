@@ -122,7 +122,50 @@ export function normalizeAddressTokens(addr) {
   return canonicalNormalizeAddressTokens(addr);
 }
 
+/**
+ * Fuzzy string similarity in [0, 1]. Same-name comparison used by name and
+ * category matching in calculateMatchScore(). Exported for tests.
+ *
+ * - exact (case-insensitive) match → 1.0
+ * - strings sharing the first 3 characters get a prefix bonus
+ * - otherwise a character-set Jaccard similarity
+ */
+export function fuzzySimilarity(str1, str2) {
+  if (!str1 || !str2) return 0;
+  const s1 = str1.toLowerCase().trim();
+  const s2 = str2.toLowerCase().trim();
+  if (s1 === s2) return 1.0;
+
+  const longer = s1.length > s2.length ? s1 : s2;
+  const shorter = s1.length > s2.length ? s2 : s1;
+  if (longer.length === 0) return 1.0;
+
+  const prefixLen = Math.min(3, shorter.length);
+  if (longer.startsWith(shorter.slice(0, prefixLen))) {
+    return 0.8 + 0.2 * (shorter.length / longer.length);
+  }
+
+  const set1 = new Set(s1.split(''));
+  const set2 = new Set(s2.split(''));
+  const intersection = new Set([...set1].filter((x) => set2.has(x)));
+  const union = new Set([...set1, ...set2]);
+  return intersection.size / union.size;
+}
+
 function calculateDistance(lat1, lng1, lat2, lng2) {
+  // Haversine distance between two coordinates, returned in meters.
+  const R = 6371000; // Earth radius in meters
+  const lat1Rad = (lat1 * Math.PI) / 180;
+  const lat2Rad = (lat2 * Math.PI) / 180;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 /**
  * Decide whether two records describe the SAME physical location, a DIFFERENT
@@ -198,16 +241,18 @@ export function calculateMatchScore(record1, record2) {
   const signals = {};
   const contradictions = [];
 
-  // Phone matching
-  const phone1 = normalizePhone(record1?.contact?.phone || record1?.phone);
-  const phone2 = normalizePhone(record2?.contact?.phone || record2?.phone);
+  // Phone matching (country-aware via FieldNormalizer)
+  const country1 = record1?.location?.country || record1?.country || null;
+  const country2 = record2?.location?.country || record2?.country || null;
+  const phone1 = normalizePhone(record1?.contact?.phone || record1?.phone, country1);
+  const phone2 = normalizePhone(record2?.contact?.phone || record2?.phone, country2);
   if (phone1 && phone2) {
     if (phone1 === phone2) {
-      score += 0.30;
+      score += MATCH_SIGNAL_WEIGHTS.phone_exact;
       signals.phone_exact = true;
     } else {
       contradictions.push({ field: 'phone', v1: phone1, v2: phone2 });
-      score -= 0.25;
+      score += MATCH_SIGNAL_WEIGHTS.phone_contradiction;
     }
   }
 
