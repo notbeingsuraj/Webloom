@@ -11,7 +11,66 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { calculateMatchScore, ENTITY_MATCH_TYPE, normalizePhone, fuzzySimilarity } from './src/services/EntityResolution.js';
-import { normalizeCoordinates, normalizeCategories } from './src/services/FieldNormalizer.js';
+import { normalizeCoordinates, normalizeCategories, normalizeHours, normalizeHoursValue } from './src/services/FieldNormalizer.js';
+
+// ============================================================================
+// TEST SUITE 7: Hours Normalization (Phase 20 #9)
+// ============================================================================
+
+test('Hours — all seven weekdays present in canonical map', () => {
+  const hours = normalizeHours('Mo-Su 07:30-18:00');
+  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  for (const day of days) {
+    assert.strictEqual(hours[day], '07:30-18:00', `${day} should have hours`);
+  }
+});
+
+test('Hours — closed day preserved as "closed"', () => {
+  const hours = normalizeHours('Monday: 09:00-17:00, Tuesday: closed');
+  assert.strictEqual(hours.monday, '09:00-17:00');
+  assert.strictEqual(hours.tuesday, 'closed');
+});
+
+test('Hours — open 24 hours preserved as literal', () => {
+  const value = normalizeHoursValue('24 hours');
+  assert.strictEqual(value, '24 hours');
+});
+
+test('Hours — multiple intervals joined comma-separated', () => {
+  const value = normalizeHoursValue(['09:00-12:00', '13:00-17:00']);
+  assert.strictEqual(value, '09:00-12:00, 13:00-17:00');
+});
+
+test('Hours — malformed input normalizes to empty map (never throws)', () => {
+  assert.deepStrictEqual(normalizeHours(null), {});
+  assert.deepStrictEqual(normalizeHours(''), {});
+  assert.deepStrictEqual(normalizeHours(undefined), {});
+  assert.deepStrictEqual(normalizeHours('garbage without day tokens'), {});
+  assert.strictEqual(normalizeHoursValue(null), null);
+  assert.strictEqual(normalizeHoursValue(''), null);
+});
+
+test('Hours — canonical numeric weekday 0=Sunday, 1=Monday (FieldNormalizer)', () => {
+  const sunday = normalizeHours([{ day_of_week: 0, start_time: '08:00', end_time: '16:00' }]);
+  assert.deepStrictEqual(sunday, { sunday: '08:00-16:00' }, '0 should be Sunday');
+
+  const monday = normalizeHours([{ day_of_week: 1, start_time: '08:00', end_time: '16:00' }]);
+  assert.deepStrictEqual(monday, { monday: '08:00-16:00' }, '1 should be Monday');
+
+  const sundayAlt = normalizeHours([{ day_of_week: 7, start_time: '08:00', end_time: '16:00' }]);
+  assert.deepStrictEqual(sundayAlt, { sunday: '08:00-16:00' }, '7 should map to Sunday (1=Mon..7=Sun)');
+});
+
+test('Hours — interval object forms normalize identically', () => {
+  const a = normalizeHoursValue({ open: '09:00', close: '17:00' });
+  const b = normalizeHoursValue({ from: '09:00', to: '17:00' });
+  const c = normalizeHoursValue({ start: '09:00', end: '17:00' });
+  assert.strictEqual(a, '09:00-17:00');
+  assert.strictEqual(b, '09:00-17:00');
+  assert.strictEqual(c, '09:00-17:00');
+  assert.strictEqual(a, b);
+  assert.strictEqual(b, c);
+});
 
 // ============================================================================
 // TEST SUITE 1: Metamorphic Normalization
@@ -421,7 +480,7 @@ test('Coordinates — longitude 0 is valid', async (t) => {
 });
 
 // ============================================================================
-// TEST SUITE 6: No [object Object] in Data
+// TEST SUITE 6: No [object Object] in Data (#10 Nested Serialization)
 // ============================================================================
 
 test('FieldNormalizer — never persist [object Object]', async (t) => {
@@ -437,6 +496,54 @@ test('FieldNormalizer — never persist [object Object]', async (t) => {
   
   // Our normalizers should prevent this
   // (Tests for actual normalizer implementations)
+});
+
+test('Nested serialization — coordinates kept structured, never stringified', async () => {
+  const { normalizeCoordinates } = await import('./src/services/FieldNormalizer.js');
+  const raw = { latitude: 37.7749, longitude: -122.4194 };
+  const normalized = normalizeCoordinates(raw);
+  assert.strictEqual(typeof normalized, 'object');
+  assert.strictEqual(typeof normalized.lat, 'number');
+  assert.strictEqual(typeof normalized.lng, 'number');
+  // Proper serialization (JSON.stringify) must produce meaningful structure,
+  // NOT a bare "{}" or "null".
+  const serialized = JSON.stringify(normalized);
+  assert.notStrictEqual(serialized, '{}', 'coordinates must serialize to a non-empty object');
+  assert.ok(serialized.includes('37.7749'), 'serialized coords must contain the values');
+});
+
+test('Nested serialization — hours preserved as object, not "[object Object]"', async () => {
+  const { normalizeHours } = await import('./src/services/FieldNormalizer.js');
+  const raw = { monday: '09:00-17:00', tuesday: 'closed' };
+  const normalized = normalizeHours(raw);
+  assert.strictEqual(typeof normalized, 'object');
+  assert.strictEqual(normalized.monday, '09:00-17:00');
+  assert.strictEqual(normalized.tuesday, 'closed');
+  // Proper serialization must preserve day/range structure.
+  const serialized = JSON.stringify(normalized);
+  assert.ok(serialized.includes('monday'), 'hours JSON must contain day keys');
+  assert.ok(serialized.includes('09:00-17:00'), 'hours JSON must contain ranges');
+  assert.notStrictEqual(serialized, '{}');
+});
+
+test('Nested serialization — JSON-stringified arrays preserve structure', async () => {
+  const { parseStringifiedStructure } = await import('./src/services/FieldNormalizer.js');
+  const raw = '["Restaurant","Fast Food"]';
+  const parsed = parseStringifiedStructure(raw);
+  assert.ok(Array.isArray(parsed), 'JSON string should parse back to an array');
+  assert.deepStrictEqual(parsed, ['Restaurant', 'Fast Food']);
+});
+
+test('Nested serialization — categories/services/amenities never become "{}" or "[object Object]"', async () => {
+  const { normalizeCategories, normalizeServices } = await import('./src/services/FieldNormalizer.js');
+  const cats = normalizeCategories('Restaurant,Fast Food');
+  const services = normalizeServices('["Delivery","Takeout"]');
+  assert.ok(Array.isArray(cats) && cats.length === 2);
+  assert.ok(Array.isArray(services) && services.length === 2);
+  assert.notStrictEqual(JSON.stringify(cats), '{}');
+  assert.notStrictEqual(JSON.stringify(services), '{}');
+  assert.notStrictEqual(String(cats), '[object Object]');
+  assert.notStrictEqual(String(services), '[object Object]');
 });
 
 export { test, assert };
