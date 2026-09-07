@@ -6,6 +6,7 @@ import WebExtractionProvider from './src/services/providers/WebExtractionProvide
 import BrandStrategyService from './src/services/BrandStrategyService.js';
 import { closeDatabase, getDb } from './src/db/client.js';
 import { IdentityRepository } from './src/db/IdentityRepository.js';
+import { createAcquisitionResult, ACQUISITION_STATUS } from './src/services/AcquisitionResult.js';
 
 const rawRecord = {
   business: { name: 'Failure Mode Bakery', category: 'Bakery', description: 'A local bakery.' },
@@ -16,8 +17,23 @@ const rawRecord = {
 
 function configureProvider() {
   GeoapifyProvider.isAvailable = () => true;
-  GeoapifyProvider.getBusiness = async () => rawRecord;
-  WebExtractionProvider.search = async () => ({ status: 'no_result', records: [] });
+  // Provider boundary now returns the authoritative AcquisitionResult. Keep
+  // this fixture aligned with the production contract instead of mocking the
+  // removed getBusiness orchestration path.
+  GeoapifyProvider.search = async () => createAcquisitionResult({
+    provider: 'geoapify',
+    sourceUrl: 'geoapify://phase9-test',
+    status: ACQUISITION_STATUS.SUCCESS,
+    records: [rawRecord],
+    diagnostics: { httpStatus: 200 },
+    latencyMs: 1,
+  });
+  WebExtractionProvider.search = async () => createAcquisitionResult({
+    provider: 'web_extraction',
+    sourceUrl: null,
+    status: ACQUISITION_STATUS.EMPTY_RESULT,
+    diagnostics: { httpStatus: null },
+  });
   BrandStrategyService.generateBrandDNA = async () => { throw new Error('AI unavailable'); };
 }
 
