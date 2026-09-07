@@ -111,14 +111,14 @@ class GeoapifyProvider extends BusinessDataProvider {
     // Guard: no credential configured → report gracefully
     if (!this.isAvailable()) {
       const latencyMs = Date.now() - startedAt;
-      return {
-        provider: 'geoapify',
+      return createAcquisitionResult({
+        provider: this.name,
+        sourceUrl,
         status: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
-        records: [],
-        error: { category: 'NOT_CONFIGURED', safeMessage: 'Geoapify API key not configured.' },
-        diagnostics: { httpStatus: null, errorCode: 'provider_unavailable', retryCount: 0, latencyMs },
-        source: { url: sourceUrl, retrieval: new Date().toISOString() },
-      };
+        error: { category: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE, safeMessage: 'Geoapify API key not configured.' },
+        diagnostics: { errorCode: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE },
+        latencyMs,
+      });
     }
 
     const text = (hints && (hints.query || hints.name)) || null;
@@ -137,14 +137,14 @@ class GeoapifyProvider extends BusinessDataProvider {
     // Must have at least a text query OR coordinates to search
     if (!params.text && (lat == null || lng == null)) {
       const latencyMs = Date.now() - startedAt;
-      return {
-        provider: 'geoapify',
+      return createAcquisitionResult({
+        provider: this.name,
+        sourceUrl,
         status: ACQUISITION_STATUS.EMPTY_RESULT,
-        records: [],
-        error: { category: 'UNSUPPORTED_URL', safeMessage: 'No search query or coordinates provided.' },
-        diagnostics: { httpStatus: null, errorCode: 'empty_result', retryCount: 0, latencyMs },
-        source: { url: sourceUrl, retrieval: new Date().toISOString() },
-      };
+        error: { category: ACQUISITION_STATUS.EMPTY_RESULT, safeMessage: 'No search query or coordinates provided.' },
+        diagnostics: { errorCode: ACQUISITION_STATUS.EMPTY_RESULT },
+        latencyMs,
+      });
     }
 
     try {
@@ -154,14 +154,14 @@ class GeoapifyProvider extends BusinessDataProvider {
 
       const features = response.data?.features;
       if (!Array.isArray(features) || features.length === 0) {
-        return {
-          provider: 'geoapify',
+        return createAcquisitionResult({
+          provider: this.name,
+          sourceUrl,
           status: ACQUISITION_STATUS.EMPTY_RESULT,
-          records: [],
-          error: { category: 'NO_RESULT', safeMessage: 'No businesses found matching the search criteria.' },
-          diagnostics: { httpStatus: response.status, errorCode: 'empty_result', retryCount: 0, latencyMs },
-          source: { url: sourceUrl, retrieval: new Date().toISOString() },
-        };
+          error: { category: ACQUISITION_STATUS.EMPTY_RESULT, safeMessage: 'No businesses found matching the search criteria.', httpStatus: response.status },
+          diagnostics: { httpStatus: response.status },
+          latencyMs,
+        });
       }
 
       const records = features
@@ -175,38 +175,39 @@ class GeoapifyProvider extends BusinessDataProvider {
         .filter((r) => r !== null);
 
       if (records.length === 0) {
-        return {
-          provider: 'geoapify',
+        return createAcquisitionResult({
+          provider: this.name,
+          sourceUrl,
           status: ACQUISITION_STATUS.EXTRACTION_FAILED,
-          records: [],
-          error: { category: 'INVALID_RESPONSE', safeMessage: 'Geoapify response could not be parsed into a profile.' },
-          diagnostics: { httpStatus: response.status, errorCode: 'extraction_failed', retryCount: 0, latencyMs },
-          source: { url: sourceUrl, retrieval: new Date().toISOString() },
-        };
+          error: { category: ACQUISITION_STATUS.EXTRACTION_FAILED, safeMessage: 'Geoapify response could not be parsed into a profile.', httpStatus: response.status },
+          diagnostics: { httpStatus: response.status },
+          latencyMs,
+        });
       }
 
-      return {
-        provider: 'geoapify',
+      return createAcquisitionResult({
+        provider: this.name,
+        sourceUrl,
         status: ACQUISITION_STATUS.SUCCESS,
         records,
-        error: null,
-        diagnostics: { httpStatus: response.status, errorCode: null, retryCount: 0, latencyMs },
-        source: { url: sourceUrl, retrieval: new Date().toISOString() },
-      };
+        diagnostics: { httpStatus: response.status },
+        latencyMs,
+      });
     } catch (error) {
       const latencyMs = Date.now() - startedAt;
       const status = this._classifyError(error);
       const safeMessage = this._safeErrorMessage(error);
       const httpStatus = error?.response?.status || null;
       this._logSafe(status, error);
-      return {
-        provider: 'geoapify',
-        status: STATUS_TO_ACQUISITION[status] || ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
-        records: [],
-        error: { category: status, safeMessage, httpStatus },
-        diagnostics: { httpStatus, errorCode: STATUS_TO_ACQUISITION[status] || 'provider_unavailable', retryCount: 0, latencyMs },
-        source: { url: sourceUrl, retrieval: new Date().toISOString() },
-      };
+      const acquisitionStatus = STATUS_TO_ACQUISITION[status] || ACQUISITION_STATUS.PROVIDER_UNAVAILABLE;
+      return createAcquisitionResult({
+        provider: this.name,
+        sourceUrl,
+        status: acquisitionStatus,
+        error: { category: acquisitionStatus, safeMessage, httpStatus },
+        diagnostics: { httpStatus },
+        latencyMs,
+      });
     }
   }
 
@@ -263,22 +264,24 @@ class GeoapifyProvider extends BusinessDataProvider {
   }
 
   /**
-   * Return the best-matching normalized business record for the hints.
-   * Enriches the chosen record with place-details (phone/website/hours) when
-   * a place_id is available.
+   * Locally select the best-matching record for the hints from an already
+   * completed acquisition result. Pure function — never performs a network
+   * request (requirement #2: no second acquisition merely because the first
+   * returned no record or multiple records).
    *
-   * @returns {Promise<Object|null>}
+   * If coordinates were supplied, prefers the record closest to them;
+   * otherwise the top-ranked record from the API.
+   *
+   * @param {Object} result - AcquisitionResult from this.search()
+   * @param {Object} [hints]
+   * @returns {Object|null} best record, or null when no usable records
    */
-  async getBusiness(hints, options = {}) {
-    const result = await this.search(hints, options);
-    // Lossless contract: result.status is a canonical ACQUISITION_STATUS
-    if (result.status !== ACQUISITION_STATUS.SUCCESS || result.records.length === 0) {
-      return null;
-    }
+  selectBestRecord(result, hints = {}) {
+    // Only SUCCESS/PARTIAL acquisitions yield candidates. A failed or empty
+    // acquisition must never be re-attempted by the caller.
+    if (!result || !result.records || result.records.length === 0) return null;
     const records = result.records;
 
-    // If coordinates were supplied, prefer the record closest to them;
-    // otherwise take the top-ranked record from the API.
     let best = records[0];
     const lat = hints?.latitude;
     const lng = hints?.longitude;
@@ -294,13 +297,60 @@ class GeoapifyProvider extends BusinessDataProvider {
         }
       }
     }
+    return best;
+  }
+
+  /**
+   * Best-effort enrich an already-selected record with place-details
+   * (phone/website/hours/categories) for its placeId. Never performs a search
+   * acquisition — only the supplementary place-details lookup for a record we
+   * already hold (requirement #2: a search is never repeated).
+   *
+   * @param {Object} record - record from search()/selectBestRecord()
+   * @returns {Promise<Object>} the (possibly enriched) record
+   */
+  async enrichRecord(record) {
+    if (!record) return record;
+    try {
+      const placeId = record?.provider?.placeId;
+      if (!placeId) return record;
+      const details = await this._fetchPlaceDetails(placeId);
+      if (details) return this._mergeDetails(record, details);
+      return record;
+    } catch {
+      return record; // enrichment is best-effort; never fail the record
+    }
+  }
+
+  /**
+   * Return the best-matching normalized business record for the hints.
+   *
+   * Convenience API — performs EXACTLY ONE search() acquisition, selects the
+   * best record locally, and (when a record exists) best-effort enriches it
+   * with place-details. It never issues a second search merely because the
+   * first returned no record. Callers that need the lossless diagnostics
+   * (status/error/latency) should call search() directly and use
+   * selectBestRecord() on the result.
+   *
+   * @param {Object} hints
+   * @param {Object} [options]
+   * @returns {Promise<Object|null>} the best record (enriched) or null
+   */
+  async getBusiness(hints = {}, options = {}) {
+    const result = await this.search(hints, options);
+    // Lossless contract: result.status is a canonical ACQUISITION_STATUS.
+    // No retry-like second acquisition here — if the first search returned no
+    // usable records, we report null with the original diagnostics preserved
+    // on the result for the caller (requirement #2).
+    const best = this.selectBestRecord(result, hints);
+    if (!best) return null;
 
     // Best-effort enrichment: pull place-details (phone/website/hours/categories)
     const placeId = best?.provider?.placeId;
     if (placeId) {
       const details = await this._fetchPlaceDetails(placeId);
       if (details) {
-        best = this._mergeDetails(best, details);
+        return this._mergeDetails(best, details);
       }
     }
 

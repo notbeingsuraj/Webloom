@@ -201,14 +201,33 @@ export function calculateIdentityStrength(fieldsOrRecord) {
     details.push('place_id');
   }
 
+  // Semantic-first evidence strength (#5):
+  //
+  //   name + address + phone                      -> very_strong
+  //   stable place id + name + corroborating      -> very_strong
+  //   name + phone OR name + website              -> strong
+  //   name + address OR name + city OR phone-only -> moderate
+  //   name-only / website-only / coords-only      -> weak
+  //   generic name-only / nothing                 -> insufficient
+  //
+  // Semantic combinations are checked BEFORE raw score bands because a
+  // score alone cannot distinguish e.g. name+address (0.60) from
+  // name+phone (0.65) — the combination determines the tier, not the sum.
+  const semanticVeryStrong =
+    (hasName && hasAddress && hasPhone) ||
+    (hasPlaceId && hasName && (hasPhone || hasAddress || hasWebsite));
+  const semanticStrong = hasName && (hasPhone || hasWebsite);
+  const semanticModerate = (hasName && (hasAddress || hasCity)) || hasPhone;
+  const semanticWeak = (hasName && !isGenericName) || hasWebsite || hasCoords;
+
   let strength;
-  if (score >= 0.85 || (hasPlaceId && hasName && (hasPhone || hasAddress || hasWebsite))) {
+  if (semanticVeryStrong) {
     strength = IDENTITY_EVIDENCE_STRENGTH.VERY_STRONG;
-  } else if (score >= 0.60 || (hasName && (hasPhone || hasWebsite))) {
+  } else if (semanticStrong) {
     strength = IDENTITY_EVIDENCE_STRENGTH.STRONG;
-  } else if (score >= 0.35 || (hasName && (hasAddress || hasCity))) {
+  } else if (semanticModerate) {
     strength = IDENTITY_EVIDENCE_STRENGTH.MODERATE;
-  } else if (score >= 0.20 || (hasName && !isGenericName)) {
+  } else if (semanticWeak) {
     strength = IDENTITY_EVIDENCE_STRENGTH.WEAK;
   } else {
     strength = IDENTITY_EVIDENCE_STRENGTH.INSUFFICIENT;

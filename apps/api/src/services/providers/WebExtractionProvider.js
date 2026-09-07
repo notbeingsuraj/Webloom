@@ -73,8 +73,8 @@ class WebExtractionProvider extends BusinessDataProvider {
     const startedAt = Date.now();
 
     if (!url) {
-      const result = createAcquisitionResult({
-        provider: 'web_extraction',
+      return createAcquisitionResult({
+        provider: this.name,
         sourceUrl: null,
         status: ACQUISITION_STATUS.UNSUPPORTED_URL,
         fields: {},
@@ -85,14 +85,6 @@ class WebExtractionProvider extends BusinessDataProvider {
         message: 'No URL provided for web extraction.',
         latencyMs: 0,
       });
-      return {
-        provider: 'web_extraction',
-        status: ACQUISITION_STATUS.UNSUPPORTED_URL,
-        records: [],
-        error: result.errors[0],
-        diagnostics: { httpStatus: null, errorCode: 'unsupported_url', retryCount: 0, latencyMs: 0 },
-        source: { url: null, retrieval: new Date().toISOString() },
-      };
     }
 
     try {
@@ -101,20 +93,12 @@ class WebExtractionProvider extends BusinessDataProvider {
       const latencyMs = Date.now() - startedAt;
 
       if (!result || typeof result !== 'object') {
-        const acq = classifyEmptyAcquisition({
-          provider: 'web_extraction',
+        return classifyEmptyAcquisition({
+          provider: this.name,
           sourceUrl: url,
           record: {},
           latencyMs,
         });
-        return {
-          provider: 'web_extraction',
-          status: acq.status,
-          records: [],
-          error: acq.errors[0] || null,
-          diagnostics: { httpStatus: null, errorCode: acq.errorCode, retryCount: 0, latencyMs },
-          source: { url, retrieval: new Date().toISOString() },
-        };
       }
 
       // BusinessDataExtractor returns the flattened canonical profile
@@ -143,30 +127,22 @@ class WebExtractionProvider extends BusinessDataProvider {
       );
 
       if (!hasEvidence) {
-        const acq = classifyEmptyAcquisition({
-          provider: 'web_extraction',
+        return classifyEmptyAcquisition({
+          provider: this.name,
           sourceUrl: url,
           record,
           latencyMs,
         });
-        return {
-          provider: 'web_extraction',
-          status: acq.status, // empty_result / provider_unavailable / extraction_failed
-          records: [],
-          error: acq.errors[0] || null,
-          diagnostics: { httpStatus: null, errorCode: acq.errorCode, retryCount: 0, latencyMs },
-          source: { url, retrieval: record.retrieval },
-        };
       }
 
-      return {
-        provider: 'web_extraction',
+      return createAcquisitionResult({
+        provider: this.name,
+        sourceUrl: url,
         status: ACQUISITION_STATUS.SUCCESS,
         records: [record],
-        error: null,
-        diagnostics: { httpStatus: 200, errorCode: null, retryCount: 0, latencyMs },
-        source: { url, retrieval: record.retrieval },
-      };
+        diagnostics: { httpStatus: 200 },
+        latencyMs,
+      });
     } catch (error) {
       const latencyMs = Date.now() - startedAt;
       // Lossless error: category + safe message + timing preserved
@@ -174,8 +150,8 @@ class WebExtractionProvider extends BusinessDataProvider {
       const category = error?.category || (error?.response ? 'HTTP_ERROR' : 'PROVIDER_UNAVAILABLE');
       const httpStatus = error?.response?.status || null;
       console.error(`[WebExtractionProvider] Web extraction failed: ${safeMessage}`);
-      const acq = createAcquisitionResult({
-        provider: 'web_extraction',
+      return createAcquisitionResult({
+        provider: this.name,
         sourceUrl: url,
         status: ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
         fields: {},
@@ -186,14 +162,6 @@ class WebExtractionProvider extends BusinessDataProvider {
         message: safeMessage,
         latencyMs,
       });
-      return {
-        provider: 'web_extraction',
-        status: acq.status,
-        records: [],
-        error: acq.errors[0] || null,
-        diagnostics: { httpStatus, errorCode: acq.errorCode, retryCount: 0, latencyMs },
-        source: { url, retrieval: new Date().toISOString() },
-      };
     }
   }
 

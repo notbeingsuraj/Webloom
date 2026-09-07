@@ -412,26 +412,26 @@ class BusinessResearchService {
     }
 
     // --- LEVEL 2: Geoapify structured data (provider provenance) ---
-    // getBusiness() performs search + place-details enrichment (phone/website/
-    // hours) and returns the best single record. When it returns null, we call
-    // search() once more to capture the LOSS LESS diagnostic details (status,
-    // error category, safe message, latency) so failures are never silent.
+    // ONE acquisition: search() returns the lossless AcquisitionResult
+    // (status, records, error, diagnostics). selectBestRecord() locally picks
+    // the best match; enrichRecord() best-effort adds place-details for the
+    // chosen record ONLY. There is no second search when the first returns no
+    // record — the diagnostics come from the same acquisition call (#2).
     let geoapifyRecord = null;
     if (GeoapifyProvider.isAvailable()) {
-      const business = await GeoapifyProvider.getBusiness(hints);
-      if (business) {
-        geoapifyRecord = business;
+      const geoResult = await GeoapifyProvider.search(hints);
+      providerTrace.geoapify = geoResult.status;
+      providerTrace.geoapifyError = geoResult.error || null;
+      providerTrace.geoapifyDiagnostics = geoResult.diagnostics || null;
+
+      const best = GeoapifyProvider.selectBestRecord(geoResult, hints);
+      if (best) {
+        geoapifyRecord = await GeoapifyProvider.enrichRecord(best);
         this._mergeCanonical(profile, geoapifyRecord, 'discovered', 'geoapify', sourceUrl);
         providerTrace.geoapify = 'ok';
-      } else {
-        // Lossless: preserve the exact failure details from the structured result
-        const geoResult = await GeoapifyProvider.search(hints);
-        providerTrace.geoapify = geoResult.status;
-        providerTrace.geoapifyError = geoResult.error || null;
-        providerTrace.geoapifyDiagnostics = geoResult.diagnostics || null;
-        if (config?.debugBusinessAnalysis) {
-          console.log(`[Geoapify] status=${geoResult.status}, error=${geoResult.error?.safeMessage || 'none'}`);
-        }
+      }
+      if (config?.debugBusinessAnalysis) {
+        console.log(`[Geoapify] status=${geoResult.status}, error=${geoResult.error?.safeMessage || 'none'}`);
       }
     } else {
       console.error('Geoapify provider unavailable; using fallback extraction.');
