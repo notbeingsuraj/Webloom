@@ -181,3 +181,99 @@ test('SourceCache — normalized URL equivalence', () => {
   cache.close();
   rmSync(dbPath, { recursive: true, force: true });
 });
+
+test('SourceCache — tracking-only differences map to the same entry', () => {
+  const dbPath = makeTempDbPath();
+  const cache = new SourceCache(dbPath);
+
+  const base = 'https://example.com/page?product=abc';
+  const variants = [
+    `${base}&utm_source=newsletter`,
+    `${base}&utm_medium=email&utm_campaign=launch`,
+    `${base}&ref=partner`,
+    `${base}&fbclid=xyz123`,
+    `${base}&gclid=abc456`,
+    `${base}&utm_source=x#section`,
+  ];
+
+  cache.set(base, { data: { business: { name: 'Same Source' } } }, { provider: 'web_extraction' });
+  for (const v of variants) {
+    const entry = cache.get(v, 'web_extraction');
+    assert.ok(entry, `tracking variant should resolve to same cache entry: ${v}`);
+    assert.strictEqual(entry.result.data.business.name, 'Same Source');
+  }
+
+  cache.close();
+  rmSync(dbPath, { recursive: true, force: true });
+});
+
+test('SourceCache — legitimate query differences map to different entries', () => {
+  const dbPath = makeTempDbPath();
+  const cache = new SourceCache(dbPath);
+
+  // Different legitimate identifying params must NOT collide.
+  cache.set('https://example.com/page?q=tartine', { data: { business: { name: 'A' } } }, { provider: 'web_extraction' });
+  cache.set('https://example.com/page?q=bluebottle', { data: { business: { name: 'B' } } }, { provider: 'web_extraction' });
+
+  const a = cache.get('https://example.com/page?q=tartine', 'web_extraction');
+  const b = cache.get('https://example.com/page?q=bluebottle', 'web_extraction');
+
+  assert.strictEqual(a.result.data.business.name, 'A');
+  assert.strictEqual(b.result.data.business.name, 'B');
+
+  // Top-level page (no query) is yet another distinct entry.
+  cache.set('https://example.com/page', { data: { business: { name: 'C' } } }, { provider: 'web_extraction' });
+  const c = cache.get('https://example.com/page', 'web_extraction');
+  assert.strictEqual(c.result.data.business.name, 'C');
+
+  cache.close();
+  rmSync(dbPath, { recursive: true, force: true });
+});
+
+test('SourceCache — normalization is idempotent (cache key is deterministic)', () => {
+  const dbPath = makeTempDbPath();
+  const cache = new SourceCache(dbPath);
+
+  // A single canonical key must be produced regardless of how many times the
+  // URL is normalized, and different raw spellings must all settle on it.
+  const center = cache.normalizeUrl('https://maps.google.com/maps?q=Tartine&utm_source=foo');
+  const second = cache.normalizeUrl(center);
+  assert.strictEqual(second, center, 'normalizing an already-normalized URL is a no-op');
+
+  // Writing once under a raw URL and reading under its fully-normalized form
+  // must return the same record.
+  cache.set('https://www.google.com/maps?q=Tartine&utm_source=x&utm_medium=y#frag', { data: { business: { name: 'Tartine' } } }, { provider: 'web_extraction' });
+  const entry = cache.get(center, 'web_extraction');
+  assert.ok(entry, 'raw and normalized spellings share one cache entry');
+  assert.strictEqual(entry.result.data.business.name, 'Tartine');
+
+  cache.close();
+  rmSync(dbPath, { recursive: true, force: true });
+});
+
+test('SourceCache — provider isolation preserved under URL normalization', () => {
+  const dbPath = makeTempDbPath();
+  const cache = new SourceCache(dbPath);
+
+  // Same normalized URL, two providers → two distinct entries that never cross.
+  const trackingUrl = 'https://maps.google.com/maps?q=Tartine&utm_source=news';
+
+  cache.set(trackingUrl, { data: { business: { name: 'Geoapify Read' } } }, { provider: 'geoapify' });
+  cache.set(trackingUrl, { data: { business: { name: 'Web Read' } } }, { provider: 'web_extraction' });
+
+  const geo = cache.get('https://maps.google.com/maps?q=Tartine&utm_medium=banner', 'geoapify');
+  const web = cache.get('https://maps.google.com/maps?q=Tartine&ref=affiliate', 'web_extraction');
+
+  assert.ok(geo, 'geoapify entry reachable via normalized tracking variant');
+  assert.ok(web, 'web_extraction entry reachable via normalized tracking variant');
+  assert.strictEqual(geo.result.data.business.name, 'Geoapify Read');
+  assert.strictEqual(web.result.data.business.name, 'Web Read');
+
+  // Provider-specific invalidation removes only the intended provider.
+  cache.delete({ sourceUrl: trackingUrl, provider: 'geoapify' });
+  assert.strictEqual(cache.get(trackingUrl, 'geoapify'), null, 'geoapify entry removed');
+  assert.ok(cache.get(trackingUrl, 'web_extraction'), 'web_extraction entry survives');
+
+  cache.close();
+  rmSync(dbPath, { recursive: true, force: true });
+});

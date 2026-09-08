@@ -162,9 +162,9 @@ export class SourceCache {
    *   - sourceUrl requires provider to identify the exact composite key
    */
   delete({ sourceUrl = null, provider = null } = {}) {
-    if (sournormalized = this.normalizeUrl(sourceUrl);
-      const hash = SourceCache.hashSourceUrl(normalized
-      const hash = SourceCache.hashSourceUrl(sourceUrl);
+    if (sourceUrl && provider) {
+      const normalized = this.normalizeUrl(sourceUrl);
+      const hash = SourceCache.hashSourceUrl(normalized);
       return this.db.prepare('DELETE FROM source_cache WHERE source_hash = ? AND provider = ?').run(hash, provider);
     }
     if (provider) {
