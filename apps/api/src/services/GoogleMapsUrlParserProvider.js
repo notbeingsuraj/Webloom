@@ -13,6 +13,8 @@
  * - query string (for search URLs)
  */
 
+import { normalizeUrl as canonicalNormalizeUrl } from '../utils/urlNormalizer.js';
+
 class GoogleMapsUrlParserProvider {
   /**
    * Validate if URL is a Google Maps URL
@@ -170,21 +172,20 @@ class GoogleMapsUrlParserProvider {
   }
 
   /**
-   * Normalize Google Maps URL for consistent caching
+   * Normalize Google Maps URL for consistent caching.
+   *
+   * Uses the SINGLE canonical URL normalizer (urlNormalizer) shared with
+   * SourceCache so the cache key and the provider-derived normalized URL always
+   * agree. Tracking parameters (utm_*, ref, fbclid, gclid…) are stripped,
+   * fragments dropped, www./google.com maps hosts folded to maps.google.com,
+   * and legitimate query parameters (place_id, query, cid, hl, q…) are
+   * preserved and deterministically ordered. Idempotent.
    * @param {string} url - Google Maps URL
    * @returns {string} Normalized URL
    */
   static normalizeUrl(url) {
     try {
-      const parsed = new URL(url);
-      const allowedParams = ['place_id', 'query', 'cid', 'hl'];
-      const cleaned = new URL(parsed.origin + parsed.pathname);
-      allowedParams.forEach(param => {
-        if (parsed.searchParams.has(param)) {
-          cleaned.searchParams.set(param, parsed.searchParams.get(param));
-        }
-      });
-      return cleaned.toString();
+      return canonicalNormalizeUrl(url);
     } catch {
       return url;
     }

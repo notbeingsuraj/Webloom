@@ -31,6 +31,7 @@
 
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
+import { normalizeUrl } from '../utils/urlNormalizer.js';
 
 const DEFAULT_DB_PATH = process.env.SQLITE_SOURCE_CACHE_PATH || './source-cache.db';
 
@@ -39,11 +40,25 @@ const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24h default
 export class SourceCache {
   /**
    * @param {string} [dbPath] SQLite file path
+   * @param {Object} [opts]
+   * @param {(url: string) => string} [opts.normalizer] canonical URL normalizer
+   *   applied to every source URL before the cache key is computed. Defaults to
+   *   the single canonical normalizer (urlNormalizer) shared with the providers,
+   *   guaranteeing tracking-parameter- and host-equivalent URLs collide on the
+   *   same key. Pass null to store URLs exactly as provided.
    */
-  constructor(dbPath = DEFAULT_DB_PATH) {
+  constructor(dbPath = DEFAULT_DB_PATH, { normalizer = normalizeUrl } = {}) {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
+    this._normalizer = normalizer;
     this._ensureSchema();
+  }
+
+  /** Normalize a source URL to its canonical cache key form. */
+  normalizeUrl(url) {
+    if (!this._normalizer) return url;
+    const normalized = this._normalizer(url);
+    return typeof normalized === 'string' ? normalized : url;
   }
 
   _ensureSchema() {
@@ -79,7 +94,8 @@ export class SourceCache {
    */
   get(normalizedUrl, provider = 'unknown', ttlMs = DEFAULT_TTL_MS) {
     if (!normalizedUrl) return null;
-    const hash = SourceCache.hashSourceUrl(normalizedUrl);
+    const normalized = this.normalizeUrl(normalizedUrl);
+    const hash = SourceCache.hashSourceUrl(normalized);
     const row = this.db
       .prepare('SELECT * FROM source_cache WHERE source_hash = ? AND provider = ?')
       .get(hash, provider);
@@ -118,7 +134,8 @@ export class SourceCache {
    */
   set(normalizedUrl, result, { provider = 'unknown', ttlMs = DEFAULT_TTL_MS, contentHash = null } = {}) {
     if (!normalizedUrl) return;
-    const hash = SourceCache.hashSourceUrl(normalizedUrl);
+    const normalized = this.normalizeUrl(normalizedUrl);
+    const hash = SourceCache.hashSourceUrl(normalized);
     const now = new Date().toISOString();
     const expiresAt =
       ttlMs === Infinity ? null : new Date(Date.now() + ttlMs).toISOString();
@@ -136,7 +153,7 @@ export class SourceCache {
            expires_at = excluded.expires_at,
            result = excluded.result`
       )
-      .run(hash, provider, normalizedUrl, digest, now, expiresAt, serialized);
+      .run(hash, provider, normalized, digest, now, expiresAt, serialized);
   }
 
   /**
@@ -145,7 +162,8 @@ export class SourceCache {
    *   - sourceUrl requires provider to identify the exact composite key
    */
   delete({ sourceUrl = null, provider = null } = {}) {
-    if (sourceUrl && provider) {
+    if (sournormalized = this.normalizeUrl(sourceUrl);
+      const hash = SourceCache.hashSourceUrl(normalized
       const hash = SourceCache.hashSourceUrl(sourceUrl);
       return this.db.prepare('DELETE FROM source_cache WHERE source_hash = ? AND provider = ?').run(hash, provider);
     }
