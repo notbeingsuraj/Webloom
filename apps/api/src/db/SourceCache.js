@@ -71,23 +71,23 @@ export class SourceCache {
   }
 
   /**
-   * Read a cache entry by normalized URL.
+   * Read a cache entry by normalized URL and provider.
    * @param {string} normalizedUrl
+   * @param {string} provider - required; distinguishes provider acquisitions for same URL
    * @param {number} [ttlMs] optional TTL override (defaults to DEFAULT_TTL_MS)
    * @returns {Object|null} { result, sourceUrl, retrievedAt, provider, contentHash, expired }
    */
-  get(normalizedUrl, ttlMs = DEFAULT_TTL_MS) {
-    if (!normalizedUrl) return null;
+  get(normalizedUrl, provider, ttlMs = DEFAULT_TTL_MS) {
+    if (!normalizedUrl || !provider) return null;
     const hash = SourceCache.hashSourceUrl(normalizedUrl);
     const row = this.db
-      .prepare('SELECT * FROM source_cache WHERE source_hash = ?')
-      .get(hash);
+      .prepare('SELECT * FROM source_cache WHERE source_hash = ? AND provider = ?')
+      .get(hash, provider);
     if (!row) return null;
 
     const expired = row.expires_at != null && new Date(row.expires_at).getTime() < Date.now();
     if (expired) {
-      // TTL expired → treat as cache miss and purge the row lazily
-      this.db.prepare('DELETE FROM source_cache WHERE id = ?').run(row.id);
+      this.db.prepare('DELETE FROM source_cache WHERE source_hash = ? AND provider = ?').run(hash, provider);
       return null;
     }
 
