@@ -77,8 +77,8 @@ export class SourceCache {
    * @param {number} [ttlMs] optional TTL override (defaults to DEFAULT_TTL_MS)
    * @returns {Object|null} { result, sourceUrl, retrievedAt, provider, contentHash, expired }
    */
-  get(normalizedUrl, provider, ttlMs = DEFAULT_TTL_MS) {
-    if (!normalizedUrl || !provider) return null;
+  get(normalizedUrl, provider = 'unknown', ttlMs = DEFAULT_TTL_MS) {
+    if (!normalizedUrl) return null;
     const hash = SourceCache.hashSourceUrl(normalizedUrl);
     const row = this.db
       .prepare('SELECT * FROM source_cache WHERE source_hash = ? AND provider = ?')
@@ -116,8 +116,8 @@ export class SourceCache {
    * @param {number} [opts.ttlMs] TTL in ms (defaults to DEFAULT_TTL_MS; pass Infinity for no expiry)
    * @param {string} [opts.contentHash] sha256 of serialized result (computed if omitted)
    */
-  set(normalizedUrl, result, { provider = null, ttlMs = DEFAULT_TTL_MS, contentHash = null } = {}) {
-    if (!normalizedUrl || !provider) return;
+  set(normalizedUrl, result, { provider = 'unknown', ttlMs = DEFAULT_TTL_MS, contentHash = null } = {}) {
+    if (!normalizedUrl) return;
     const hash = SourceCache.hashSourceUrl(normalizedUrl);
     const now = new Date().toISOString();
     const expiresAt =

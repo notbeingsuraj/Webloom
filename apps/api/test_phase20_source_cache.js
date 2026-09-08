@@ -65,7 +65,7 @@ test('SourceCache — TTL expiry removes stale entries', () => {
   const url = 'https://stale.example.com';
 
   // Negative TTL: expires in the past → immediate miss, no race
-  cache.set(url, { data: { business: { name: 'Stale Biz' } } }, { ttlMs: -1000 });
+  cache.set(url, { data: { business: { name: 'Stale Biz' } } }, { provider: 'test', ttlMs: -1000 });
   const stale = cache.get(url, 'test');
   assert.strictEqual(stale, null, 'expired entry should be a miss');
   cache.close();
@@ -76,7 +76,7 @@ test('SourceCache — Infinity TTL never expires', () => {
   const dbPath = makeTempDbPath();
   const cache = new SourceCache(dbPath);
   const url = 'https://infinity.example.com';
-  cache.set(url, { data: { business: { name: 'Forever Biz' } } }, { ttlMs: Infinity });
+  cache.set(url, { data: { business: { name: 'Forever Biz' } } }, { provider: 'test', ttlMs: Infinity });
   const entry = cache.get(url, 'test');
   assert.ok(entry, 'Infinity TTL entry should be retrievable');
   cache.close();
@@ -86,8 +86,8 @@ test('SourceCache — Infinity TTL never expires', () => {
 test('SourceCache — purgeExpired removes only expired rows', () => {
   const dbPath = makeTempDbPath();
   const cache = new SourceCache(dbPath);
-  cache.set('https://fresh.example.com', { data: { business: { name: 'Fresh' } } }, { ttlMs: Infinity });
-  cache.set('https://expired.example.com', { data: { business: { name: 'Expired' } } }, { ttlMs: -1000 });
+  cache.set('https://fresh.example.com', { data: { business: { name: 'Fresh' } } }, { provider: 'test', ttlMs: Infinity });
+  cache.set('https://expired.example.com', { data: { business: { name: 'Expired' } } }, { provider: 'test', ttlMs: -1000 });
 
   const purged = cache.purgeExpired();
   assert.strictEqual(purged, 1, 'exactly one expired row purged');
