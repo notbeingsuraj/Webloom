@@ -1,91 +1,268 @@
 # Webloom
 
-### Intelligence that turns businesses into digital experiences.
+> AI-native platform for building and developing web applications from natural language.
 
-Webloom is an AI-native platform for understanding businesses, discovering what they need, and autonomously transforming that intelligence into high-quality digital experiences.
+Webloom turns natural-language requirements into working web applications using LLMs, code generation, project context, tool execution, and automated debugging.
 
-It is not simply an AI website builder.
+Instead of only generating code, Webloom follows an iterative development loop:
 
-Webloom combines **business intelligence, evidence-driven research, semantic understanding, design intelligence, autonomous generation, and lifecycle intelligence** into a single system.
+    Prompt
+      ↓
+    Understand
+      ↓
+    Plan
+      ↓
+    Generate / Modify
+      ↓
+    Execute
+      ↓
+    Inspect
+      ↓
+    Repair
+      ↓
+    Working Application
 
-The result is a digital experience built from understanding a business rather than filling a template.
+## What Webloom Does
 
----
+- **Natural-language development** — describe what you want to build.
+- **AI code generation** — generate and modify application code.
+- **Project-aware reasoning** — understand the existing codebase and its structure.
+- **Tool execution** — read files, edit code, install dependencies, run commands, and inspect logs.
+- **Automated debugging** — use build and runtime errors as feedback for targeted fixes.
+- **Live execution** — run generated applications and observe real execution results.
+- **Iterative development** — continue developing an existing project through natural language.
 
-## The Problem
+## Architecture
 
-Most website builders start with a blank canvas.
+    ┌──────────────────────────────┐
+    │          Webloom UI          │
+    │ Prompt • Editor • Preview    │
+    │ Files • Logs • Controls      │
+    └──────────────┬───────────────┘
+                   │
+                   ▼
+    ┌──────────────────────────────┐
+    │          API Server          │
+    │ Projects • Sessions • AI     │
+    │ Execution • Files • Events   │
+    └──────────────┬───────────────┘
+                   │
+             ┌─────┴─────┐
+             ▼           ▼
+    ┌────────────────┐ ┌────────────────┐
+    │   AI Layer     │ │ Runtime Engine │
+    │                │ │                │
+    │ LLMs           │ │ Build / Run    │
+    │ Planning       │ │ Processes      │
+    │ Reasoning      │ │ Logs / Errors  │
+    │ Code Generation│ │                │
+    └───────┬────────┘ └───────┬────────┘
+            │                  │
+            └─────────┬────────┘
+                      ▼
+               Generated Project
 
-Choose a template.  
-Enter a business name.  
-Write some text.  
-Upload a few images.  
-Adjust some colors.  
-Publish.
+## AI Development Loop
 
-Humanity has somehow managed to turn "building a website" into filling out a very elaborate form.
+Webloom is designed around a closed feedback loop rather than one-shot code generation.
 
-The deeper problem is that a good website requires something most website builders never attempt to solve:
+    User Requirement
+           ↓
+    Context Construction
+           ↓
+    Task Planning
+           ↓
+    Tool Calls
+           ↓
+    Code Changes
+           ↓
+    Build / Runtime
+           ↓
+    Logs & Errors
+           ↓
+    Error Analysis
+           ↓
+    Targeted Repair
+           └──────────────→ Build / Runtime
 
-> **Understanding the business.**
+This allows Webloom to handle problems such as:
 
-A strong digital experience requires answers to questions such as:
+- Syntax and type errors
+- Missing dependencies
+- Broken imports
+- Configuration issues
+- Build failures
+- Runtime exceptions
+- Integration problems
 
-- What does this business actually do?
-- Who does it serve?
-- What makes it different?
-- Which services matter most?
-- What information is trustworthy?
-- Which claims are supported by evidence?
-- Which sources conflict?
-- What does the customer actually need to know?
-- What visual language fits the business?
-- Which pages should exist?
-- What content hierarchy makes sense?
-- What should the user do next?
-- How should the website evolve over time?
+## Core Components
 
-Webloom is built around solving these problems.
+### Frontend
 
----
+The Webloom interface provides:
 
-# What is Webloom?
+- Natural-language prompt input
+- Project and file navigation
+- Code editing
+- Application preview
+- Execution status
+- Logs and errors
+- AI interaction
 
-Webloom is an **AI-driven business-to-web intelligence platform**.
+### Backend
 
-It transforms fragmented business information into a structured understanding of the business and uses that understanding to generate, evaluate, and continuously improve digital experiences.
+The backend coordinates the system and manages:
 
-### The Webloom Pipeline
+- API requests
+- Projects and sessions
+- AI orchestration
+- File operations
+- Process execution
+- Runtime state
+- Logs and errors
 
-```text
-BUSINESS
-   │
-   ▼
-DISCOVERY
-   │
-   ▼
-EVIDENCE COLLECTION
-   │
-   ▼
-BUSINESS INTELLIGENCE
-   │
-   ▼
-SEMANTIC UNDERSTANDING
-   │
-   ▼
-DESIGN INTELLIGENCE
-   │
-   ▼
-AUTONOMOUS GENERATION
-   │
-   ▼
-PROJECT WORKSPACE
-   │
-   ▼
-VALIDATION
-   │
-   ▼
-DEPLOYMENT
-   │
-   ▼
-LIFECYCLE INTELLIGENCE
+### AI Layer
+
+The AI layer handles:
+
+- Requirement understanding
+- Task planning
+- Code generation
+- Code modification
+- Project reasoning
+- Error analysis
+- Automated repair
+
+### Runtime Engine
+
+The runtime engine executes generated applications and provides real feedback to the AI.
+
+Typical flow:
+
+    Install dependencies
+           ↓
+    Start application
+           ↓
+    Capture output
+           ↓
+    Detect errors
+           ↓
+    Return feedback
+
+## Tool-Based Development
+
+Webloom gives the AI controlled tools for interacting with a project.
+
+Typical operations include:
+
+    read_file()
+    write_file()
+    edit_file()
+    list_files()
+    create_directory()
+    install_dependency()
+    run_command()
+    inspect_logs()
+
+This allows the AI to work with the project instead of simply producing isolated code snippets.
+
+## Context Management
+
+Webloom does not need to send the entire codebase to the model for every request.
+
+Relevant context can include:
+
+- User requirements
+- Project structure
+- Relevant source files
+- Recent changes
+- Tool results
+- Build output
+- Runtime logs
+- Error messages
+
+The goal is to provide the model with the right context while avoiding unnecessary data and token usage.
+
+## Security
+
+AI-generated code must be executed in an isolated environment.
+
+Production deployments should consider:
+
+- Process isolation
+- Filesystem restrictions
+- Resource limits
+- Execution timeouts
+- Network restrictions
+- Environment-variable isolation
+- Command policies
+- Project-level permissions
+
+Generated code should never be executed with unrestricted host privileges.
+
+## Example
+
+    Build a SaaS dashboard for managing projects.
+    Add authentication, analytics, team management,
+    and a responsive dark-mode interface.
+
+Webloom interprets the requirement, plans the implementation, generates the code, runs the application, observes failures, and iterates on the project.
+
+## Project Structure
+
+    Webloom/
+    ├── frontend/        # Web interface
+    ├── backend/         # API and orchestration
+    ├── runtime/         # Application execution
+    ├── ai/              # AI / agent logic
+    └── README.md
+
+The actual structure may differ depending on the current implementation.
+
+## Getting Started
+
+### Clone
+
+    git clone <repository-url>
+    cd Webloom
+
+### Install Dependencies
+
+    npm install
+
+### Configure Environment
+
+Create a `.env` file containing the required configuration.
+
+    PORT=5001
+    AI_API_KEY=your_api_key
+
+Add any additional variables required by the configured model provider or services.
+
+### Run
+
+    npm run dev
+
+## Development Philosophy
+
+Webloom is built around a simple principle:
+
+> **Don't just generate code. Generate software that works.**
+
+The system therefore focuses on the complete development cycle:
+
+    Generate
+       ↓
+    Execute
+       ↓
+    Observe
+       ↓
+    Debug
+       ↓
+    Repair
+       ↓
+    Verify
+
+## Status
+
+Webloom is an actively developed project focused on AI-assisted software engineering, autonomous code generation, application execution, and iterative debugging.
