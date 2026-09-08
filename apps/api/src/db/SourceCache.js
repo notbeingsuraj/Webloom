@@ -117,7 +117,7 @@ export class SourceCache {
    * @param {string} [opts.contentHash] sha256 of serialized result (computed if omitted)
    */
   set(normalizedUrl, result, { provider = null, ttlMs = DEFAULT_TTL_MS, contentHash = null } = {}) {
-    if (!normalizedUrl) return;
+    if (!normalizedUrl || !provider) return;
     const hash = SourceCache.hashSourceUrl(normalizedUrl);
     const now = new Date().toISOString();
     const expiresAt =
