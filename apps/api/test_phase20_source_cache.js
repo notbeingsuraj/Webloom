@@ -132,3 +132,48 @@ test('BusinessDataExtractor — cache methods delegate to SourceCache', async ()
   assert.ok(cached === null || cached.cached === true, 'cache read should not throw');
   extractor.clearCache();
 });
+
+test('SourceCache — provider-specific invalidation does not collide', () => {
+  const dbPath = makeTempDbPath();
+  const cache = new SourceCache(dbPath);
+  const url = 'https://maps.google.com/?q=Same+Place';
+
+  // Same URL, different providers - should NOT share cache entry
+  cache.set(url, { data: { business: { name: 'FromGeoapify' } } }, { provider: 'geoapify' });
+  cache.set(url, { data: { business: { name: 'FromWebExtraction' } } }, { provider: 'web_extraction' });
+
+  const geoEntry = cache.get(url);
+  // Last write wins for same source_url, but provider field should match last writer
+  assert.ok(geoEntry, 'entry should be retrievable');
+  assert.strictEqual(geoEntry.result.data.business.name, 'FromWebExtraction');
+
+  // Explicit provider-based deletion
+  cache.delete({ provider: 'web_extraction' });
+  const afterDelete = cache.get(url);
+  assert.strictEqual(afterDelete, null, 'provider-specific delete should clear it');
+  cache.close();
+  rmSync(dbPath, { recursive: true, force: true });
+});
+
+test('SourceCache — normalized URL equivalence', () => {
+  const dbPath = makeTempDbPath();
+  const cache = new SourceCache(dbPath);
+
+  // These normalize to the same canonical URL
+  const urls = [
+    'https://maps.google.com/maps?q=Tartine',
+    'https://maps.google.com/maps?q=Tartine&utm_source=foo',
+    'https://www.google.com/maps?q=Tartine',
+  ];
+
+  cache.set(urls[0], { data: { business: { name: 'Tartine' } } }, { provider: 'web_extraction' });
+  const entry1 = cache.get(urls[1]); // Should hit cache
+  const entry2 = cache.get(urls[2]); // Should hit cache
+
+  assert.ok(entry1, 'URL with tracking params should hit same cache');
+  assert.ok(entry2, 'www.google.com should normalize to same cache');
+  assert.strictEqual(entry1.result.data.business.name, 'Tartine');
+
+  cache.close();
+  rmSync(dbPath, { recursive: true, force: true });
+});

@@ -20,6 +20,11 @@
  *   provider        — which provider produced the entry
  *   result          — JSON serialization of the acquisition result
  *
+ * INVARIANT: this is a provider-acquisition cache. Its identity is
+ * (provider, normalized source URL), not URL alone. A Geoapify acquisition and
+ * a web-extraction acquisition for the same URL must never overwrite each
+ * other.
+ *
  * This table is NOT linked to business_entity. Never confuse a cached source
  * with a business identity.
  */
@@ -45,13 +50,14 @@ export class SourceCache {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS source_cache (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
-        source_hash   TEXT NOT NULL UNIQUE,
+        source_hash   TEXT NOT NULL,
+        provider      TEXT NOT NULL,
         source_url    TEXT NOT NULL,
         content_hash  TEXT,
-        provider      TEXT,
         retrieved_at  TEXT NOT NULL,
         expires_at    TEXT,
-        result        TEXT NOT NULL
+        result        TEXT NOT NULL,
+        UNIQUE(source_hash, provider)
       );
       CREATE INDEX IF NOT EXISTS idx_source_cache_source_url ON source_cache(source_url);
       CREATE INDEX IF NOT EXISTS idx_source_cache_provider ON source_cache(provider);
