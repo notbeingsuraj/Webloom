@@ -142,11 +142,12 @@ export class SourceCache {
   /**
    * Delete an entry (or all entries for a provider).
    * @param {Object} [opts] { sourceUrl?, provider? }
+   *   - sourceUrl requires provider to identify the exact composite key
    */
   delete({ sourceUrl = null, provider = null } = {}) {
-    if (sourceUrl) {
+    if (sourceUrl && provider) {
       const hash = SourceCache.hashSourceUrl(sourceUrl);
-      return this.db.prepare('DELETE FROM source_cache WHERE source_hash = ?').run(hash);
+      return this.db.prepare('DELETE FROM source_cache WHERE source_hash = ? AND provider = ?').run(hash, provider);
     }
     if (provider) {
       return this.db.prepare('DELETE FROM source_cache WHERE provider = ?').run(provider);

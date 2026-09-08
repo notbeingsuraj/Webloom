@@ -106,7 +106,7 @@ class BusinessDataExtractor {
    */
   getCachedExtraction(url) {
     const normalized = this.normalizeUrl(url);
-    const entry = this._cacheInstance().get(normalized);
+    const entry = this._cacheInstance().get(normalized, 'web_extraction');
     if (entry) {
       // entry.result is the stored wrapper { data, timestamp, normalizedUrl }.
       // Spread the underlying data result and surface cached metadata.
