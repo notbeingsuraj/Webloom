@@ -32,7 +32,7 @@ test('SourceCache — set/get round-trip persists result', () => {
   };
   cache.set(url, payload, { provider: 'official_website' });
 
-  const entry = cache.get(url);
+  const entry = cache.get(url, 'official_website');
   assert.ok(entry, 'entry should be retrievable');
   assert.strictEqual(entry.provider, 'official_website');
   assert.strictEqual(entry.result.data.business.name, 'Tartine Bakery');
@@ -51,7 +51,7 @@ test('SourceCache — survives process restart (file persisted)', () => {
 
   // "Restart": new instance on the same file
   const reader = new SourceCache(dbPath);
-  const entry = reader.get(url);
+  const entry = reader.get(url, 'web_extraction');
   assert.ok(entry, 'cache entry should survive restart');
   assert.strictEqual(entry.result.data.identity.name, 'Sutter Health');
   assert.strictEqual(entry.provider, 'web_extraction');
@@ -66,7 +66,7 @@ test('SourceCache — TTL expiry removes stale entries', () => {
 
   // Negative TTL: expires in the past → immediate miss, no race
   cache.set(url, { data: { business: { name: 'Stale Biz' } } }, { ttlMs: -1000 });
-  const stale = cache.get(url);
+  const stale = cache.get(url, 'test');
   assert.strictEqual(stale, null, 'expired entry should be a miss');
   cache.close();
   rmSync(dbPath, { recursive: true, force: true });
@@ -77,7 +77,7 @@ test('SourceCache — Infinity TTL never expires', () => {
   const cache = new SourceCache(dbPath);
   const url = 'https://infinity.example.com';
   cache.set(url, { data: { business: { name: 'Forever Biz' } } }, { ttlMs: Infinity });
-  const entry = cache.get(url);
+  const entry = cache.get(url, 'test');
   assert.ok(entry, 'Infinity TTL entry should be retrievable');
   cache.close();
   rmSync(dbPath, { recursive: true, force: true });
@@ -91,8 +91,8 @@ test('SourceCache — purgeExpired removes only expired rows', () => {
 
   const purged = cache.purgeExpired();
   assert.strictEqual(purged, 1, 'exactly one expired row purged');
-  assert.ok(cache.get('https://fresh.example.com'), 'fresh entry should survive');
-  assert.strictEqual(cache.get('https://expired.example.com'), null, 'expired entry should be gone');
+  assert.ok(cache.get('https://fresh.example.com', 'test'), 'fresh entry should survive');
+  assert.strictEqual(cache.get('https://expired.example.com', 'test'), null, 'expired entry should be gone');
   cache.close();
   rmSync(dbPath, { recursive: true, force: true });
 });
@@ -108,8 +108,8 @@ test('SourceCache — source identity is separate from business entity identity'
   cache.set(sourceUrl, { data: { business: { name: 'First Read' } } }, { provider: 'web_extraction' });
   cache.set(sourceUrl, { data: { business: { name: 'Second Read' } } }, { provider: 'web_extraction' });
 
-  const entry = cache.get(sourceUrl);
-  assert.strictEqual(entry.result.data.business.name, 'Second Read', 'last write wins for same source');
+  const entry = cache.get(sourceUrl, 'web_extraction');
+  assert.strictEqual(entry.result.data.business.name, 'Second Read', 'last write wins for same source and provider');
 
   // No business_entity table exists in source-cache.db — the file only holds
   // source_cache rows. This proves source cache identity is NOT entity identity.
@@ -142,15 +142,19 @@ test('SourceCache — provider-specific invalidation does not collide', () => {
   cache.set(url, { data: { business: { name: 'FromGeoapify' } } }, { provider: 'geoapify' });
   cache.set(url, { data: { business: { name: 'FromWebExtraction' } } }, { provider: 'web_extraction' });
 
-  const geoEntry = cache.get(url);
-  // Last write wins for same source_url, but provider field should match last writer
-  assert.ok(geoEntry, 'entry should be retrievable');
-  assert.strictEqual(geoEntry.result.data.business.name, 'FromWebExtraction');
+  const geoEntry = cache.get(url, 'geoapify');
+  const webEntry = cache.get(url, 'web_extraction');
+  // Each provider has its own entry for the same URL
+  assert.ok(geoEntry, 'geoapify entry should be retrievable');
+  assert.ok(webEntry, 'web_extraction entry should be retrievable');
+  assert.strictEqual(geoEntry.result.data.business.name, 'FromGeoapify');
+  assert.strictEqual(webEntry.result.data.business.name, 'FromWebExtraction');
 
   // Explicit provider-based deletion
   cache.delete({ provider: 'web_extraction' });
-  const afterDelete = cache.get(url);
+  const afterDelete = cache.get(url, 'web_extraction');
   assert.strictEqual(afterDelete, null, 'provider-specific delete should clear it');
+  assert.ok(cache.get(url, 'geoapify'), 'geoapify entry should survive');
   cache.close();
   rmSync(dbPath, { recursive: true, force: true });
 });
@@ -167,8 +171,8 @@ test('SourceCache — normalized URL equivalence', () => {
   ];
 
   cache.set(urls[0], { data: { business: { name: 'Tartine' } } }, { provider: 'web_extraction' });
-  const entry1 = cache.get(urls[1]); // Should hit cache
-  const entry2 = cache.get(urls[2]); // Should hit cache
+  const entry1 = cache.get(urls[1], 'web_extraction'); // Should hit cache
+  const entry2 = cache.get(urls[2], 'web_extraction'); // Should hit cache
 
   assert.ok(entry1, 'URL with tracking params should hit same cache');
   assert.ok(entry2, 'www.google.com should normalize to same cache');
