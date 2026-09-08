@@ -127,17 +127,16 @@ export class SourceCache {
 
     this.db
       .prepare(
-        `INSERT INTO source_cache (source_hash, source_url, content_hash, provider, retrieved_at, expires_at, result)
+        `INSERT INTO source_cache (source_hash, provider, source_url, content_hash, retrieved_at, expires_at, result)
          VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(source_hash) DO UPDATE SET
+         ON CONFLICT(source_hash, provider) DO UPDATE SET
            source_url = excluded.source_url,
            content_hash = excluded.content_hash,
-           provider = excluded.provider,
            retrieved_at = excluded.retrieved_at,
            expires_at = excluded.expires_at,
            result = excluded.result`
       )
-      .run(hash, normalizedUrl, digest, provider, now, expiresAt, serialized);
+      .run(hash, provider, normalizedUrl, digest, now, expiresAt, serialized);
   }
 
   /**
