@@ -39,9 +39,20 @@ export function isPrivateIp(ip) {
     clean = clean.slice(1, -1);
   }
 
-  // IPv4-mapped IPv6: ::ffff:192.168.1.1
+  // IPv4-mapped IPv6: Node's URL parser may expose either dotted form
+  // (::ffff:192.168.1.1) or hexadecimal form (::ffff:c0a8:0101).
   if (clean.startsWith('::ffff:')) {
-    clean = clean.slice(7);
+    const mapped = clean.slice(7);
+    if (mapped.includes('.')) {
+      clean = mapped;
+    } else {
+      const groups = mapped.split(':');
+      if (groups.length === 2 && groups.every((group) => /^[0-9a-f]{1,4}$/i.test(group))) {
+        const high = parseInt(groups[0], 16);
+        const low = parseInt(groups[1], 16);
+        clean = `${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`;
+      }
+    }
   }
 
   // IPv6 checks
