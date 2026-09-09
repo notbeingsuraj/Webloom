@@ -101,13 +101,17 @@ check('fuzzySimilarity helper exists', () => {
 
 check('normalizePhone helper exists', () => {
   assert.strictEqual(typeof normalizePhone, 'function');
-  // normalizePhone returns an E.164-ish canonical form (+1XXXXXXXXXX)
-  // per Phase 20 stabilization. Equivalent formats MUST map to the same value.
+  // Unambiguous formats (with '+' country code or 11-digit NANP trunk) normalize
+  // to E.164. Ambiguous local numbers WITHOUT a country hint must NOT invent a
+  // country — they return null (P1.2 phone normalization boundary).
   assert.strictEqual(normalizePhone('+1 (415) 555-0123'), '+14155550123');
-  assert.strictEqual(normalizePhone('415-555-0123'), '+14155550123');
   assert.strictEqual(normalizePhone('14155550123'), '+14155550123'); // 11-digit with leading 1
   assert.strictEqual(normalizePhone('+14155550123'), '+14155550123');
+  // 10-digit local number without country context -> null (unresolved)
+  assert.strictEqual(normalizePhone('415-555-0123'), null);
   assert.strictEqual(normalizePhone(null), null);
+  // With a country hint, ambiguous numbers DO resolve
+  assert.strictEqual(normalizePhone('415-555-0123', 'US'), '+14155550123');
 });
 
 check('normalizeWebsite helper exists', () => {
@@ -165,7 +169,7 @@ check('Similar names with all strong signals produce same_entity', () => {
   const record1 = {
     identity: { name: 'Blue Bottle Coffee' },
     contact: {
-      phone: '15106533394', // 11-digit format to normalize to same as record2
+      phone: '15106533394', // 11-digit format -> normalizes to +15106533394
       website: 'https://bluebottlecoffee.com',
     },
     location: {
@@ -177,7 +181,7 @@ check('Similar names with all strong signals produce same_entity', () => {
   const record2 = {
     identity: { name: 'Blue Bottle Coffee Co.' }, // Slight variation
     contact: {
-      phone: '510-653-3394',
+      phone: '+1-510-653-3394', // Explicit country code -> normalizes to same as record1
       website: 'bluebottlecoffee.com',
     },
     location: {

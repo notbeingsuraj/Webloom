@@ -80,7 +80,7 @@ class BusinessProfile {
   }
 
   set(path, value, provenance, confidence, sourceInfo = {}) {
-    const validProvenances = ['identified', 'discovered', 'verified', 'user_provided', 'inferred'];
+    const validProvenances = ['identified', 'discovered', 'verified', 'user_provided', 'inferred', 'ai_generated'];
     if (!validProvenances.includes(provenance)) {
       throw new Error(`Invalid provenance: ${provenance}. Must be one of: ${validProvenances.join(', ')}`);
     }
@@ -98,9 +98,12 @@ class BusinessProfile {
     const field = parts[parts.length - 1];
     const current = target[field];
     
-    const provenancePriority = { verified: 4, discovered: 3, user_provided: 3, identified: 2, inferred: 1 };
+    // ai_generated sits BELOW every deterministic/observed tier: it can fill an
+    // empty slot (0.5 > 0) but can NEVER overwrite identified/discovered/
+    // verified/user_provided identity (P1.2 AI quarantine).
+    const provenancePriority = { verified: 4, discovered: 3, user_provided: 3, identified: 2, inferred: 1, ai_generated: 0.5 };
     const currentPriority = current?.provenance ? provenancePriority[current.provenance] : 0;
-    const newPriority = provenancePriority[provenance];
+    const newPriority = provenancePriority[provenance] ?? 0;
     
     // Check for conflict before potentially overwriting
     const isNewValue = value !== current?.value;
@@ -281,7 +284,7 @@ class BusinessProfile {
     }
     
     // Update confidence based on provenance priority
-    const provenancePriority = { verified: 4, discovered: 3, user_provided: 3, identified: 2, inferred: 1 };
+    const provenancePriority = { verified: 4, discovered: 3, user_provided: 3, identified: 2, inferred: 1, ai_generated: 0.5 };
     const newPriority = provenancePriority[provenance] || 0;
     const currentPriority = provenancePriority[claim.provenance] || 0;
     if (newPriority > currentPriority || (newPriority === currentPriority && confidence > claim.confidence)) {
@@ -320,7 +323,7 @@ class BusinessProfile {
    * Infer claim type from provenance and field
    */
   _inferClaimType(path, provenance) {
-    if (provenance === 'inferred') return 'inference';
+    if (provenance === 'inferred' || provenance === 'ai_generated') return 'inference';
     if (path.startsWith('identity.description') || path.startsWith('identity.category')) {
       return 'observation';
     }
@@ -466,7 +469,7 @@ class BusinessProfile {
   }
 
   getProvenanceBreakdown() {
-    const breakdown = { verified: 0, discovered: 0, identified: 0, user_provided: 0, inferred: 0 };
+    const breakdown = { verified: 0, discovered: 0, identified: 0, user_provided: 0, inferred: 0, ai_generated: 0 };
     
     const countProvenance = (obj) => {
       for (const value of Object.values(obj)) {

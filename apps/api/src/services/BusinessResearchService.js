@@ -642,10 +642,27 @@ class BusinessResearchService {
           console.error(`[IdentityPersistence] touchProviderIdentity failed (best-effort): ${err?.message || String(err)}`);
         }
       } else {
-        // Unseen primary observation — create a new persistent entity.
+        // Unseen primary observation — create a new persistent entity ONLY when
+        // there is genuine identity evidence.  P1.2 synthetic identity
+        // prevention: never manufacture 'Unknown Business' / 'Unknown' as
+        // durable canonical values; those strings silently corrupt identity
+        // resolution, downstream research, and intelligence rendering.
+        if (!this._hasSufficientIdentity(primary.record, hints)) {
+          return { status: 'insufficient_evidence', entityId: null, providerIdentities: [], resolutionRecord: null };
+        }
+
+        const canonicalName = this._canonicalName(primary.record) || hints.name;
+        const canonicalAddress = this._canonicalAddress(primary.record) || null;
+
+        // Safety net: if after all canonical accessors the name is still
+        // synthetic / null, do not create an entity.
+        if (this._isSyntheticName(canonicalName)) {
+          return { status: 'insufficient_evidence', entityId: null, providerIdentities: [], resolutionRecord: null };
+        }
+
         const identityData = {
-          canonicalName: this._canonicalName(primary.record) || hints.name || 'Unknown Business',
-          canonicalAddress: this._canonicalAddress(primary.record) || 'Unknown',
+          canonicalName,
+          canonicalAddress: canonicalAddress || 'Unknown',
           canonicalPhone: this._canonicalContact(primary.record)?.phone || null,
           canonicalWebsite: this._canonicalContact(primary.record)?.website || null,
           canonicalLatitude: this._canonicalCoordinates(primary.record)?.lat ?? null,
@@ -705,22 +722,30 @@ class BusinessResearchService {
             }
 
             const resolveToPrimary = matchType === 'same_entity' && matchScore >= 0.85;
-            const targetEntityId = resolveToPrimary ? entityId : (
-              // For uncertain/different, create a distinct entity (no forced reuse /
-              // no identity contamination).
-              (() => {
-                const e = repo.createEntity({
-                  canonicalName: this._canonicalName(secondary.record) || 'Unknown Business',
-                  canonicalAddress: this._canonicalAddress(secondary.record) || 'Unknown',
-                  canonicalPhone: this._canonicalContact(secondary.record)?.phone || null,
-                  canonicalWebsite: this._canonicalContact(secondary.record)?.website || null,
-                  canonicalLatitude: this._canonicalCoordinates(secondary.record)?.lat ?? null,
-                  canonicalLongitude: this._canonicalCoordinates(secondary.record)?.lng ?? null,
-                  category: this._canonicalCategory(secondary.record) || null,
-                });
-                return e.entityId;
-              })()
-            );
+            const targetEntityId = resolveToPrimary ? entityId : (() => {
+              // P1.2: Never manufacture synthetic identity values for uncertain
+              // secondary observations. If the secondary record lacks sufficient
+              // identity evidence, map it to the primary entity rather than
+              // creating a fake "Unknown Business" entity.  If the primary entity
+              // itself has no real identity (can happen when both are AI-derived
+              // and synthetic), do not create a synthetic secondary entity either.
+              if (this._isSyntheticName(this._canonicalName(secondary.record)) && !this._canonicalAddress(secondary.record)) {
+                // Insufficient secondary identity — map to primary and let
+                // review queue handle the ambiguity.
+                return entityId;
+              }
+              const secondaryCanonicalName = this._canonicalName(secondary.record) || 'Unknown Business';
+              const e = repo.createEntity({
+                canonicalName: this._isSyntheticName(secondaryCanonicalName) ? null : secondaryCanonicalName,
+                canonicalAddress: this._canonicalAddress(secondary.record) || 'Unknown',
+                canonicalPhone: this._canonicalContact(secondary.record)?.phone || null,
+                canonicalWebsite: this._canonicalContact(secondary.record)?.website || null,
+                canonicalLatitude: this._canonicalCoordinates(secondary.record)?.lat ?? null,
+                canonicalLongitude: this._canonicalCoordinates(secondary.record)?.lng ?? null,
+                category: this._canonicalCategory(secondary.record) || null,
+              });
+              return e.entityId;
+            })();
 
             const mapping = repo.createProviderIdentity({
               provider: secondary.provider,
@@ -929,6 +954,67 @@ class BusinessResearchService {
 
   // ---- lightweight accessors for canonical record shapes ----
 
+  /**
+   * Check if a canonical name is a synthetic placeholder rather than a real
+   * business identity.  P1.2 synthetic identity prevention: these strings must
+   * never be persisted as durable canonical identity values.
+   *
+   * @param {string|null} name
+   * @returns {boolean} true if the name is a synthetic placeholder
+   */
+  _isSyntheticName(name) {
+    if (!name || typeof name !== 'string') return true;
+    const trimmed = name.trim().toLowerCase();
+    return /^(unknown\s*business|unknown|n\/a|unnamed business|na)$/i.test(trimmed);
+  }
+
+  /**
+   * Determine whether a record carries enough identity evidence to safely
+   * persist a BusinessEntity.  Returns true when at least one authoritative
+   * identity signal is present: a real (non-synthetic) name, a hard provider
+   * identifier (placeId / CID), coordinates, a normalized phone, or a
+   * website — alone or combined.
+   *
+   * This is the P1.2 synthetic identity prevention gate: if a record has no
+   * usable identity, we must NOT manufacture one (e.g. "Unknown Business").
+   *
+   * P1.2 AI quarantine (requirement 2G): an AI-derived record (metadata.aiExtracted)
+   * must NOT independently create a durable authoritative identity.  AI names/
+   * phones/websites are candidate evidence only; they cannot bootstrap an entity
+   * unless a deterministic signal (URL-derived hint name/coords, or a hard
+   * provider identifier) anchors the identity.
+   *
+   * @param {Object} record     - canonical flat provider record
+   * @param {Object} recordHints - deterministic input hints (may carry name/coords)
+   * @returns {boolean}
+   */
+  _hasSufficientIdentity(record, recordHints) {
+    const isAiDerived = Boolean(record?.metadata?.aiExtracted);
+    const name = recordHints?.name || this._canonicalName(record);
+    const hasRealName = !this._isSyntheticName(name);
+    const hasCoords = Boolean(this._canonicalCoordinates(record)?.lat);
+    const hasProviderId = Boolean(record?.provider?.placeId || record?.source?.placeId);
+    const contact = this._canonicalContact(record) || {};
+    const hasPhone = Boolean(contact.phone);
+    const hasWebsite = Boolean(contact.website);
+    const address = this._canonicalAddress(record);
+    const hasRealAddress = Boolean(address && !/^(unknown|n\/a)$/i.test(String(address).trim()));
+
+    // Deterministic anchors that are authoritative regardless of AI derivation:
+    // hard provider ID, URL-derived hint name, or URL-derived coordinates.
+    const hasDeterministicAnchor =
+      hasProviderId ||
+      Boolean(recordHints?.name && !this._isSyntheticName(recordHints.name)) ||
+      Boolean(recordHints?.latitude != null && recordHints?.longitude != null);
+
+    if (isAiDerived) {
+      // AI-derived data alone must never bootstraps a durable entity.
+      return hasDeterministicAnchor;
+    }
+
+    return hasRealName || hasCoords || hasProviderId || hasPhone || hasWebsite || hasRealAddress;
+  }
+
   _canonicalName(record) {
     return record?.business?.name || record?.identity?.name?.value || record?.identity?.name || record?.name || null;
   }
@@ -990,10 +1076,17 @@ class BusinessResearchService {
     const sourceInfo = { sourceUrl: sourceUrl || undefined };
     const confidence = record.confidence || {};
 
+    // P1.2 AI quarantine: if the record was produced by AI extraction (flagged
+    // in the extraction metadata), downgrade its provenance to ai_generated so
+    // its identity fields can NEVER outrank deterministic URL/provider identity.
+    // AI data remains available as candidate/evidence data (fills gaps only).
+    const isAiDerived = Boolean(record?.metadata?.aiExtracted);
+    const effectiveProvenance = isAiDerived && provenance === 'discovered' ? 'ai_generated' : provenance;
+
     const setOrSkip = (fieldPath, value, conf) => {
       if (value == null || value === '') return;
       if (onlyIfMissing && profile.get(fieldPath) != null) return;
-      profile.set(fieldPath, value, provenance, conf, sourceInfo);
+      profile.set(fieldPath, value, effectiveProvenance, conf, sourceInfo);
     };
 
     if (record.business) {
@@ -1001,7 +1094,7 @@ class BusinessResearchService {
       setOrSkip('identity.category', sanitizeFieldValue(record.business.category), confidence.category || 0.8);
       if (Array.isArray(record.business.categories) && record.business.categories.length) {
         if (!onlyIfMissing || !profile.get('identity.categories') || profile.get('identity.categories').length === 0) {
-          profile.set('identity.categories', record.business.categories, provenance, 0.8, sourceInfo);
+          profile.set('identity.categories', record.business.categories, effectiveProvenance, 0.8, sourceInfo);
         }
       }
       setOrSkip('identity.description', sanitizeFieldValue(record.business.description), 0.7);
@@ -1033,20 +1126,20 @@ class BusinessResearchService {
     if (record.hours && Object.keys(record.hours).some((k) => record.hours[k])) {
       // Merge day-by-day; prefer existing over new when onlyIfMissing
       if (!onlyIfMissing) {
-        profile.set('hours', record.hours, provenance, 0.8, sourceInfo);
+        profile.set('hours', record.hours, effectiveProvenance, 0.8, sourceInfo);
       } else {
         const existingHours = profile.get('hours') || {};
         const merged = { ...existingHours };
         for (const [day, val] of Object.entries(record.hours)) {
           if (val && !merged[day]) merged[day] = val;
         }
-        profile.set('hours', merged, provenance, 0.8, sourceInfo);
+        profile.set('hours', merged, effectiveProvenance, 0.8, sourceInfo);
       }
     }
 
     if (Array.isArray(record.services) && record.services.length) {
       if (!onlyIfMissing || profile.get('identity.services') == null) {
-        profile.set('identity.services', record.services, provenance, 0.7, sourceInfo);
+        profile.set('identity.services', record.services, effectiveProvenance, 0.7, sourceInfo);
       }
     }
   }
@@ -1285,8 +1378,14 @@ class BusinessResearchService {
         location: addressInfo.value,
       },
       facts: [
-        ...(nameInfo.value ? [{ claim: `Business name is ${nameInfo.value}`, source: 'structured_provider', verified: true }] : []),
-        ...(ratingInfo.value != null ? [{ claim: `Has a rating of ${ratingInfo.value}/5`, source: 'structured_provider', verified: true }] : []),
+        // P1.2 provenance regression: facts must reflect actual provenance
+        // from the BusinessProfile rather than claiming verified: true for all.
+        // Only data with 'verified' provenance should be marked as verified.
+        ...(nameInfo.value ? [{ claim: `Business name is ${nameInfo.value}`, source: nameInfo.provenance || 'unknown', verified: nameInfo.provenance === 'verified', verification: nameInfo.provenance || 'unknown' }] : []),
+        ...(ratingInfo.value != null ? [{ claim: `Has a rating of ${ratingInfo.value}/5`, source: ratingInfo.provenance || 'unknown', verified: ratingInfo.provenance === 'verified', verification: ratingInfo.provenance || 'unknown' }] : []),
+        ...(phoneInfo.value ? [{ claim: `Phone: ${phoneInfo.value}`, source: phoneInfo.provenance || 'unknown', verified: phoneInfo.provenance === 'verified', verification: phoneInfo.provenance || 'unknown' }] : []),
+        ...(websiteInfo.value ? [{ claim: `Website: ${websiteInfo.value}`, source: websiteInfo.provenance || 'unknown', verified: websiteInfo.provenance === 'verified', verification: websiteInfo.provenance || 'unknown' }] : []),
+        ...(addressInfo.value ? [{ claim: `Address: ${addressInfo.value}`, source: addressInfo.provenance || 'unknown', verified: addressInfo.provenance === 'verified', verification: addressInfo.provenance || 'unknown' }] : []),
       ],
       unknowns: this.identifyUnknownsIntelligence({ website: websiteInfo.value, phone: phoneInfo.value, email: null }),
       rating: ratingInfo.value,

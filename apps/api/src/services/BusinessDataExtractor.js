@@ -583,6 +583,12 @@ Rules:
     let extractedProfile;
     let resolutionStatus = 'unresolved';
     let acquisitionMethod = 'r_jina_ai';
+    // P1.2 AI quarantine: tracks whether the extracted profile was produced by
+    // the AI model (extractWithAI) rather than deterministic parsing. AI-derived
+    // identity fields must be labeled ai_generated so they can never overwrite
+    // identified/discovered/verified identity (BusinessProfile provenance
+    // priority: ai_generated (0.5) < identified (2)).
+    let aiExtracted = false;
 
     try {
       pageData = await this.fetchPage(googleMapsUrl);
@@ -610,6 +616,7 @@ Rules:
       } else {
         // Use AI to extract structured profile from page content
         extractedProfile = await this.extractWithAI(metadata, pageData.url);
+        aiExtracted = true;
 
         // Validate and clean
         extractedProfile = this.validateProfile(extractedProfile);
@@ -654,39 +661,44 @@ Rules:
       profile.set('location.coordinates', identified.coordinates, 'identified', 0.8, { sourceUrl: googleMapsUrl });
     }
 
-    // Add DISCOVERED data from Google Maps page extraction
+    // Add DISCOVERED/ai_generated data from Google Maps page extraction.
+    // P1.2 AI quarantine: when the profile was produced by the AI model, the
+    // identity fields are labeled ai_generated so they can never outrank
+    // deterministic URL/provider identity. Values remain available as
+    // evidence/candidate data but cannot overwrite authoritative fields.
+    const extractedProvenance = aiExtracted ? 'ai_generated' : 'discovered';
     if (extractedProfile.business?.name) {
-      profile.set('identity.name', extractedProfile.business.name, 'discovered', extractedProfile.confidence?.name || 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
+      profile.set('identity.name', extractedProfile.business.name, extractedProvenance, extractedProfile.confidence?.name || 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
     }
     if (extractedProfile.business?.category) {
-      profile.set('identity.category', extractedProfile.business.category, 'discovered', extractedProfile.confidence?.category || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
+      profile.set('identity.category', extractedProfile.business.category, extractedProvenance, extractedProfile.confidence?.category || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
     }
     if (extractedProfile.business?.categories?.length) {
-      profile.set('identity.categories', extractedProfile.business.categories, 'discovered', 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
+      profile.set('identity.categories', extractedProfile.business.categories, extractedProvenance, 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
     }
     if (extractedProfile.business?.description) {
-      profile.set('identity.description', extractedProfile.business.description, 'discovered', 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
+      profile.set('identity.description', extractedProfile.business.description, extractedProvenance, 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
     }
     if (extractedProfile.contact?.phone) {
-      profile.set('contact.phone', extractedProfile.contact.phone, 'discovered', extractedProfile.confidence?.phone || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
+      profile.set('contact.phone', extractedProfile.contact.phone, extractedProvenance, extractedProfile.confidence?.phone || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
     }
     if (extractedProfile.contact?.website) {
-      profile.set('contact.website', extractedProfile.contact.website, 'discovered', extractedProfile.confidence?.website || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
+      profile.set('contact.website', extractedProfile.contact.website, extractedProvenance, extractedProfile.confidence?.website || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
     }
     if (extractedProfile.location?.full_address) {
-      profile.set('location.full_address', extractedProfile.location.full_address, 'discovered', extractedProfile.confidence?.address || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
+      profile.set('location.full_address', extractedProfile.location.full_address, extractedProvenance, extractedProfile.confidence?.address || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
     }
     if (extractedProfile.location?.coordinates) {
-      profile.set('location.coordinates', extractedProfile.location.coordinates, 'discovered', 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
+      profile.set('location.coordinates', extractedProfile.location.coordinates, extractedProvenance, 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
     }
     if (extractedProfile.ratings?.rating) {
-      profile.set('ratings.rating', extractedProfile.ratings.rating, 'discovered', extractedProfile.confidence?.rating || 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
+      profile.set('ratings.rating', extractedProfile.ratings.rating, extractedProvenance, extractedProfile.confidence?.rating || 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
     }
     if (extractedProfile.hours && Object.keys(extractedProfile.hours).some(k => extractedProfile.hours[k])) {
-      profile.set('hours', extractedProfile.hours, 'discovered', 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
+      profile.set('hours', extractedProfile.hours, extractedProvenance, 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
     }
     if (extractedProfile.social_links?.length) {
-      profile.set('social_links', extractedProfile.social_links, 'discovered', 0.5, { sourceUrl: pageData?.url || googleMapsUrl });
+      profile.set('social_links', extractedProfile.social_links, extractedProvenance, 0.5, { sourceUrl: pageData?.url || googleMapsUrl });
     }
 
     // Step 4: Build an AcquisitionResult from the extraction (before merging
@@ -721,7 +733,7 @@ Rules:
           hasOpenGraph: Object.keys(metadata?.openGraph || {}).length > 0,
           acquisitionMethod,
           resolutionStatus: 'unresolved',
-          provenanceBreakdown: { verified: 0, discovered: 0, identified: 0, user_provided: 0, inferred: 0 },
+          provenanceBreakdown: { verified: 0, discovered: 0, identified: 0, user_provided: 0, inferred: 0, ai_generated: 0 },
           completeness: 0,
           providerError: acquisition.errors?.[0] || null,
           providerUnavailable: acquisition.status === ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
@@ -775,6 +787,10 @@ Rules:
         hasOpenGraph: Object.keys(metadata?.openGraph || {}).length > 0,
         acquisitionMethod,
         resolutionStatus,
+        // P1.2 AI quarantine: surface whether the profile identity was produced
+        // by AI so downstream merge/persistence boundaries can distinguish
+        // AI-derived identity from provider-observed facts.
+        aiExtracted,
         provenanceBreakdown: profile.getProvenanceBreakdown(),
         completeness: profile.getCompleteness(),
         providerError: extractedProfile?.providerError || null,

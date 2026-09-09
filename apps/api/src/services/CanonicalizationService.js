@@ -54,7 +54,8 @@ const PROVENANCE_PRIORITY = {
   discovered: 3,
   user_provided: 3,
   identified: 2,
-  inferred: 1
+  inferred: 1,
+  ai_generated: 0.5
 };
 
 /**

@@ -108,6 +108,64 @@ export function normalizePhone(phone, countryHint = null) {
 }
 
 /**
+ * Canonical accessor for a business identity field across the provider shapes.
+ *
+ * Providers do NOT agree on a single shape: Geoapify emits the flat
+ * `business.name`, while web-extraction emits the dotted `identity.name`, and
+ * legacy records may carry a bare `name`. This accessor reads all three
+ * without privileging one over another, so identical businesses represented
+ * in different provider shapes resolve to the same entity (P1.2 shape parity).
+ *
+ * Signal de-duplication: each canonical path resolves a SINGLE value, so the
+ * caller scores it exactly once regardless of how many aliases exist.
+ *
+ * @param {string} field - 'name' | 'category' (identity-critical fields that
+ *   have both `business.*` and `identity.*` representations)
+ * @param {Object} record - provider record in any supported shape
+ * @returns {*} the first non-null value found, or null
+ */
+export function canonicalIdentityField(field, record) {
+  if (!record || !field) return null;
+  // business.name (Geoapify flat shape) → identity.name (dotted shape) →
+  // bare name (legacy shape).
+  return (
+    record?.business?.[field] ??
+    record?.identity?.[field] ??
+    record?.[field] ??
+    null
+  );
+}
+
+/**
+ * Resolve the phone tri-state for an entity record.
+ *
+ * Distinguishes:
+ *   - absent        → the record carries no phone at all
+ *   - normalized    → the phone is present AND canonical normalization resolved it
+ *   - unresolved    → the phone is present but cannot be safely normalized
+ *                     (e.g. local number without a country hint)
+ *
+ * Previously an unresolved-but-present phone collapsed to null — the same as an
+ * absent phone — which silently reduced identity evidence at the matching
+ * boundary. This fix preserves the raw signal so it stays visible in coverage
+ * and diagnostics without creating false positives.
+ *
+ * @returns {{status:'absent'|'normalized'|'unresolved', raw: string|null, value: string|null}}
+ */
+export function resolvePhoneSignal(record) {
+  const raw = record?.contact?.phone ?? record?.phone ?? null;
+  if (raw == null || raw === '') {
+    return { status: 'absent', raw: null, value: null };
+  }
+  const country = record?.location?.country || record?.country || null;
+  const value = canonicalNormalizePhone(raw, country);
+  if (value) {
+    return { status: 'normalized', raw: String(raw), value };
+  }
+  return { status: 'unresolved', raw: String(raw), value: null };
+}
+
+/**
  * Backward-compatible website/domain normalizer delegation to FieldNormalizer (#3).
  * Returns the normalized hostname/domain.
  */
@@ -241,11 +299,19 @@ export function calculateMatchScore(record1, record2) {
   const signals = {};
   const contradictions = [];
 
-  // Phone matching (country-aware via FieldNormalizer)
-  const country1 = record1?.location?.country || record1?.country || null;
-  const country2 = record2?.location?.country || record2?.country || null;
-  const phone1 = normalizePhone(record1?.contact?.phone || record1?.phone, country1);
-  const phone2 = normalizePhone(record2?.contact?.phone || record2?.phone, country2);
+  // Phone matching — tri-state (absent / unresolved / normalized)
+  // An unresolved-but-present phone must NOT be treated as absent: it stays
+  // visible in coverage and diagnostics but never produces a false match or
+  // a false contradiction. P1.2 phone-normalization boundary.
+  const phoneA = resolvePhoneSignal(record1);
+  const phoneB = resolvePhoneSignal(record2);
+  const phone1 = phoneA.value;
+  const phone2 = phoneB.value;
+  // Signal that a phone is "present" (raw value exists) on at least one side,
+  // even when it could not be normalized. Used so coverage does not silently
+  // count an unresolved phone as missing.
+  const phonePresent1 = phoneA.status !== 'absent';
+  const phonePresent2 = phoneB.status !== 'absent';
   if (phone1 && phone2) {
     if (phone1 === phone2) {
       score += MATCH_SIGNAL_WEIGHTS.phone_exact;
@@ -255,6 +321,10 @@ export function calculateMatchScore(record1, record2) {
       score += MATCH_SIGNAL_WEIGHTS.phone_contradiction;
     }
   }
+  signals.phone_present = {
+    side1: phonePresent1 ? phoneA.status : 'absent',
+    side2: phonePresent2 ? phoneB.status : 'absent',
+  };
 
   // Website/Domain matching
   // CRITICAL FIX: normalizeWebsite() returns hostname, so website_exact and
@@ -356,9 +426,11 @@ export function calculateMatchScore(record1, record2) {
     signals.state_match = true;
   }
 
-  // Name matching - FIXED: properly detect name contradictions
-  const name1 = record1?.identity?.name || record1?.name;
-  const name2 = record2?.identity?.name || record2?.name;
+  // Name matching — canonical accessor reads business.name / identity.name /
+  // name (P1.2 shape parity). Each record contributes exactly ONE name value,
+  // so the name signal is never double-counted when multiple aliases exist.
+  const name1 = canonicalIdentityField('name', record1);
+  const name2 = canonicalIdentityField('name', record2);
   let nameSim = 0;
   if (name1 && name2) {
     nameSim = fuzzySimilarity(name1, name2);
@@ -416,6 +488,13 @@ export function calculateMatchScore(record1, record2) {
   // by an evidence-coverage multiplier. This prevents a couple of matching fields
   // with nothing to contradict them from reaching the same confidence as a fully
   // corroborated match — without any arbitrary per-null penalty.
+  //
+  // P1.2 phone-boundary: a phone that is PRESENT but unresolved is not the same
+  // as an absent phone. It cannot contribute a normalized match (no false
+  // positive), but it also must not silently shrink evidence coverage (no false
+  // absence). We therefore count a phone as *comparable* only when both sides
+  // resolved to a normalized value; coverage otherwise reflects the fact that
+  // the phone was present on the record(s) that carried it.
   const corePresent = {
     name: !!(name1 && name2),
     phone: !!(phone1 && phone2),
@@ -423,7 +502,15 @@ export function calculateMatchScore(record1, record2) {
     address: !!(addr1 && addr2),
   };
   const comparableCore = CORE_IDENTITY_FIELDS.filter((f) => corePresent[f]).length;
-  const coverage = comparableCore / CORE_IDENTITY_FIELDS.length;
+  const phonePresentButUnresolvedOnBoth =
+    phonePresent1 && phonePresent2 && !(phone1 && phone2);
+  // If the phone is present-but-unresolved on at least one side, count it as
+  // coverage "present" so the evidence is not silently dropped — but never as a
+  // matched signal.
+  let coverage = comparableCore / CORE_IDENTITY_FIELDS.length;
+  if (phonePresentButUnresolvedOnBoth) {
+    coverage = (comparableCore + 0.5) / CORE_IDENTITY_FIELDS.length;
+  }
   const coverageFactor =
     CLASSIFICATION.COVERAGE_FLOOR + (1 - CLASSIFICATION.COVERAGE_FLOOR) * coverage;
 
