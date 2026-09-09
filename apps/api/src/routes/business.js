@@ -1,6 +1,7 @@
 import express from 'express';
 import BusinessResearchService from '../services/BusinessResearchService.js';
 import BusinessDataExtractor from '../services/BusinessDataExtractor.js';
+import CanonicalBusinessProfileService from '../services/CanonicalBusinessProfileService.js';
 import { config } from '../config/env.js';
 
 const router = express.Router();
@@ -44,13 +45,13 @@ router.post('/analyze', async (req, res, next) => {
       longitude,
     });
 
-    const business = result.intelligence;
+    const rawIntelligence = result.intelligence;
 
     // Provider chain returned nothing usable → 503 provider_unavailable
     const nothingUsable =
       result.provider?.geoapify &&
       result.provider?.geoapify !== 'ok' &&
-      (!business.contact?.phone && !business.contact?.website && !business.location?.address);
+      (!rawIntelligence?.contact?.phone && !rawIntelligence?.contact?.website && !rawIntelligence?.location?.address);
 
     if (nothingUsable) {
       const providerError = {
@@ -89,7 +90,7 @@ router.post('/analyze', async (req, res, next) => {
     let businessDNA = null;
     let brandStrategyStatus = 'not_attempted';
     try {
-      businessDNA = await BrandStrategyService.generateBrandDNA(business);
+      businessDNA = await BrandStrategyService.generateBrandDNA(rawIntelligence);
       brandStrategyStatus = 'ok';
     } catch (brandError) {
       // Optional enrichment failed — log server-side (safe/redacted), do not 500.
@@ -99,20 +100,44 @@ router.post('/analyze', async (req, res, next) => {
       businessDNA = null;
     }
 
+    // P1.4: Route business data through the canonical projection layer.
+    // The canonical shape replaces raw intelligence as the HTTP representation
+    // of business data. Endpoint-specific analysis metadata (source, facts,
+    // unknowns, trustSignals, positioning, digitalPresence) moves to
+    // metadata.analysis to preserve endpoint-specific information without
+    // contaminating the canonical business representation.
+    const canonicalService = CanonicalBusinessProfileService;
+    const canonical = canonicalService.fromEntityData({ record: rawIntelligence });
+
     res.json({
       success: true,
-      business,
+      business: canonical,
       businessDNA,
       brandStrategy: { status: brandStrategyStatus },
       metadata: {
         source: 'geoapify_and_web_extraction',
         providers: result.provider,
-        confidence: business.confidence?.overall || 0,
+        confidence: canonical.confidence?.entity || rawIntelligence?.confidence?.overall || 0,
         extractedAt: new Date().toISOString(),
         cached: false,
         persistence: result.persistence,
         brandDNAStatus: brandStrategyStatus,
         validationIssues: result.validation?.issues?.length ? result.validation.issues.map((i) => i.field) : [],
+        // P1.4: endpoint-specific analysis metadata preserved separately
+        analysis: {
+          source: rawIntelligence?.source ?? null,
+          facts: rawIntelligence?.facts ?? [],
+          unknowns: rawIntelligence?.unknowns ?? [],
+          trustSignals: rawIntelligence?.trustSignals ?? [],
+          positioning: rawIntelligence?.positioning ?? null,
+          digitalPresence: rawIntelligence?.digitalPresence ?? null,
+          services: rawIntelligence?.services ?? [],
+          rating: rawIntelligence?.rating ?? null,
+          reviewCount: rawIntelligence?.reviewCount ?? null,
+          openingHours: rawIntelligence?.openingHours ?? null,
+          reviews: rawIntelligence?.reviews ?? [],
+          photos: rawIntelligence?.photos ?? [],
+        },
       },
     });
   } catch (error) {
@@ -156,14 +181,33 @@ router.post('/research', async (req, res, next) => {
       longitude: req.body.longitude,
     });
 
+    // P1.4: Route business data through the canonical projection layer.
+    const canonicalService = CanonicalBusinessProfileService;
+    const canonical = canonicalService.fromEntityData({ record: result.intelligence });
+
     res.json({
       success: true,
-      data: result.intelligence,
+      data: canonical,
       metadata: {
         extractedAt: new Date().toISOString(),
         sourceUrl: googleMapsUrl,
         providers: result.provider,
         validationIssues: result.validation?.issues?.length ? result.validation.issues.map((i) => i.field) : [],
+        // P1.4: endpoint-specific analysis metadata preserved separately
+        analysis: {
+          source: result.intelligence?.source ?? null,
+          facts: result.intelligence?.facts ?? [],
+          unknowns: result.intelligence?.unknowns ?? [],
+          trustSignals: result.intelligence?.trustSignals ?? [],
+          positioning: result.intelligence?.positioning ?? null,
+          digitalPresence: result.intelligence?.digitalPresence ?? null,
+          services: result.intelligence?.services ?? [],
+          rating: result.intelligence?.rating ?? null,
+          reviewCount: result.intelligence?.reviewCount ?? null,
+          openingHours: result.intelligence?.openingHours ?? null,
+          reviews: result.intelligence?.reviews ?? [],
+          photos: result.intelligence?.photos ?? [],
+        },
       },
     });
   } catch (error) {
