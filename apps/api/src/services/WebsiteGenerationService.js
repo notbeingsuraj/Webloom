@@ -24,6 +24,12 @@ import GeneratedSiteManager from './GeneratedSiteManager.js';
 import DesignIntelligenceService from './DesignIntelligenceService.js';
 import { validateFactualFields, sanitizeAICopy } from './FactualDataValidator.js';
 import { config } from '../config/env.js';
+// P1.3: ONE canonical read layer for business facts. extractFacts now reads
+// through the canonical projection instead of direct shape-specific access,
+// so WebsiteGenerationService no longer needs to know which of Webloom's four
+// business shapes it receives (flat provider / BusinessProfile / intelligence /
+// persisted entity).
+import CanonicalBusinessProfileService from './CanonicalBusinessProfileService.js';
 
 // Deterministic category → theme defaults used when no AI spec is available.
 const THEMES = {
@@ -266,30 +272,38 @@ class WebsiteGenerationService {
 
   /**
    * Extract a flat verified-facts object from the business intelligence shape.
+   * P1.3: reads THROUGH the canonical read layer (CanonicalBusinessProfileService)
+   * so this consumer no longer depends on any single source shape. The read
+   * layer guards synthetic identity, provider-ID leakage, and AI provenance
+   * across all four source shapes (flat provider / BusinessProfile /
+   * intelligence / persisted entity).
    * Only non-null profile values are set; unknown remain null (never invented).
    */
   extractFacts(business) {
-    const cats = Array.isArray(business.identity?.categories) ? business.identity.categories.map((c) => String(c)).filter(Boolean) : [];
-    const hours = business.openingHours || null;
+    const canonical = CanonicalBusinessProfileService.fromBusinessProfile(business);
+    const cats = Array.isArray(canonical.business.categories) ? canonical.business.categories.map((c) => String(c)).filter(Boolean) : [];
+    const hours = canonical.business.hours || null;
+    const addr = canonical.identity.addressComponents || {};
+    const coords = canonical.identity.coordinates || null;
     return {
-      name: business.identity?.name ?? null,
-      category: business.identity?.category ?? null,
+      name: canonical.identity.name ?? null,
+      category: canonical.business.category ?? null,
       categories: cats,
-      description: business.identity?.description ?? null,
-      phone: business.contact?.phone ?? null,
-      email: business.contact?.email ?? null,
-      website: business.contact?.website ?? null,
-      address: business.location?.address ?? null,
-      city: business.location?.city ?? null,
-      state: business.location?.state ?? null,
-      country: business.location?.country ?? null,
-      postalCode: business.location?.postalCode ?? null,
-      latitude: business.location?.coordinates?.lat ?? business.location?.coordinates?.latitude ?? null,
-      longitude: business.location?.coordinates?.lng ?? business.location?.coordinates?.longitude ?? null,
+      description: canonical.business.description ?? null,
+      phone: canonical.identity.phone ?? null,
+      email: canonical.business.email ?? null,
+      website: canonical.identity.website ?? null,
+      address: canonical.identity.address ?? null,
+      city: addr.city ?? null,
+      state: addr.state ?? null,
+      country: addr.country ?? null,
+      postalCode: addr.postalCode ?? null,
+      latitude: coords?.lat ?? null,
+      longitude: coords?.lng ?? null,
       hours,
       hoursText: this.hoursToText(hours),
-      rating: business.rating ?? null,
-      reviewCount: business.reviewCount ?? null,
+      rating: canonical.reputation.rating ?? null,
+      reviewCount: canonical.reputation.reviewCount ?? null,
     };
   }
 
