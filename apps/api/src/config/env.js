@@ -19,6 +19,9 @@ export const config = {
   },
   ai: {
     primaryModel: process.env.AI_PRIMARY_MODEL || null,
+    // Fallback model used when the primary model fails or times out.
+    // Defaults to the OmniRoute fast combo — a resilient, low-latency model
+    // that exists in every OmniRoute catalog.
     fallbackModel: process.env.AI_FALLBACK_MODEL || null,
   },
   omniroute: {
@@ -29,6 +32,7 @@ export const config = {
       reasoning: process.env.OMNIROUTE_REASONING_MODEL || 'auto/best-coding',
       coding: process.env.OMNIROUTE_CODING_MODEL || 'auto/best-coding',
       copywriting: process.env.OMNIROUTE_COPYWRITING_MODEL || 'auto/best-fast',
+      vision: process.env.OMNIROUTE_VISION_MODEL || 'auto/best-vision',
     },
   },
   rateLimit: {

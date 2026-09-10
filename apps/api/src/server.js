@@ -1,6 +1,7 @@
 import app from './app.js';
 import { config } from './config/env.js';
 import { initializeDatabase } from './db/client.js';
+import aiService from './services/AIService.js';
 
 const PORT = config.port;
 
@@ -30,6 +31,14 @@ async function start() {
     console.log(`  Health:      http://localhost:${PORT}/health`);
     console.log('═══════════════════════════════════════════');
     console.log('');
+
+    // Non-fatal gateway probe: surface OmniRoute auth/reachability problems at
+    // boot so a misconfigured key or gateway down is visible in the startup log
+    // instead of manifesting as slow per-request timeouts/401s downstream.
+    aiService.probeGateway().then((probe) => {
+      console.log(`  AI Gateway:  ${probe.ok ? '✅ ' + probe.message : '❌ ' + probe.message}`);
+      console.log('');
+    });
   });
 
   // Handle unhandled promise rejections

@@ -115,8 +115,11 @@ class AIService {
       errorCode: error.code || error.providerError?.errorCode || null,
     });
 
-    if (category === PROVIDER_ERROR_CATEGORIES.INVALID_RESPONSE) return false;
+    // Auth failures will never succeed on a fallback model — the request is
+    // rejected at the gateway, not by the model. Fail fast instead of burning
+    // time on the fallback (which hits the same gateway + key).
     if (category === PROVIDER_ERROR_CATEGORIES.AUTHENTICATION) return false;
+    if (category === PROVIDER_ERROR_CATEGORIES.INVALID_RESPONSE) return false;
     if (category === PROVIDER_ERROR_CATEGORIES.PROVIDER_UNAVAILABLE) return true;
     if (category === PROVIDER_ERROR_CATEGORIES.RATE_LIMITED) return true;
     if (category === PROVIDER_ERROR_CATEGORIES.QUOTA_EXHAUSTED) return true;
@@ -335,6 +338,13 @@ class AIService {
           error.latencyMs = Date.now() - startedAt;
           error.safeMessage = providerError.safeMessage;
 
+          // Auth failures (401/403/invalid key) are deterministic — retrying
+          // cannot fix them and only delays the caller (15s+ per attempt).
+          // Fail fast so the pipeline degrades immediately instead of hanging.
+          if (providerError.category === PROVIDER_ERROR_CATEGORIES.AUTHENTICATION) {
+            throw error;
+          }
+
           if (status && retryableStatusCodes.has(Number(status)) && attempt < maxAttempts) {
             const delayMs = 500 * Math.pow(2, attempt - 1);
             await this.sleep(delayMs);
@@ -409,7 +419,51 @@ class AIService {
   }
 
   getFallbackModel(primaryModel) {
-    return config.ai?.fallbackModel || null;
+    if (config.ai?.fallbackModel) {
+      return config.ai.fallbackModel;
+    }
+    // Robust default: if the primary is a heavy reasoning model, fall back to
+    // the fast combo (always present in the OmniRoute catalog). If the primary
+    // is already fast, there is no meaningful fallback.
+    if (primaryModel && primaryModel.includes('fast')) return null;
+    return config.omniroute.models.fast || 'auto/best-fast';
+  }
+
+  /**
+   * Probe the OmniRoute gateway at startup (non-fatal).
+   * Verifies the gateway is reachable and the configured API key is accepted,
+   * so config drift (rotated key, wrong port, gateway down) is visible
+   * immediately instead of surfacing as slow per-request timeouts.
+   * @returns {Promise<{ok: boolean, statusCode: number|null, message: string, modelCount: number}>}
+   */
+  async probeGateway() {
+    const gateway = config.omniroute.baseUrl;
+    try {
+      const resp = await this.client.get('/models', { timeout: 5000 });
+      const models = resp.data?.data || [];
+      return {
+        ok: true,
+        statusCode: resp.status,
+        message: `OmniRoute gateway reachable (${models.length} models available)`,
+        modelCount: models.length,
+      };
+    } catch (error) {
+      const status = error?.response?.status ?? error?.status ?? null;
+      const category = this.classifyProviderError({
+        status,
+        message: error?.message || '',
+        errorCode: error?.code || null,
+      });
+      return {
+        ok: false,
+        statusCode: status,
+        message: status === 401 || status === 403
+          ? `OmniRoute gateway rejected the API key (HTTP ${status}) — check OMNIROUTE_API_KEY`
+          : `OmniRoute gateway unreachable at ${gateway}: ${error?.message || 'unknown error'}`,
+        modelCount: 0,
+        category,
+      };
+    }
   }
 
   /**
