@@ -22,8 +22,11 @@ class GoogleMapsUrlParserProvider {
    * @returns {boolean}
    */
   static validateGoogleMapsUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) return false;
     try {
-      const parsed = new URL(url);
+      const parsed = new URL(trimmed);
       const validHostnames = [
         'maps.google.com',
         'www.google.com',
@@ -31,6 +34,16 @@ class GoogleMapsUrlParserProvider {
         'goo.gl',
         'maps.app.goo.gl',
         'maps.googleapis.com',
+        'www.google.co.uk',
+        'www.google.de',
+        'www.google.fr',
+        'www.google.ca',
+        'www.google.com.au',
+        'google.co.uk',
+        'google.de',
+        'google.fr',
+        'google.ca',
+        'google.com.au',
       ];
       return validHostnames.some(h => parsed.hostname === h || parsed.hostname.endsWith('.' + h));
     } catch {

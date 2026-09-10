@@ -22,15 +22,18 @@ router.post('/analyze', async (req, res, next) => {
     
     if (!googleMapsUrl && !name) {
       return res.status(400).json({ 
-        error: 'googleMapsUrl or name is required' 
+        error: 'Please provide a Google Maps URL or business name.',
+        code: 'MISSING_INPUT',
+        category: 'USER_INPUT_ERROR',
       });
     }
 
     // Validate URL format when provided (using the parser, not a network call)
     if (googleMapsUrl && !BusinessDataExtractor.validateGoogleMapsUrl(googleMapsUrl)) {
       return res.status(400).json({ 
-        error: 'Invalid Google Maps URL format',
-        code: 'INVALID_URL'
+        error: 'That doesn\'t appear to be a supported Google Maps URL. Please paste a URL from maps.google.com.',
+        code: 'INVALID_URL',
+        category: 'USER_INPUT_ERROR',
       });
     }
 
@@ -169,7 +172,8 @@ router.post('/research', async (req, res, next) => {
     
     if (!googleMapsUrl) {
       return res.status(400).json({ 
-        error: 'googleMapsUrl is required' 
+        error: 'googleMapsUrl is required',
+        category: 'USER_INPUT_ERROR',
       });
     }
 
@@ -177,7 +181,9 @@ router.post('/research', async (req, res, next) => {
     const isValid = BusinessDataExtractor.validateGoogleMapsUrl(googleMapsUrl);
     if (!isValid) {
       return res.status(400).json({ 
-        error: 'Invalid Google Maps URL format' 
+        error: 'That doesn\'t appear to be a supported Google Maps URL. Please paste a URL from maps.google.com.',
+        code: 'INVALID_URL',
+        category: 'USER_INPUT_ERROR',
       });
     }
 

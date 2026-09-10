@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Globe, Mail, MapPin, Phone, Sparkles, Trash2 } from 'lucide-react';
+import { Globe, Mail, MapPin, Phone, Sparkles, Trash2, Star, Clock, Tag, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import ScoreIndicator from '../components/ui/ScoreIndicator';
@@ -59,13 +59,11 @@ export default function LeadDetail() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Lead detail</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-[#111111] md:text-[2.7rem]">{lead?.businessName || 'Unknown business'}</h1>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-[#111111] md:text-[2.7rem]">{lead?.businessName || 'Local business'}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-[#6E6E73]">
               <span>{lead?.businessCategory || 'Local business'}</span>
-              <span className="h-1 w-1 rounded-full bg-[#D2D2D7]" />
-              <span>{lead?.location?.city || 'Location unavailable'}</span>
-              <span className="h-1 w-1 rounded-full bg-[#D2D2D7]" />
-              <span>{lead?.contact?.website ? 'Website present' : 'No website detected'}</span>
+              {lead?.location?.city && <><span className="h-1 w-1 rounded-full bg-[#D2D2D7]" /><span>{lead.location.city}</span></>}
+              {lead?.contact?.website && <><span className="h-1 w-1 rounded-full bg-[#D2D2D7]" /><span className="flex items-center gap-1"><Globe className="h-3 w-3" /> Website</span></>}
             </div>
           </div>
 
@@ -122,33 +120,37 @@ export default function LeadDetail() {
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                   <dt className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Location</dt>
                   <dd className="mt-3 flex items-center gap-2 text-sm text-[#111111]">
-                    <MapPin className="h-4 w-4 text-[#6E6E73]" />
-                    {lead?.location?.address || 'N/A'}
+                    <MapPin className="h-4 w-4 shrink-0 text-[#6E6E73]" />
+                    <span>{lead?.location?.address || 'Location not available'}</span>
                   </dd>
                 </div>
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                   <dt className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Phone</dt>
                   <dd className="mt-3 flex items-center gap-2 text-sm text-[#111111]">
-                    <Phone className="h-4 w-4 text-[#6E6E73]" />
-                    {lead?.contact?.phone || 'N/A'}
+                    <Phone className="h-4 w-4 shrink-0 text-[#6E6E73]" />
+                    {lead?.contact?.phone ? (
+                      <a href={`tel:${lead.contact.phone}`} className="text-[#0A84FF] hover:text-[#0077ED]">{lead.contact.phone}</a>
+                    ) : <span className="text-[#6E6E73]">Not available</span>}
                   </dd>
                 </div>
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                   <dt className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Email</dt>
                   <dd className="mt-3 flex items-center gap-2 text-sm text-[#111111]">
-                    <Mail className="h-4 w-4 text-[#6E6E73]" />
-                    {lead?.contact?.email || 'N/A'}
+                    <Mail className="h-4 w-4 shrink-0 text-[#6E6E73]" />
+                    {lead?.contact?.email ? (
+                      <a href={`mailto:${lead.contact.email}`} className="text-[#0A84FF] hover:text-[#0077ED]">{lead.contact.email}</a>
+                    ) : <span className="text-[#6E6E73]">Not available</span>}
                   </dd>
                 </div>
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                   <dt className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Website</dt>
                   <dd className="mt-3 flex items-center gap-2 text-sm text-[#111111]">
-                    <Globe className="h-4 w-4 text-[#6E6E73]" />
+                    <Globe className="h-4 w-4 shrink-0 text-[#6E6E73]" />
                     {lead?.contact?.website ? (
-                      <a href={lead.contact.website} target="_blank" rel="noreferrer" className="text-[#0A84FF] hover:text-[#0077ED]">Visit</a>
-                    ) : (
-                      <span className="text-[#B42318]">No website</span>
-                    )}
+                      <a href={lead.contact.website} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[#0A84FF] hover:text-[#0077ED]">
+                        Visit site <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : <span className="text-[#6E6E73]">No website detected</span>}
                   </dd>
                 </div>
               </dl>
@@ -158,19 +160,65 @@ export default function LeadDetail() {
               <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Business DNA</h2>
               <div className="mt-5 space-y-4">
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Audience</p>
-                  <p className="mt-2 text-sm text-[#111111]">{lead?.businessDNA?.targetAudience || 'Unavailable'}</p>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Target audience</p>
+                  <p className="mt-2 text-sm leading-6 text-[#111111]">{lead?.businessDNA?.targetAudience || 'Analysis pending'}</p>
                 </div>
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Positioning</p>
-                  <p className="mt-2 text-sm text-[#111111]">{lead?.businessDNA?.valueProposition || 'Unavailable'}</p>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Value proposition</p>
+                  <p className="mt-2 text-sm leading-6 text-[#111111]">{lead?.businessDNA?.valueProposition || 'Analysis pending'}</p>
                 </div>
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Brand personality</p>
-                  <p className="mt-2 text-sm text-[#111111]">{lead?.businessDNA?.brandPersonality || 'Unavailable'}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#111111]">{lead?.businessDNA?.brandPersonality || 'Analysis pending'}</p>
                 </div>
               </div>
             </div>
+
+            {/* Provenance / Source Information */}
+            {(lead?.analysis?.metrics?.trustSignals || lead?.businessData?.services) && (
+              <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
+                <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Business details</h2>
+                <div className="mt-5 space-y-3">
+                  {lead?.businessData?.services && lead.businessData.services.length > 0 && (
+                    <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Services</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {lead.businessData.services.map((s: string) => (
+                          <span key={s} className="inline-flex items-center gap-1 rounded-full border border-[#E5E5EA] bg-white px-2.5 py-1 text-xs text-[#111111]">
+                            <Tag className="h-3 w-3 text-[#6E6E73]" /> {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {lead?.businessData?.openingHours && (
+                    <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Hours</p>
+                      <div className="mt-2 flex items-center gap-2 text-sm text-[#111111]">
+                        <Clock className="h-4 w-4 text-[#6E6E73]" />
+                        <span>Hours data available</span>
+                      </div>
+                    </div>
+                  )}
+                  {lead?.analysis?.metrics?.trustSignals && (
+                    <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Source confidence</p>
+                      <div className="mt-2 flex items-center gap-2">
+                        {Array.isArray(lead.analysis.metrics.trustSignals) ? (
+                          lead.analysis.metrics.trustSignals.slice(0, 3).map((signal: string, i: number) => (
+                            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] px-2 py-1 text-xs text-[#067647]">
+                              <CheckCircle2 className="h-3 w-3" /> {signal}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-sm text-[#111111]">Sources consulted</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-6">
@@ -216,30 +264,69 @@ export default function LeadDetail() {
       )}
 
       {activeTab === 'Analysis' && (
-        <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Opportunity breakdown</h2>
-            <StatusBadge status={lead?.opportunityScore?.priority || 'high'} />
+        <div className="space-y-6">
+          <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Opportunity breakdown</h2>
+              <StatusBadge status={lead?.opportunityScore?.priority || 'high'} />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Rating</p>
+                <div className="mt-3 flex items-center gap-1.5">
+                  {lead?.businessData?.rating ? (
+                    <>
+                      <Star className="h-4 w-4 text-[#F59E0B] fill-[#F59E0B]" />
+                      <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead.businessData.rating}</span>
+                      <span className="text-sm text-[#6E6E73]">/ 5</span>
+                    </>
+                  ) : <span className="text-2xl font-semibold text-[#6E6E73]">—</span>}
+                </div>
+              </div>
+              <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Reviews</p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead?.businessData?.reviewCount ?? '—'}</p>
+              </div>
+              <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Website</p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead?.contact?.website ? 'Present' : 'Missing'}</p>
+              </div>
+              <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Score</p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead?.opportunityScore?.total ?? '—'}</p>
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Trust</p>
-              <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead?.businessData?.rating ?? 'N/A'}</p>
+          {/* Research / Analysis Details */}
+          {lead?.analysis?.metrics?.facts && lead.analysis.metrics.facts.length > 0 && (
+            <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
+              <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Key findings</h2>
+              <div className="mt-4 space-y-2">
+                {lead.analysis.metrics.facts.slice(0, 8).map((fact: string, i: number) => (
+                  <div key={i} className="flex items-start gap-2.5 rounded-xl border border-[#E5E5EA] bg-[#F7F7F8] px-4 py-3 text-sm text-[#111111]">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-[#067647] mt-0.5" />
+                    <span className="leading-6">{fact}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Reviews</p>
-              <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead?.businessData?.reviewCount ?? 'N/A'}</p>
+          )}
+
+          {lead?.analysis?.metrics?.unknowns && lead.analysis.metrics.unknowns.length > 0 && (
+            <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
+              <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Information gaps</h2>
+              <div className="mt-4 space-y-2">
+                {lead.analysis.metrics.unknowns.slice(0, 5).map((unknown: string, i: number) => (
+                  <div key={i} className="flex items-start gap-2.5 rounded-xl border border-[#E5E5EA] bg-[#FFF7ED] px-4 py-3 text-sm text-[#C2410C]">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span className="leading-6">{unknown}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Website</p>
-              <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead?.contact?.website ? 'Yes' : 'No'}</p>
-            </div>
-            <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Score</p>
-              <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead?.opportunityScore?.total ?? 'N/A'}</p>
-            </div>
-          </div>
+          )}
         </div>
       )}
 

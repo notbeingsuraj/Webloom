@@ -75,11 +75,13 @@ router.post('/', async (req, res, next) => {
       // P1.5: Business identity comes from canonical projection.
       businessName: canonical.identity.name,
       businessCategory: canonical.business.category,
-      location: canonical.identity.addressComponents ? {
-        city: canonical.identity.addressComponents.city,
-        state: canonical.identity.addressComponents.state,
-        country: canonical.identity.addressComponents.country,
-      } : null,
+      location: {
+        address: canonical.identity.address || null,
+        city: canonical.identity.addressComponents?.city || null,
+        state: canonical.identity.addressComponents?.state || null,
+        country: canonical.identity.addressComponents?.country || null,
+        coordinates: canonical.identity.coordinates || null,
+      },
       contact: {
         phone: canonical.identity.phone,
         email: canonical.business.email,
@@ -121,6 +123,32 @@ router.post('/', async (req, res, next) => {
     res.status(201).json({
       success: true,
       data: lead,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/leads/stats/dashboard
+ * Dashboard statistics
+ */
+router.get('/stats/dashboard', (req, res, next) => {
+  try {
+    const leads = Array.from(leadCache.values());
+    const totalLeads = leads.length;
+    const highPriority = leads.filter(l => l.opportunityScore?.priority === 'high').length;
+    const websitesGenerated = leads.filter(l => l.generatedWebsite).length;
+    const contacted = leads.filter(l => l.status === 'contacted' || l.status === 'won').length;
+
+    res.json({
+      success: true,
+      data: {
+        totalLeads,
+        highPriority,
+        websitesGenerated,
+        contacted,
+      },
     });
   } catch (error) {
     next(error);
