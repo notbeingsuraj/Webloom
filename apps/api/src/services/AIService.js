@@ -21,7 +21,11 @@ class AIService {
   constructor() {
     this.client = axios.create({
       baseURL: config.omniroute.baseUrl,
-      timeout: config.extraction.timeout,
+      // AI calls (brand DNA, digital audit, re-research) are long-running
+      // reasoning tasks — they need a much larger budget than the 15s
+      // extraction timeout. Coupling them previously forced every enrichment
+      // to degrade on slow (but healthy) gateway routes.
+      timeout: config.ai.timeout,
       headers: {
         'Authorization': `Bearer ${config.omniroute.apiKey}`,
         'Content-Type': 'application/json',

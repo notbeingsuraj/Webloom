@@ -23,6 +23,12 @@ export const config = {
     // Defaults to the OmniRoute fast combo — a resilient, low-latency model
     // that exists in every OmniRoute catalog.
     fallbackModel: process.env.AI_FALLBACK_MODEL || null,
+    // AI generation timeout — distinct from the extraction timeout. Heavy
+    // reasoning calls (brand DNA, digital audit) routinely exceed the 15s
+    // extraction budget, so coupling them forced every enrichment to degrade.
+    // 90s gives long-running reasoning models room while still failing fast
+    // on a dead gateway.
+    timeout: parseInt(process.env.AI_TIMEOUT_MS) || 90000,
   },
   omniroute: {
     apiKey: process.env.OMNIROUTE_API_KEY,
