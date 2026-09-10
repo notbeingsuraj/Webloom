@@ -8,6 +8,7 @@
 import AIService from './AIService.js';
 import { buildAssetGenerationPrompt } from '../prompts/assetGeneration.js';
 import { config } from '../config/env.js';
+import CanonicalBusinessProfileService from './CanonicalBusinessProfileService.js';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -236,8 +237,14 @@ class AssetGenerationService {
       body: { family: 'system-ui, sans-serif' }
     };
     
-    const businessName = params.businessProfile?.identity?.name || 'Business';
-    const category = params.businessProfile?.identity?.category || 'Business';
+    // P1.5: business facts come from canonical projection. The 'Business'
+    // fallback is display-only placeholder text for SVG rendering — never a
+    // synthetic identity assertion.
+    const canonical = CanonicalBusinessProfileService.fromEntityData({
+      record: params.businessProfile,
+    });
+    const businessName = canonical.identity.name || 'Business';
+    const category = canonical.business.category || 'Business';
     
     // Parse aspect ratio
     const [w, h] = aspectRatio.split(':').map(Number);

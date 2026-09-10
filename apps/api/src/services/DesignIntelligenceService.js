@@ -12,6 +12,7 @@
 import AIService from './AIService.js';
 import { buildDesignIntelligencePrompt } from '../prompts/designIntelligence.js';
 import { DESIGN_INTELLIGENCE_SCHEMA } from '../schemas/designIntelligence.js';
+import CanonicalBusinessProfileService from './CanonicalBusinessProfileService.js';
 
 class DesignIntelligenceService {
   /**
@@ -21,8 +22,13 @@ class DesignIntelligenceService {
    */
   async generateDesignIntelligence(businessProfile, brandDNA, digitalAudit, options = {}) {
     const startTime = Date.now();
-    
-    if (!businessProfile || !businessProfile.identity?.name) {
+
+    // P1.5: Validate business identity through canonical projection — never
+    // accept a provider-ID-as-name or a synthetic placeholder.
+    const canonical = CanonicalBusinessProfileService.fromEntityData({
+      record: businessProfile,
+    });
+    if (!canonical.identity.name) {
       throw new Error('BusinessProfile with name is required');
     }
     if (!brandDNA) {
@@ -95,15 +101,19 @@ class DesignIntelligenceService {
    * Uses business category, brand DNA, and audit data to make intelligent design decisions.
    */
   generateDeterministicIntelligence(businessProfile, brandDNA, digitalAudit, startTime) {
-    const facts = businessProfile.identity || {};
-    const category = facts.category || (facts.categories && facts.categories[0]) || 'general';
+    // P1.5: Read business facts through the canonical projection.
+    const canonical = CanonicalBusinessProfileService.fromEntityData({ record: businessProfile });
+    const facts = canonical.identity || {};
+    const category = canonical.business.category
+      || (canonical.business.categories && canonical.business.categories[0])
+      || 'general';
     const brandPersonality = brandDNA?.brandPersonality || ['professional', 'trustworthy'];
-    const hasWebsite = businessProfile.contact?.website;
-    const hasPhone = businessProfile.contact?.phone;
-    const hasHours = businessProfile.openingHours && Object.keys(businessProfile.openingHours).length > 0;
-    const hasAddress = businessProfile.location?.address;
-    const hasRating = businessProfile.rating != null;
-    const services = businessProfile.services || [];
+    const hasWebsite = canonical.identity.website;
+    const hasPhone = canonical.identity.phone;
+    const hasHours = canonical.business.hours && Object.keys(canonical.business.hours).length > 0;
+    const hasAddress = canonical.identity.address;
+    const hasRating = canonical.reputation.rating != null;
+    const services = canonical.business.services || [];
 
     // Determine layout family based on category and brand personality
     const layoutFamily = this.selectLayoutFamily(category, brandPersonality);
@@ -829,17 +839,19 @@ class DesignIntelligenceService {
    * Generate content strategy
    */
   generateContentStrategy(businessProfile, brandPersonality, pageArchitecture) {
-    const facts = businessProfile.identity || {};
+    // P1.5: Read business facts through the canonical projection.
+    const canonical = CanonicalBusinessProfileService.fromEntityData({ record: businessProfile });
+    const facts = canonical.identity || {};
     const name = facts.name || 'This Business';
-    const category = facts.category || 'local business';
-    const description = facts.description || '';
-    const phone = businessProfile.contact?.phone;
-    const website = businessProfile.contact?.website;
-    const address = businessProfile.location?.address;
+    const category = canonical.business.category || 'local business';
+    const description = canonical.business.description || '';
+    const phone = canonical.identity.phone;
+    const website = canonical.identity.website;
+    const address = canonical.identity.address;
     const hasPhone = !!phone;
     const hasWebsite = !!website;
     const hasAddress = !!address;
-    const services = businessProfile.services || [];
+    const services = canonical.business.services || [];
     
     const primaryAction = hasPhone ? 'call' : (hasWebsite ? 'visit' : 'directions');
     const primaryCtaText = hasPhone 
@@ -910,17 +922,17 @@ class DesignIntelligenceService {
         },
         location: {
           heading: 'Visit Us',
-          address: businessProfile.location?.address || 'Address available on contact',
+          address: canonical.identity.address || 'Address available on contact',
         },
         hours: {
           heading: 'Hours',
-          schedule: businessProfile.openingHours || {},
+          schedule: canonical.business.hours || {},
         },
         contact: {
           heading: 'Get in Touch',
-          phone: businessProfile.contact?.phone,
-          email: businessProfile.contact?.email,
-          website: businessProfile.contact?.website,
+          phone: canonical.identity.phone,
+          email: canonical.business.email,
+          website: canonical.identity.website,
         },
         cta: {
           headline: `Ready to Experience ${name}?`,

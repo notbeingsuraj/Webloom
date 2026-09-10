@@ -106,8 +106,19 @@ router.post('/analyze', async (req, res, next) => {
     // unknowns, trustSignals, positioning, digitalPresence) moves to
     // metadata.analysis to preserve endpoint-specific information without
     // contaminating the canonical business representation.
+    //
+    // Provider metadata: the persisted provider-identity observations (if the
+    // research pipeline produced them; best-effort) are handed to the
+    // projection as canonical provider metadata — so provider IDs live in
+    // `providers[]`, never in identity, and never as a route-reconstructed
+    // field. When persistence was skipped, the projection still derives
+    // provider info from the intelligence record's own source metadata.
     const canonicalService = CanonicalBusinessProfileService;
-    const canonical = canonicalService.fromEntityData({ record: rawIntelligence });
+    const persistedProviders = result.persistence?.providerIdentities ?? null;
+    const canonical = canonicalService.fromEntityData({
+      record: rawIntelligence,
+      providerIdentities: persistedProviders,
+    });
 
     res.json({
       success: true,
@@ -182,8 +193,15 @@ router.post('/research', async (req, res, next) => {
     });
 
     // P1.4: Route business data through the canonical projection layer.
+    // Provider metadata: pass through persisted provider-identity observations
+    // (when the research pipeline produced them) so provider IDs stay inside
+    // canonical `providers[]` rather than leaking into identity.
     const canonicalService = CanonicalBusinessProfileService;
-    const canonical = canonicalService.fromEntityData({ record: result.intelligence });
+    const persistedProviders = result.persistence?.providerIdentities ?? null;
+    const canonical = canonicalService.fromEntityData({
+      record: result.intelligence,
+      providerIdentities: persistedProviders,
+    });
 
     res.json({
       success: true,
