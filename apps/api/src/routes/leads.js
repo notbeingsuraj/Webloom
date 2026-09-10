@@ -5,6 +5,7 @@ import BusinessDataExtractor from '../services/BusinessDataExtractor.js';
 import BusinessResearchService from '../services/BusinessResearchService.js';
 import BrandStrategyService from '../services/BrandStrategyService.js';
 import DigitalAuditService from '../services/DigitalAuditService.js';
+import CanonicalBusinessProfileService from '../services/CanonicalBusinessProfileService.js';
 
 const router = express.Router();
 
@@ -49,11 +50,21 @@ router.post('/', async (req, res, next) => {
     // Perform digital audit
     const audit = await DigitalAuditService.auditDigitalPresence(businessData);
 
+    // P1.5: Project business data through the canonical read layer.
+    // Canonical fields provide identity/contact/location/reputation.
+    // Analysis-specific metadata (trustSignals, facts, unknowns, digitalPresence,
+    // positioning) remains in analysis — it is not canonical business data.
+    const canonical = CanonicalBusinessProfileService.fromEntityData({
+      record: businessData,
+    });
+
     // Create lead object
     const leadId = uuidv4();
     const lead = {
       _id: leadId,
-      leadName: leadName || businessData.identity?.name || 'Unnamed Business',
+      // P1.5: No synthetic identity fallback — null when no authoritative name.
+      // P1.2 invariant: canonical identity never invents 'Unnamed Business'.
+      leadName: leadName || canonical.identity.name || null,
       internalNotes: internalNotes || '',
       customInstructions: customInstructions || '',
       status: 'new',
@@ -61,29 +72,38 @@ router.post('/', async (req, res, next) => {
         googleMapsUrl,
         extractedAt: extractedData.metadata?.extractedAt || new Date().toISOString(),
       },
-      businessName: businessData.identity?.name || null,
-      businessCategory: businessData.identity?.category || null,
-      location: businessData.location?.city ? {
-        city: businessData.location.city,
-        state: businessData.location.state,
-        country: businessData.location.country,
+      // P1.5: Business identity comes from canonical projection.
+      businessName: canonical.identity.name,
+      businessCategory: canonical.business.category,
+      location: canonical.identity.addressComponents ? {
+        city: canonical.identity.addressComponents.city,
+        state: canonical.identity.addressComponents.state,
+        country: canonical.identity.addressComponents.country,
       } : null,
-      contact: businessData.contact ? {
-        phone: businessData.contact.phone,
-        email: businessData.contact.email,
-        website: businessData.contact.website,
-      } : null,
+      contact: {
+        phone: canonical.identity.phone,
+        email: canonical.business.email,
+        website: canonical.identity.website,
+      },
+      // P1.5: Canonical business facts only. Analysis-specific metadata
+      // (trustSignals, facts, unknowns) moves to analysis.metrics.
       businessData: {
-        rating: businessData.rating,
-        reviewCount: businessData.reviewCount,
-        services: businessData.services,
-        openingHours: businessData.openingHours,
-        trustSignals: businessData.trustSignals,
-        facts: businessData.facts,
-        unknowns: businessData.unknowns,
+        rating: canonical.reputation.rating,
+        reviewCount: canonical.reputation.reviewCount,
+        services: canonical.business.services,
+        openingHours: canonical.business.hours,
       },
       analysis: {
         businessData,
+        // P1.5: analysis-specific metrics preserved separately from canonical business data.
+        metrics: {
+          trustSignals: businessData.trustSignals ?? null,
+          facts: businessData.facts ?? null,
+          unknowns: businessData.unknowns ?? null,
+          digitalPresence: businessData.digitalPresence ?? null,
+          positioning: businessData.positioning ?? null,
+          source: businessData.source ?? null,
+        },
         brandDNA,
         audit,
         extractedAt: new Date().toISOString(),
