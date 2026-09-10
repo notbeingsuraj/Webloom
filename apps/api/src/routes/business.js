@@ -22,7 +22,7 @@ router.post('/analyze', async (req, res, next) => {
     
     if (!googleMapsUrl && !name) {
       return res.status(400).json({ 
-        error: 'Please provide a Google Maps URL or business name.',
+        error: 'A Google Maps URL is required. Please provide one and try again.',
         code: 'MISSING_INPUT',
         category: 'USER_INPUT_ERROR',
       });
