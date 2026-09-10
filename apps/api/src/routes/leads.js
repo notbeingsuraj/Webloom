@@ -44,11 +44,35 @@ router.post('/', async (req, res, next) => {
     // Transform to normalized BusinessProfile
     const businessData = await BusinessResearchService.extractBusinessIntelligence(extractedData);
 
-    // Build Business DNA
-    const brandDNA = await BrandStrategyService.generateBrandDNA(businessData);
+    // Build Business DNA — optional additive enrichment. Extraction has already
+    // succeeded (business is valid). If the AI brand-DNA step fails (e.g.
+    // transient upstream timeout), we must NOT discard the successful
+    // extraction or return HTTP 500. We surface an explicit failure state
+    // instead, while keeping the valid business profile. This mirrors the
+    // documented graceful-degradation behavior in routes/business.js.
+    let brandDNA = null;
+    let brandStrategyStatus = 'not_attempted';
+    try {
+      brandDNA = await BrandStrategyService.generateBrandDNA(businessData);
+      brandStrategyStatus = 'ok';
+    } catch (brandError) {
+      const safeMsg = brandError?.safeMessage || brandError?.message || 'unknown';
+      console.error('[leads] Brand DNA generation failed (non-fatal, extraction preserved):', safeMsg);
+      brandStrategyStatus = 'failed';
+      brandDNA = null;
+    }
 
-    // Perform digital audit
-    const audit = await DigitalAuditService.auditDigitalPresence(businessData);
+    // Perform digital audit — also optional enrichment. If the AI audit step
+    // fails, degrade to a deterministic no-website audit so the lead still
+    // renders (overallScore + categories are always present).
+    let audit;
+    try {
+      audit = await DigitalAuditService.auditDigitalPresence(businessData);
+    } catch (auditError) {
+      const safeMsg = auditError?.safeMessage || auditError?.message || 'unknown';
+      console.error('[leads] Digital audit failed (non-fatal, extraction preserved):', safeMsg);
+      audit = DigitalAuditService.generateNoWebsiteAudit(businessData);
+    }
 
     // P1.5: Project business data through the canonical read layer.
     // Canonical fields provide identity/contact/location/reputation.
@@ -108,6 +132,7 @@ router.post('/', async (req, res, next) => {
         },
         brandDNA,
         audit,
+        brandStrategyStatus,
         extractedAt: new Date().toISOString(),
       },
       opportunityScore: {
