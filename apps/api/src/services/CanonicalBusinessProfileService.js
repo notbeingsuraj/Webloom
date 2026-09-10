@@ -372,6 +372,8 @@ function readCoordinates(record) {
  * When no authoritative name exists, returns null (never invents).
  * Synthetic placeholders are ALSO nulled here (defense in depth) so a source
  * that contains "Unknown Business" cannot leak it into canonical identity.
+ * Provider IDs (place IDs / CIDs) are NEVER identity (invariant B) — a
+ * Google Place ID or CID string that leaked into the name field is nulled.
  */
 function canonicalName(record) {
   const { value } = readField(record, { sources: NAME_SOURCES, path: 'identity.name' });
@@ -379,6 +381,12 @@ function canonicalName(record) {
   const trimmed = value.trim();
   if (trimmed.length === 0) return null;
   if (SYNTHETIC_IDENTITY_RE.test(trimmed.toLowerCase())) return null;
+  // Invariant B: provider IDs must never become identity. A name that is
+  // actually a Google Place ID (ChIJ…), a CID (cid:… or 0x…:0x…), or a
+  // numeric-only CID payload is provider metadata, not a business name.
+  if (/^(cid:\d+|chij[a-z0-9_-]{15,}|0x[0-9a-f]+:0x[0-9a-f]+|\d{10,20})$/i.test(trimmed)) {
+    return null;
+  }
   return trimmed;
 }
 
