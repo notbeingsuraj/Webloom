@@ -38,11 +38,49 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    // Extract business data
-    const extractedData = await BusinessDataExtractor.extractFromGoogleMapsUrl(googleMapsUrl);
-    
+    // Extract business data.
+    // Use the orchestrated provider path (deterministic URL hints → Geoapify →
+    // web extraction → AI enrichment), the same robust pipeline as
+    // /api/business/analyze. The single-path AI-dependent extractor
+    // (extractFromGoogleMapsUrl) can return an empty acquisition when the AI
+    // gateway is unavailable; the orchestrated path still resolves identity
+    // from the URL + provider records, so the demo flow keeps working.
+    let extractedData = null;
+    let extractionTrace = null;
+    try {
+      const result = await BusinessResearchService.extractBusinessIntelligenceWithProviders({
+        googleMapsUrl,
+      });
+      extractedData = result.intelligence;
+      extractionTrace = result.provider || null;
+    } catch (extractError) {
+      // Fall back to the direct extractor so the route still attempts a result
+      // when the orchestrated path throws (it should not, but be resilient).
+      console.error('[leads] Orchestrated extraction failed, falling back:', extractError?.message || String(extractError));
+      extractedData = await BusinessDataExtractor.extractFromGoogleMapsUrl(googleMapsUrl);
+    }
+
+    // Provider chain returned nothing usable → surface a structured
+    // provider-unavailable result instead of persisting an empty lead.
+    const nothingUsable =
+      extractionTrace &&
+      extractionTrace.geoapify &&
+      extractionTrace.geoapify !== 'ok' &&
+      (!extractedData?.contact?.phone && !extractedData?.contact?.website && !extractedData?.location?.address);
+
+    if (nothingUsable) {
+      return res.status(503).json({
+        success: false,
+        error: 'provider_unavailable',
+        message: 'Business provider temporarily unavailable. No business data was produced.',
+        category: 'PROVIDER_UNAVAILABLE',
+      });
+    }
+
     // Transform to normalized BusinessProfile
-    const businessData = await BusinessResearchService.extractBusinessIntelligence(extractedData);
+    const businessData = extractedData.metadata?.providers
+      ? extractedData
+      : await BusinessResearchService.extractBusinessIntelligence(extractedData);
 
     // Build Business DNA — optional additive enrichment. Extraction has already
     // succeeded (business is valid). If the AI brand-DNA step fails (e.g.
