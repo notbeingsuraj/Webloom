@@ -3,6 +3,7 @@ import WebsiteGenerationService from '../services/WebsiteGenerationService.js';
 import BusinessResearchService from '../services/BusinessResearchService.js';
 import BusinessDataExtractor from '../services/BusinessDataExtractor.js';
 import GeneratedSiteManager from '../services/GeneratedSiteManager.js';
+import CanonicalBusinessProfileService from '../services/CanonicalBusinessProfileService.js';
 
 const router = express.Router();
 
@@ -39,7 +40,11 @@ router.post('/generate', async (req, res, next) => {
         longitude: req.body.longitude,
       });
 
-      if (!result.intelligence?.identity?.name) {
+      // P1.5: Validate canonical business identity — no synthetic identity.
+      const providerCanonical = CanonicalBusinessProfileService.fromEntityData({
+        record: result.intelligence,
+      });
+      if (!providerCanonical.identity.name) {
         return res.status(503).json({
           success: false,
           error: 'provider_unavailable',
@@ -49,7 +54,11 @@ router.post('/generate', async (req, res, next) => {
       businessData = result.intelligence;
     }
 
-    if (!businessData || !businessData.identity?.name) {
+    // P1.5: Validate canonical identity — reject if no authoritative name.
+    const inputCanonical = CanonicalBusinessProfileService.fromEntityData({
+      record: businessData,
+    });
+    if (!inputCanonical.identity.name) {
       return res.status(400).json({ error: 'googleMapsUrl or business object (with name) is required' });
     }
 
