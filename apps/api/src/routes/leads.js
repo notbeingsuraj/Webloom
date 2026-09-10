@@ -77,8 +77,14 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    // Transform to normalized BusinessProfile
-    const businessData = extractedData.metadata?.providers
+    // Transform to normalized BusinessProfile.
+    // The orchestrated provider path already returns the full normalized
+    // intelligence shape (identity/contact/location/source/facts/...) with the
+    // provider trace in source.providers. Use it DIRECTLY — routing it through
+    // extractBusinessIntelligence() would re-shape it via normalizeFlatProfile,
+    // which drops identity because the orchestrated shape carries its source
+    // metadata under `source`, not `metadata`.
+    const businessData = extractedData.source?.providers
       ? extractedData
       : await BusinessResearchService.extractBusinessIntelligence(extractedData);
 
