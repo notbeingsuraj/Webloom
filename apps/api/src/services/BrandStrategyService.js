@@ -1,5 +1,6 @@
 import AIService from './AIService.js';
 import { buildBrandStrategyPrompt } from '../prompts/brandStrategy.js';
+import CanonicalBusinessProfileService from './CanonicalBusinessProfileService.js';
 
 /**
  * Brand Strategy Service
@@ -11,7 +12,13 @@ class BrandStrategyService {
     try {
       const startTime = Date.now();
       
-      if (!normalizedBusinessData || !normalizedBusinessData.identity) {
+      // P1.5: Validate using canonical projection — business identity must exist
+      // in the canonical layer. The full intelligence shape is still passed to the
+      // AI prompt builder for complete context (trustSignals, facts, unknowns, etc.).
+      const canonical = CanonicalBusinessProfileService.fromEntityData({
+        record: normalizedBusinessData,
+      });
+      if (!canonical.identity.name) {
         throw new Error('Valid normalized business data is required');
       }
 
@@ -97,15 +104,19 @@ class BrandStrategyService {
     let score = 0;
     let maxScore = 0;
 
+    // P1.5: Business identity/contact/location fields come from the canonical
+    // projection layer. Analysis-specific metadata (trustSignals, facts) remains
+    // on the source data.
+    const canonical = CanonicalBusinessProfileService.fromEntityData({ record: data });
     const checks = [
-      { field: data.identity?.name, weight: 10 },
-      { field: data.identity?.category, weight: 8 },
-      { field: data.identity?.description, weight: 7 },
-      { field: data.location?.address, weight: 6 },
-      { field: data.contact?.phone, weight: 5 },
-      { field: data.contact?.website, weight: 5 },
+      { field: canonical.identity.name, weight: 10 },
+      { field: canonical.business.category, weight: 8 },
+      { field: canonical.business.description, weight: 7 },
+      { field: canonical.identity.address, weight: 6 },
+      { field: canonical.identity.phone, weight: 5 },
+      { field: canonical.identity.website, weight: 5 },
       { field: data.trustSignals?.length > 0, weight: 8 },
-      { field: data.services?.length > 0, weight: 7 },
+      { field: canonical.business.services?.length > 0, weight: 7 },
       { field: data.facts?.length > 0, weight: 6 },
     ];
 

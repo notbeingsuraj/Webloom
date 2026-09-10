@@ -1,5 +1,6 @@
 import AIService from './AIService.js';
 import { buildDigitalAuditPrompt } from '../prompts/digitalAudit.js';
+import CanonicalBusinessProfileService from './CanonicalBusinessProfileService.js';
 
 /**
  * Digital Audit Service
@@ -19,8 +20,10 @@ class DigitalAuditService {
     try {
       const startTime = Date.now();
 
-      // Check if website exists - handle both old and new data formats
-      const hasWebsite = !!businessData.contact?.website || !!businessData.digitalPresence?.website;
+      // P1.5: Business facts (contact.website) come from canonical projection.
+      // digitalPresence is endpoint-specific analysis metadata, not canonical.
+      const canonical = CanonicalBusinessProfileService.fromEntityData({ record: businessData });
+      const hasWebsite = !!canonical.identity.website || !!businessData.digitalPresence?.website;
 
       // If no website, return zero scores
       if (!hasWebsite) {
@@ -89,13 +92,13 @@ class DigitalAuditService {
    * Generate audit for business with no website
    */
   generateNoWebsiteAudit(businessData) {
-    // Support both legacy normalized format and new extraction format
-    // Legacy: businessData.digitalPresence.googleMapsUrl
-    // New:    businessData.source.mapsUrl
+    // P1.5: phone comes from canonical projection.
+    // googleMapsUrl remains on the source data (endpoint-specific metadata).
+    const canonical = CanonicalBusinessProfileService.fromEntityData({ record: businessData });
     const googleMapsUrl = businessData.digitalPresence?.googleMapsUrl
       || businessData.source?.mapsUrl
       || null;
-    const phone = businessData.contact?.phone || null;
+    const phone = canonical.identity.phone || null;
 
     return {
       websiteExists: false,
