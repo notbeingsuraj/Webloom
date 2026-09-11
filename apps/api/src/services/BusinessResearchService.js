@@ -651,7 +651,15 @@ class BusinessResearchService {
           return { status: 'insufficient_evidence', entityId: null, providerIdentities: [], resolutionRecord: null };
         }
 
-        const canonicalName = this._canonicalName(primary.record) || hints.name;
+        // Pick the canonical name. A provider (esp. Geoapify when the search
+        // drifts to a street-level feature) can return a street address in the
+        // `name` field. The URL-derived hint name is authoritative identity;
+        // an address-looking string must not become the canonical business name.
+        const recordName = this._canonicalName(primary.record);
+        const canonicalName =
+          recordName && !this._looksLikeStreetAddress(recordName)
+            ? recordName
+            : hints.name || recordName || 'Unknown Business';
         const canonicalAddress = this._canonicalAddress(primary.record) || null;
 
         // Safety net: if after all canonical accessors the name is still
@@ -734,7 +742,11 @@ class BusinessResearchService {
                 // review queue handle the ambiguity.
                 return entityId;
               }
-              const secondaryCanonicalName = this._canonicalName(secondary.record) || 'Unknown Business';
+              const secondaryRecordName = this._canonicalName(secondary.record);
+              const secondaryCanonicalName =
+                secondaryRecordName && !this._looksLikeStreetAddress(secondaryRecordName)
+                  ? secondaryRecordName
+                  : hints.name || secondaryRecordName || 'Unknown Business';
               const e = repo.createEntity({
                 canonicalName: this._isSyntheticName(secondaryCanonicalName) ? null : secondaryCanonicalName,
                 canonicalAddress: this._canonicalAddress(secondary.record) || 'Unknown',
