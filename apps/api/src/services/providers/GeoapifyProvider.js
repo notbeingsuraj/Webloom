@@ -272,6 +272,12 @@ class GeoapifyProvider extends BusinessDataProvider {
    * If coordinates were supplied, prefers the record closest to them;
    * otherwise the top-ranked record from the API.
    *
+   * P1.7: When URL-derived authoritative coordinates are available, reject
+   * any candidate that is farther than MAX_URL_COORDINATE_DISTANCE_DEGREES
+   * from the source coordinates. A Geoapify geocode search for "Manan
+   * Furnitures" might return "Manan" localities 165 km away in a different
+   * state — those must never be accepted as the same business.
+   *
    * @param {Object} result - AcquisitionResult from this.search()
    * @param {Object} [hints]
    * @returns {Object|null} best record, or null when no usable records
@@ -282,12 +288,35 @@ class GeoapifyProvider extends BusinessDataProvider {
     if (!result || !result.records || result.records.length === 0) return null;
     const records = result.records;
 
-    let best = records[0];
     const lat = hints?.latitude;
     const lng = hints?.longitude;
+
+    // P1.7: When URL provides authoritative coordinates, build a candidate
+    // list filtered to a reasonable distance. The threshold is deliberately
+    // generous (0.35° ≈ ~39 km) to tolerate minor coordinate misalignment
+    // between the Google Maps pin and Geoapify's approximation, while still
+    // rejecting results from an entirely different city (~165 km away).
+    const MAX_URL_COORDINATE_DISTANCE_DEGREES = 0.35;
+    let candidates = records;
+    if (lat != null && lng != null) {
+      const nearCandidates = records.filter((rec) => {
+        const c = rec.location?.coordinates;
+        if (!c) return false;
+        const dist = Math.hypot(c.lat - lat, c.lng - lng);
+        return dist <= MAX_URL_COORDINATE_DISTANCE_DEGREES;
+      });
+      // Only use the distance filter if there is at least one candidate
+      // within the threshold — if none match, fall back to all candidates
+      // (the caller will handle the absence of a good match).
+      if (nearCandidates.length > 0) {
+        candidates = nearCandidates;
+      }
+    }
+
+    let best = candidates[0];
     if (lat != null && lng != null) {
       let bestDist = Infinity;
-      for (const rec of records) {
+      for (const rec of candidates) {
         const c = rec.location?.coordinates;
         if (!c) continue;
         const d = Math.hypot(c.lat - lat, c.lng - lng);

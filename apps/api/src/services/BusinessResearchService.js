@@ -418,6 +418,12 @@ class BusinessResearchService {
     // the best match; enrichRecord() best-effort adds place-details for the
     // chosen record ONLY. There is no second search when the first returns no
     // record — the diagnostics come from the same acquisition call (#2).
+    //
+    // P1.7: After selectBestRecord, validate that the selected record's
+    // coordinates are compatible with the URL-derived authoritative
+    // coordinates. A candidate in a different city (e.g. Tarn Taran vs Sri
+    // Ganganagar, 165 km apart) must be rejected even if it is the only
+    // Geoapify result.
     let geoapifyRecord = null;
     if (GeoapifyProvider.isAvailable()) {
       const geoResult = await GeoapifyProvider.search(hints);
@@ -427,9 +433,35 @@ class BusinessResearchService {
 
       const best = GeoapifyProvider.selectBestRecord(geoResult, hints);
       if (best) {
-        geoapifyRecord = await GeoapifyProvider.enrichRecord(best);
-        this._mergeCanonical(profile, geoapifyRecord, 'discovered', 'geoapify', sourceUrl);
-        providerTrace.geoapify = 'ok';
+        // P1.7: Coordinate-anchor validation. When the URL provides
+        // authoritative coordinates, the selected record must be within a
+        // reasonable geographic radius. This prevents a name-only search
+        // from silently returning a different business in another city.
+        const selectedRecord = await GeoapifyProvider.enrichRecord(best);
+        const geoapifyCoords = selectedRecord?.location?.coordinates;
+        const urlLat = hints?.latitude;
+        const urlLng = hints?.longitude;
+        let coordinateReject = false;
+        if (geoapifyCoords && urlLat != null && urlLng != null) {
+          const dist = Math.hypot(geoapifyCoords.lat - urlLat, geoapifyCoords.lng - urlLng);
+          // 0.35° ≈ ~39 km: generous enough for pin-vs-centroid drift, but
+          // tight enough to reject a business 165 km away in a different state.
+          const MAX_DEVIATION_DEGREES = 0.35;
+          if (dist > MAX_DEVIATION_DEGREES) {
+            coordinateReject = true;
+            console.warn(
+              `[P1.7] Geoapify candidate rejected: coordinates ${geoapifyCoords.lat},${geoapifyCoords.lng} are ` +
+              `${dist.toFixed(2)}° from URL authoritative coordinates ${urlLat},${urlLng}. ` +
+              `Candidate city: ${selectedRecord?.location?.city || 'unknown'} — likely a different business.`,
+            );
+            providerTrace.geoapify = 'coordinate_rejected';
+          }
+        }
+        if (!coordinateReject) {
+          geoapifyRecord = selectedRecord;
+          this._mergeCanonical(profile, geoapifyRecord, 'discovered', 'geoapify', sourceUrl);
+          providerTrace.geoapify = 'ok';
+        }
       }
       if (config?.debugBusinessAnalysis) {
         console.log(`[Geoapify] status=${geoResult.status}, error=${geoResult.error?.safeMessage || 'none'}`);
@@ -593,12 +625,20 @@ class BusinessResearchService {
 
     // Build ordered list of provider observations to persist.
     // Geoapify is the primary/authoritative provider; web-extraction is secondary.
+    //
+    // P1.7: When the Google Maps URL carries an authoritative placeId/cid,
+    // use THAT as the providerRecordId for geoapify — not the raw URL.
+    // The raw URL changes with tracking parameters and is not a stable
+    // identity key. A deterministic placeId from the URL is the correct
+    // identifier for the provider mapping, ensuring repeat lookups resolve
+    // to the same persistent entity.
+    const urlPlaceId = hints?.placeId || hints?.cid || null;
     const observations = [];
     if (geoapifyRecord) {
       observations.push({
         record: geoapifyRecord,
         provider: 'geoapify',
-        providerRecordId: geoapifyRecord?.provider?.placeId || sourceUrl || null,
+        providerRecordId: urlPlaceId || geoapifyRecord?.provider?.placeId || sourceUrl || null,
       });
     }
     if (webRecord) {
@@ -1082,6 +1122,25 @@ class BusinessResearchService {
         }
       } catch {
         // ignore parse failure; rely on other hints
+      }
+    }
+    // P1.7: Always attempt to forward placeId/cid from the URL, even when
+    // extractDeterministicHints() already found a name from the input.
+    // These are authoritative identity anchors that constrain provider lookup
+    // and must not be silently dropped.
+    if (input.googleMapsUrl && !hints.placeId) {
+      try {
+        const { default: parser } = await import('./GoogleMapsUrlParserProvider.js');
+        const parsed = parser.parse(input.googleMapsUrl);
+        const identified = parsed.identified || {};
+        if (identified.placeId) hints.placeId = identified.placeId;
+        if (identified.urlType) hints.urlType = identified.urlType;
+        // Forward cid separately when the placeId is in hex CID format
+        if (identified.placeId && identified.placeId.startsWith('0x')) {
+          hints.cid = identified.placeId;
+        }
+      } catch {
+        // ignore parse failure
       }
     }
     hints.sourceUrl = input.googleMapsUrl || input.sourceUrl || null;
