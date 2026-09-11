@@ -6,6 +6,10 @@ import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import ScoreIndicator from '../components/ui/ScoreIndicator';
 import AuditRow from '../components/ui/AuditRow';
+import WebsitePreview from '../components/WebsitePreview';
+import { IntentList, TriggerList, ObjectiveList, VisualDirectionPanel } from '../components/IntelligenceCards';
+import { toIntentItems, toTriggerItems, toObjectiveItems, toVisualDirectionData } from '../utils/intelligenceRenderers';
+import { resolveLeadScore } from '../utils/opportunityScore';
 import { leadService } from '../services/leadService';
 
 const tabs = ['Overview', 'Analysis', 'Website', 'Outreach'];
@@ -39,23 +43,45 @@ export default function LeadDetail() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['lead', id] }),
   });
 
+  const generateWebsiteMutation = useMutation({
+    mutationFn: () => leadService.generateWebsiteSpec(id!),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['lead', id] }),
+  });
+
   const lead = data?.data;
-  const websiteSpecification = lead?.generatedWebsite?.specification;
+
+  // ----- Opportunity score: ONE normalized source for both tabs -----
+  const score = useMemo(
+    () =>
+      resolveLeadScore({
+        score: lead?.opportunityScore?.total ?? null,
+        status: lead?.opportunityScore?.status ?? null,
+      }),
+    [lead?.opportunityScore?.total, lead?.opportunityScore?.status],
+  );
+
+  const scoreDescription = useMemo(() => {
+    if (score.state === 'unavailable') return 'Opportunity score not available.';
+    if (score.state === 'preliminary') return 'Preliminary score — the digital audit did not complete, so this is not a final assessment.';
+    const total = score.value ?? 0;
+    if (total >= 80) return 'Strong opportunity with visible demand and a clear growth story.';
+    if (total >= 60) return 'Promising lead with moderate urgency and a clear conversion path.';
+    return 'There is potential, but the current digital presence needs strategic refinement.';
+  }, [score]);
+
+  // ----- Website generation state -----
+  const websiteState = lead?.generatedWebsite;
+  const websiteGenerateError = generateWebsiteMutation.isError
+    ? (generateWebsiteMutation.error as any)?.response?.data?.message ||
+      (generateWebsiteMutation.error as any)?.response?.data?.error ||
+      'The website specification could not be generated. Check the API and try again.'
+    : null;
 
   const analysisState = lead?.analysis?.brandStrategyStatus || 'not_attempted';
   const hasBrandDNA = !!lead?.analysis?.brandDNA;
   const showDna = analysisState === 'ok' && hasBrandDNA;
   const dnaEmptyText = analysisState === 'failed' ? 'Analysis unavailable' : 'Analysis pending';
 
-  const scoreDescription = useMemo(() => {
-    if (lead?.opportunityScore?.total == null) return 'Healthy local opportunity with clear digital conversion gaps.';
-    if (lead.opportunityScore.total >= 80) return 'Strong opportunity with visible demand and a clear growth story.';
-    if (lead.opportunityScore.total >= 60) return 'Promising lead with moderate urgency and a clear conversion path.';
-    return 'There is potential, but the current digital presence needs strategic refinement.';
-  }, [lead?.opportunityScore?.total]);
-
-  // Derive the recommended action from real analysis data instead of a
-  // hardcoded string. Falls back to a generic CTA only when nothing is known.
   const recommendedAction = useMemo(() => {
     const recs = lead?.analysis?.brandDNA?.strategicRecommendations;
     if (recs?.length && typeof recs[0] === 'object' && recs[0]?.recommendation) return recs[0].recommendation;
@@ -307,9 +333,10 @@ export default function LeadDetail() {
 
           <div className="space-y-6">
             <ScoreIndicator
-              score={lead?.opportunityScore?.total ?? 0}
+              score={score.value ?? 0}
               label="Opportunity"
               description={scoreDescription}
+              suffix={score.state === 'preliminary' ? 'Preliminary' : undefined}
             />
 
             <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">

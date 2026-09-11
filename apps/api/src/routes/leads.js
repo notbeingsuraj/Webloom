@@ -6,6 +6,7 @@ import BusinessResearchService from '../services/BusinessResearchService.js';
 import BrandStrategyService from '../services/BrandStrategyService.js';
 import DigitalAuditService from '../services/DigitalAuditService.js';
 import CanonicalBusinessProfileService from '../services/CanonicalBusinessProfileService.js';
+import LeadWebsiteSpecService from '../services/LeadWebsiteSpecService.js';
 
 const router = express.Router();
 
@@ -470,6 +471,70 @@ router.post('/:id/brand-dna', async (req, res, next) => {
       success: true,
       data: lead,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/leads/:id/website-spec
+ * Generate (or regenerate) the website specification for a lead.
+ *
+ * The specification is produced from the lead's canonical business data +
+ * brand DNA + digital audit (AI landing-page spec when available, otherwise
+ * the same deterministic config the generated site uses). It is persisted on
+ * the lead as `generatedWebsite` and returned so the frontend renders the
+ * actual generated output — never a fabricated or placeholder spec.
+ *
+ * Failure handling:
+ *   - No business data / no identity → HTTP 400 with a truthful error.
+ *   - Generation failed → the persisted `generatedWebsite.status` is 'failed'
+ *     with a safe `error` message (HTTP 200 with truthful state, so the UI
+ *     can show a retry action instead of treating it as a network failure).
+ *   - Missing source website → `noSourceWebsite: true` (NOT an error — the
+ *     business simply has no discovered website; the spec is still generated
+ *     deterministically from the profile).
+ */
+router.post('/:id/website-spec', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const lead = leadCache.get(id);
+
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    const businessData = lead.analysis?.businessData;
+    const brandDNA = lead.analysis?.brandDNA ?? null;
+    const audit = lead.analysis?.audit ?? null;
+
+    if (!businessData) {
+      return res.status(400).json({
+        success: false,
+        error: 'business_data_missing',
+        message: 'This lead has no business data, so a website specification cannot be generated.',
+        category: 'USER_INPUT_ERROR',
+      });
+    }
+
+    const canonical = CanonicalBusinessProfileService.fromEntityData({ record: businessData });
+    if (!canonical.identity.name) {
+      return res.status(400).json({
+        success: false,
+        error: 'business_identity_missing',
+        message: 'Business identity is unavailable, so a website specification cannot be generated.',
+        category: 'USER_INPUT_ERROR',
+      });
+    }
+
+    const result = await LeadWebsiteSpecService.generate(businessData, brandDNA, audit);
+
+    // Persist onto the lead (the existing persistence design: in-memory cache).
+    lead.generatedWebsite = result;
+    lead.updatedAt = new Date().toISOString();
+    leadCache.set(id, lead);
+
+    res.json({ success: true, data: result });
   } catch (error) {
     next(error);
   }

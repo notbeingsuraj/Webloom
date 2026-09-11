@@ -1,4 +1,5 @@
 import api from './api';
+import type { LeadGeneratedWebsite } from '../types/websiteSpecification';
 
 export interface Lead {
   _id: string;
@@ -37,9 +38,17 @@ export interface Lead {
         };
         secondary?: Array<{ segment?: string }>;
       };
-      customerIntent?: unknown;
+      customerIntent?: Array<{
+        intent?: string;
+        urgency?: string;
+        frequency?: string;
+      }> | string | null;
       painPoints?: Array<{ pain?: string; severity?: string; source?: string }>;
-      purchaseTriggers?: unknown;
+      purchaseTriggers?: Array<{
+        trigger?: string;
+        type?: string;
+        strength?: string;
+      }> | string | null;
       services?: unknown;
       competitiveAdvantages?: Array<{ advantage?: string; category?: string }>;
       trustSignals?: unknown;
@@ -54,12 +63,32 @@ export interface Lead {
         doUse?: string[];
         dontUse?: string[];
       };
-      visualDirection?: unknown;
+      visualDirection?: {
+        mood?: string;
+        colorPalette?: {
+          primary?: string;
+          secondary?: string;
+          reasoning?: string;
+        };
+        imagery?: {
+          style?: string;
+          subjects?: string[];
+          avoid?: string[];
+        };
+        typography?: {
+          style?: string;
+          reasoning?: string;
+        };
+      } | string | null;
       positioning?: {
         statement?: string;
         differentiation?: string;
       };
-      websiteObjectives?: unknown;
+      websiteObjectives?: Array<{
+        objective?: string;
+        priority?: string;
+        metrics?: string[];
+      }> | string | null;
       conversionStrategy?: {
         primaryCTA?: { action?: string; text?: string; reasoning?: string };
       };
@@ -70,6 +99,7 @@ export interface Lead {
       websiteExists?: boolean;
       websiteUrl?: string;
       overallScore?: number;
+      status?: string;
       categories?: Record<string, { score?: number; notes?: string; verified?: boolean }>;
       strengths?: string[];
       weaknesses?: string[];
@@ -86,14 +116,7 @@ export interface Lead {
       source?: unknown;
     };
   };
-  generatedWebsite?: {
-    specification?: {
-      pageTitle?: string;
-      pageDescription?: string;
-      primaryCTA?: { text?: string };
-      sections?: Array<{ type?: string; content?: { headline?: string } }>;
-    };
-  };
+  generatedWebsite?: LeadGeneratedWebsite;
   createdAt: string;
 }
 
@@ -137,6 +160,15 @@ export const leadService = {
 
   async generateBrandDNA(id: string) {
     const response = await api.post(`/leads/${id}/brand-dna`);
+    return response.data;
+  },
+
+  /** Generate (or regenerate) the website specification for a lead. */
+  async generateWebsiteSpec(id: string) {
+    const response = await api.post<{
+      success: boolean;
+      data: LeadGeneratedWebsite;
+    }>(`/leads/${id}/website-spec`);
     return response.data;
   },
 };
