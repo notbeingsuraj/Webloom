@@ -267,16 +267,30 @@ class GeoapifyProvider extends BusinessDataProvider {
    * Locally select the best-matching record for the hints from an already
    * completed acquisition result. Pure function — never performs a network
    * request (requirement #2: no second acquisition merely because the first
+   /**
+   * Locally select the best-matching record for the hints from an already
+   * completed acquisition result. Pure function — never performs a network
+   * request (requirement #2: no second acquisition merely because the first
    * returned no record or multiple records).
    *
    * If coordinates were supplied, prefers the record closest to them;
    * otherwise the top-ranked record from the API.
    *
-   * P1.7: When URL-derived authoritative coordinates are available, reject
-   * any candidate that is farther than MAX_URL_COORDINATE_DISTANCE_DEGREES
-   * from the source coordinates. A Geoapify geocode search for "Manan
-   * Furnitures" might return "Manan" localities 165 km away in a different
-   * state — those must never be accepted as the same business.
+   * P1.7: When authoritative coordinates are available (a /place/ URL's
+   * @lat,lng or explicit operator-supplied latitude/longitude), ANY candidate
+   * farther than MAX_URL_COORDINATE_DISTANCE_DEGREES from those coordinates is
+   * REJECTED — selectBestRecord() returns null, it never silently falls back
+   * to a far-away candidate. A Geoapify geocode search for "Manan Furnitures"
+   * might return "Manan" localities 165 km away in a different state; those
+   * must never be accepted as the same business, even when they are the only
+   * results.
+   *
+   * Coordinate anchors come from `hints` ONLY when the caller marks them
+   * authoritative:
+   *   - `hints.coordinatesAuthoritative === true`  → hard reject beyond
+   *     threshold (no fallback to far candidates)
+   *   - otherwise → coordinates are proximity bias only (e.g. a search-URL
+   *     viewport): rank by distance, but never reject on distance alone.
    *
    * @param {Object} result - AcquisitionResult from this.search()
    * @param {Object} [hints]
@@ -290,27 +304,27 @@ class GeoapifyProvider extends BusinessDataProvider {
 
     const lat = hints?.latitude;
     const lng = hints?.longitude;
+    const authoritative =
+      lat != null && lng != null && hints?.coordinatesAuthoritative === true;
 
-    // P1.7: When URL provides authoritative coordinates, build a candidate
-    // list filtered to a reasonable distance. The threshold is deliberately
-    // generous (0.35° ≈ ~39 km) to tolerate minor coordinate misalignment
-    // between the Google Maps pin and Geoapify's approximation, while still
-    // rejecting results from an entirely different city (~165 km away).
+    // P1.7: With authoritative coordinates, only candidates within a
+    // reasonable distance qualify. The threshold is deliberately generous
+    // (0.35° ≈ ~39 km) to tolerate minor coordinate misalignment between the
+    // Google Maps pin and Geoapify's approximation, while still rejecting
+    // results from an entirely different city (~165 km away). When NO
+    // candidate is within the threshold, there is NO fallback — we return null
+    // rather than silently resolving to a different business.
     const MAX_URL_COORDINATE_DISTANCE_DEGREES = 0.35;
     let candidates = records;
-    if (lat != null && lng != null) {
+    if (authoritative) {
       const nearCandidates = records.filter((rec) => {
         const c = rec.location?.coordinates;
         if (!c) return false;
         const dist = Math.hypot(c.lat - lat, c.lng - lng);
         return dist <= MAX_URL_COORDINATE_DISTANCE_DEGREES;
       });
-      // Only use the distance filter if there is at least one candidate
-      // within the threshold — if none match, fall back to all candidates
-      // (the caller will handle the absence of a good match).
-      if (nearCandidates.length > 0) {
-        candidates = nearCandidates;
-      }
+      if (nearCandidates.length === 0) return null;
+      candidates = nearCandidates;
     }
 
     let best = candidates[0];

@@ -420,7 +420,7 @@ class BusinessResearchService {
     // record — the diagnostics come from the same acquisition call (#2).
     //
     // P1.7: After selectBestRecord, validate that the selected record's
-    // coordinates are compatible with the URL-derived authoritative
+    // coordinates are compatible with the authoritative URL/operator
     // coordinates. A candidate in a different city (e.g. Tarn Taran vs Sri
     // Ganganagar, 165 km apart) must be rejected even if it is the only
     // Geoapify result.
@@ -433,16 +433,20 @@ class BusinessResearchService {
 
       const best = GeoapifyProvider.selectBestRecord(geoResult, hints);
       if (best) {
-        // P1.7: Coordinate-anchor validation. When the URL provides
-        // authoritative coordinates, the selected record must be within a
-        // reasonable geographic radius. This prevents a name-only search
-        // from silently returning a different business in another city.
+        // P1.7: Coordinate-anchor validation. When authoritative coordinates
+        // are available (a /place/ URL's @lat,lng or explicit operator-supplied
+        // coordinates; NOT a search-URL viewport), the selected record must be
+        // within a reasonable geographic radius. This prevents a name-only
+        // search from silently returning a different business in another city.
+        // hints.coordinatesAuthoritative (set in _buildHints) distinguishes
+        // coordinates that anchor identity from coordinates that merely bias
+        // the search ranking.
         const selectedRecord = await GeoapifyProvider.enrichRecord(best);
         const geoapifyCoords = selectedRecord?.location?.coordinates;
         const urlLat = hints?.latitude;
         const urlLng = hints?.longitude;
         let coordinateReject = false;
-        if (geoapifyCoords && urlLat != null && urlLng != null) {
+        if (geoapifyCoords && urlLat != null && urlLng != null && hints?.coordinatesAuthoritative === true) {
           const dist = Math.hypot(geoapifyCoords.lat - urlLat, geoapifyCoords.lng - urlLng);
           // 0.35° ≈ ~39 km: generous enough for pin-vs-centroid drift, but
           // tight enough to reject a business 165 km away in a different state.
@@ -451,7 +455,7 @@ class BusinessResearchService {
             coordinateReject = true;
             console.warn(
               `[P1.7] Geoapify candidate rejected: coordinates ${geoapifyCoords.lat},${geoapifyCoords.lng} are ` +
-              `${dist.toFixed(2)}° from URL authoritative coordinates ${urlLat},${urlLng}. ` +
+              `${dist.toFixed(2)}° from authoritative coordinates ${urlLat},${urlLng}. ` +
               `Candidate city: ${selectedRecord?.location?.city || 'unknown'} — likely a different business.`,
             );
             providerTrace.geoapify = 'coordinate_rejected';
@@ -1105,17 +1109,33 @@ class BusinessResearchService {
 
   /**
    * Convert deterministic input hints from URL / name / coords.
+   *
+   * Coordinate authority: operator-supplied latitude/longitude (from the
+   * request body) and coordinates embedded in a /place/ URL are AUTHORITATIVE
+   * identity anchors. The @lat,lng of a /search/ URL is a viewport, not a pin:
+   * it is forwarded on the hints for proximity bias only and MUST NOT drive
+   * the P1.7 coordinate-rejection gate. That gate is keyed off
+   * hints.coordinatesAuthoritative.
    */
   async _buildHints(input = {}) {
     const hints = extractDeterministicHints(input);
 
+    // Explicit operator-supplied coordinates are authoritative anchors.
+    const operatorCoords =
+      input?.latitude != null && input?.longitude != null;
+    let urlAuthority = null; // 'place' | 'search' | null
+
     // Pull from a Google Maps URL via GoogleMapsUrlParser if available.
-    if (!hints.name && input.googleMapsUrl) {
+    if (input.googleMapsUrl) {
       try {
         const { default: parser } = await import('./GoogleMapsUrlParserProvider.js');
         const parsed = parser.parse(input.googleMapsUrl);
         const identified = parsed.identified || {};
         if (identified.placeName && !hints.name) hints.name = identified.placeName;
+        urlAuthority = identified.urlType || null;
+        // Coordinates from a URL: only /place/ URLs carry a business pin.
+        // /search/ URLs carry a viewport center — proximity bias only, never
+        // an authoritative anchor (see coordinatesAuthoritative below).
         if (identified.coordinates) {
           if (hints.latitude == null) hints.latitude = identified.coordinates.lat;
           if (hints.longitude == null) hints.longitude = identified.coordinates.lng;
@@ -1124,6 +1144,13 @@ class BusinessResearchService {
         // ignore parse failure; rely on other hints
       }
     }
+
+    // Authoritative ONLY when the coordinates came from an explicit operator
+    // input or a /place/ URL pin. Viewport coords (or no URL type at all)
+    // never anchor identity.
+    hints.coordinatesAuthoritative =
+      operatorCoords || urlAuthority === 'place';
+
     // P1.7: Always attempt to forward placeId/cid from the URL, even when
     // extractDeterministicHints() already found a name from the input.
     // These are authoritative identity anchors that constrain provider lookup
