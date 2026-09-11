@@ -23,7 +23,7 @@ class DigitalAuditService {
       // P1.5: Business facts (contact.website) come from canonical projection.
       // digitalPresence is endpoint-specific analysis metadata, not canonical.
       const canonical = CanonicalBusinessProfileService.fromEntityData({ record: businessData });
-      const hasWebsite = !!canonical.identity.website || !!businessData.digitalPresence?.website;
+      const hasWebsite = !!canonical.identity.website || !!businessData.digitalPresence?.website || !!businessData.contact?.website;
 
       // If no website, return zero scores
       if (!hasWebsite) {
@@ -207,6 +207,105 @@ class DigitalAuditService {
         auditedAt: new Date().toISOString(),
         version: 'v1',
         hasWebsite: false,
+      },
+    };
+  }
+
+  /**
+   * Generate a truthful degraded audit when the AI audit is unavailable but a
+   * website IS known to exist (from canonical projection).
+   *
+   * The previous failure fallback (generateNoWebsiteAudit) unconditionally
+   * reported websiteExists:false even when the business had a website — the
+   * UI then showed "Website: Unknown" / "Missing" while the header offered
+   * "Visit site". This method reports the real website state and marks every
+   * AI-dependent category as "not scored" so the user sees an honest,
+   * incomplete audit instead of a fabricated "no website" verdict.
+   */
+  generateDegradedAudit(businessData) {
+    const canonical = CanonicalBusinessProfileService.fromEntityData({ record: businessData });
+    const website = canonical.identity.website || businessData.contact?.website || businessData.digitalPresence?.website || null;
+    const googleMapsUrl = businessData.digitalPresence?.googleMapsUrl
+      || businessData.source?.mapsUrl
+      || null;
+    const phone = canonical.identity.phone || null;
+    const websiteExists = !!website;
+
+    const notScored = (notes) => ({ score: 0, notes, verified: false });
+
+    return {
+      websiteExists,
+      websiteUrl: website || null,
+      lastChecked: new Date().toISOString(),
+      overallScore: 0,
+      status: 'degraded',
+      degradedReason: 'digital_audit_ai_unavailable',
+      categories: {
+        design: notScored('Audit unavailable — AI audit did not complete'),
+        mobile: notScored('Audit unavailable — AI audit did not complete'),
+        navigation: notScored('Audit unavailable — AI audit did not complete'),
+        conversion: notScored('Audit unavailable — AI audit did not complete'),
+        trust: notScored('Audit unavailable — AI audit did not complete'),
+        seo: notScored('Audit unavailable — AI audit did not complete'),
+        localSeo: {
+          score: googleMapsUrl ? 3 : 0,
+          notes: googleMapsUrl
+            ? 'Google Business Profile detected (not independently audited)'
+            : 'No Google Business Profile detected',
+          verified: false,
+        },
+        content: notScored('Audit unavailable — AI audit did not complete'),
+        branding: notScored('Audit unavailable — AI audit did not complete'),
+        performance: notScored('Audit unavailable — AI audit did not complete'),
+        contactAccessibility: {
+          score: phone ? 2 : 0,
+          notes: phone
+            ? 'Phone available via Google Maps only'
+            : 'No contact information available online',
+          verified: false,
+        },
+      },
+      strengths: [],
+      weaknesses: [
+        {
+          area: 'Digital Audit',
+          description: websiteExists
+            ? `Website detected (${website}) but the in-depth audit did not complete.`
+            : 'No website detected.',
+          severity: websiteExists ? 'medium' : 'critical',
+        },
+      ],
+      criticalIssues: [],
+      recommendations: [
+        {
+          category: 'Retry Audit',
+          recommendation: websiteExists
+            ? 'Re-run the digital audit to score the detected website.'
+            : 'Run the audit again once business data is available.',
+          expectedImpact: 'medium',
+          effort: 'low',
+          priority: 1,
+        },
+      ],
+      opportunityGap: {
+        description: websiteExists
+          ? 'Opportunity assessment pending — audit did not complete.'
+          : 'Complete absence of digital presence represents maximum opportunity gap',
+        businessImpact: websiteExists
+          ? 'Unable to assess website quality until the audit completes.'
+          : 'Losing customers daily to competitors with websites.',
+        competitivePosition: 'unknown',
+      },
+      dataLimitations: [
+        'In-depth audit did not complete (AI audit unavailable)',
+        'Scores are not available for AI-dependent categories',
+        'Website presence reported from provider data',
+      ],
+      metadata: {
+        auditedAt: new Date().toISOString(),
+        version: 'v1-degraded',
+        hasWebsite: websiteExists,
+        degraded: true,
       },
     };
   }

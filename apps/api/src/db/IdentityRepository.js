@@ -1619,13 +1619,43 @@ export class IdentityRepository {
       if (field.fieldPath === 'identity.name' && looksLikeStreetAddress(field.value)) {
         continue;
       }
+      // JSON-stringified arrays/objects stored in canonical_field are parsed
+      // back to their structured value here so profile field types are stable
+      // (e.g. identity.services stays an array, location.coordinates stays an
+      // object). Plain strings/numbers pass through untouched.
+      const value = parseCanonicalFieldValue(field.value);
       // Canonical storage is authoritative over fresh provider values.
-      profile.set(field.fieldPath, field.value, field.provenance, field.confidence, {
+      profile.set(field.fieldPath, value, field.provenance, field.confidence, {
         sourceId: field.sourceId,
         claimId: field.claimId,
         canonical: true,
       });
     }
+  }
+}
+
+/**
+ * Parse a persisted canonical-field value back into its structured form.
+ *
+ * CanonicalizationService stores arrays/objects in the text column via
+ * JSON.stringify. When reloading into a BusinessProfile we must restore the
+ * structured value (array for identity.services/categories, {lat,lng} for
+ * coordinates, day-map for hours) so downstream consumers never see raw
+ * JSON strings. Plain strings and numbers pass through untouched.
+ */
+function parseCanonicalFieldValue(raw) {
+  if (typeof raw !== 'string') return raw;
+  const trimmed = raw.trim();
+  const looksJson =
+    (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+    (trimmed.startsWith('{') && trimmed.endsWith('}'));
+  if (!looksJson) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed !== null && typeof parsed === 'object') return parsed;
+    return raw;
+  } catch {
+    return raw;
   }
 }
 

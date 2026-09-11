@@ -71,11 +71,42 @@ const PROVIDER_AUTHORITY = {
 };
 
 /**
- * Normalize field value for comparison
+ * Normalize field value for comparison.
+ *
+ * List fields (identity.categories, identity.services) may arrive as a real
+ * array, a JSON-stringified array ("[\"catering\",...]"), or a legacy
+ * comma-joined string ("catering,catering.cafe"). All three are normalized to
+ * a canonical sorted array of trimmed strings so comparisons are reliable
+ * regardless of the transport shape.
  */
 function normalizeFieldValue(fieldPath, value) {
   if (value == null || value === '') return null;
-  
+
+  const isListField =
+    fieldPath === 'identity.categories' || fieldPath === 'identity.services';
+
+  if (isListField) {
+    let items = null;
+    if (Array.isArray(value)) {
+      items = value.map((v) => String(v).trim()).filter(Boolean);
+    } else if (typeof value === 'string') {
+      // JSON-stringified array OR comma-joined legacy string.
+      let parsed = null;
+      try {
+        parsed = JSON.parse(value);
+      } catch {
+        parsed = null;
+      }
+      if (Array.isArray(parsed)) {
+        items = parsed.map((v) => String(v).trim()).filter(Boolean);
+      } else {
+        items = value.split(',').map((v) => v.trim()).filter(Boolean);
+      }
+    }
+    if (!items || items.length === 0) return null;
+    return [...new Set(items)].sort().join('\u0000');
+  }
+
   switch (fieldPath) {
     case 'contact.phone':
       return normalizePhone(value);
@@ -245,7 +276,9 @@ export class CanonicalizationService {
       if (record.business.description) {
         observations.push({ fieldPath: 'identity.description', value: record.business.description, provenance: 'discovered', confidence: baseConfidence * 0.7 });
       }
-      if (record.business.categories) {
+      if (record.business.categories && Array.isArray(record.business.categories)) {
+        observations.push({ fieldPath: 'identity.categories', value: record.business.categories, provenance: 'discovered', confidence: baseConfidence * 0.8 });
+      } else if (record.business.categories) {
         observations.push({ fieldPath: 'identity.categories', value: record.business.categories, provenance: 'discovered', confidence: baseConfidence * 0.8 });
       }
       if (record.business.business_type) {
@@ -303,7 +336,12 @@ export class CanonicalizationService {
     }
 
     if (record.services) {
-      observations.push({ fieldPath: 'identity.services', value: JSON.stringify(record.services), provenance: 'discovered', confidence: baseConfidence * 0.7 });
+      observations.push({
+        fieldPath: 'identity.services',
+        value: Array.isArray(record.services) ? record.services : record.services,
+        provenance: 'discovered',
+        confidence: baseConfidence * 0.7,
+      });
     }
 
     return observations;
@@ -388,7 +426,18 @@ export class CanonicalizationService {
   }
 
   /**
-   * Resolve conflict by choosing one value
+   * Resolve conflict by choosing one value.
+   *
+   * IMPORTANT (Demo-blocker fix): previously this method recorded the conflict
+   * but NEVER persisted the winning value back to the canonical_field table.
+   * For descriptive fields (identity.categories, identity.services) the
+   * winning observation was therefore silently discarded, and the stale
+   * canonical value (often a JSON-stringified array) survived forever —
+   * downstream consumers kept seeing raw `["catering",...]` strings.
+   *
+   * The winner is now persisted through _setCanonicalField so the resolved
+   * value is authoritative, while the conflict record preserves the rejected
+   * value for auditability.
    */
   async _resolveConflict(entityId, fieldPath, chosen, rejected, strategy) {
     console.log(`[Canonicalization] Resolved conflict on ${fieldPath} using ${strategy}: "${rejected.value}" -> "${chosen.value}"`);
@@ -404,6 +453,9 @@ export class CanonicalizationService {
       resolutionReason: 'Canonicalization selected the stronger observation.',
       resolvedAt: new Date().toISOString(),
     });
+    // Persist the winner so the canonical value always reflects the resolved
+    // observation (previously omitted — stale canonical values were kept).
+    await this._setCanonicalField(entityId, fieldPath, chosen);
     return { fieldPath, strategy, chosen: chosen.value, rejected: rejected.value };
   }
 

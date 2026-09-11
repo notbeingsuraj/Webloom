@@ -107,15 +107,25 @@ router.post('/', async (req, res, next) => {
     }
 
     // Perform digital audit — also optional enrichment. If the AI audit step
-    // fails, degrade to a deterministic no-website audit so the lead still
-    // renders (overallScore + categories are always present).
+    // fails, degrade honestly: when a website is known to exist, report a
+    // degraded audit (websiteExists true, categories "not scored"); only a
+    // genuinely website-less business gets the deterministic no-website audit.
+    // The previous fallback reported websiteExists:false even when the lead
+    // had a website — the UI then contradicted itself (header "Visit site",
+    // audit "No website").
     let audit;
+    let auditStatus = 'ok';
     try {
       audit = await DigitalAuditService.auditDigitalPresence(businessData);
     } catch (auditError) {
       const safeMsg = auditError?.safeMessage || auditError?.message || 'unknown';
       console.error('[leads] Digital audit failed (non-fatal, extraction preserved):', safeMsg);
-      audit = DigitalAuditService.generateNoWebsiteAudit(businessData);
+      auditStatus = 'failed';
+      const canonicalForAudit = CanonicalBusinessProfileService.fromEntityData({ record: businessData });
+      const hasWebsiteForAudit = !!canonicalForAudit.identity.website || !!businessData.digitalPresence?.website || !!businessData.contact?.website;
+      audit = hasWebsiteForAudit
+        ? DigitalAuditService.generateDegradedAudit(businessData)
+        : DigitalAuditService.generateNoWebsiteAudit(businessData);
     }
 
     // P1.5: Project business data through the canonical read layer.
@@ -179,9 +189,17 @@ router.post('/', async (req, res, next) => {
         brandStrategyStatus,
         extractedAt: new Date().toISOString(),
       },
+      // opportunityScore: audit.overallScore is a 0-10 scale (mean of 0-10
+      // category scores). The frontend renders it /100, so convert to 0-100.
+      // When the audit degraded/failed the score is not a real assessment —
+      // mark it preliminary so the UI shows a truthful state.
       opportunityScore: {
-        total: audit.overallScore || 0,
-        priority: audit.overallScore >= 70 ? 'high' : audit.overallScore >= 40 ? 'medium' : 'low',
+        total: Math.round((audit.overallScore || 0) * 10),
+        priority: audit.overallScore >= 7 ? 'high' : audit.overallScore >= 4 ? 'medium' : 'low',
+        status: auditStatus === 'ok' ? 'complete' : 'preliminary',
+        explanation: auditStatus === 'ok'
+          ? 'Based on the completed digital audit.'
+          : 'Preliminary score — the digital audit did not complete.',
       },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -365,7 +383,17 @@ router.delete('/:id', (req, res, next) => {
 
 /**
  * POST /api/leads/:id/brand-dna
- * Regenerate brand DNA for a lead
+ * Regenerate the analysis for a lead: brand DNA + digital audit.
+ *
+ * This is the endpoint the "Refresh analysis" button calls. It re-runs the
+ * full analysis enrichment (brand DNA, digital audit), persists the fresh
+ * results onto the lead, and returns the COMPLETE updated lead so the
+ * frontend can render from the response (not by guessing values).
+ *
+ * Failure handling:
+ *   - Brand DNA failure → status 'failed', brandDNA null (lead preserved)
+ *   - Audit failure → degraded/no-website audit (lead preserved)
+ *   - HTTP 200 always returns the updated lead with truthful state flags
  */
 router.post('/:id/brand-dna', async (req, res, next) => {
   try {
@@ -378,16 +406,69 @@ router.post('/:id/brand-dna', async (req, res, next) => {
       });
     }
 
-    const brandDNA = await BrandStrategyService.generateBrandDNA(lead.analysis.businessData);
-    
-    // Update lead with new brand DNA
+    const businessData = lead.analysis.businessData;
+
+    // Regenerate brand DNA (optional enrichment; failure is non-fatal).
+    let brandDNA = null;
+    let brandStrategyStatus = 'not_attempted';
+    try {
+      brandDNA = await BrandStrategyService.generateBrandDNA(businessData);
+      brandStrategyStatus = 'ok';
+    } catch (brandError) {
+      const safeMsg = brandError?.safeMessage || brandError?.message || 'unknown';
+      console.error('[leads] Refresh: brand DNA regeneration failed (non-fatal):', safeMsg);
+      brandStrategyStatus = 'failed';
+      brandDNA = null;
+    }
+
+    // Re-run digital audit with the same honest degradation as creation.
+    let audit;
+    let auditStatus = 'ok';
+    try {
+      audit = await DigitalAuditService.auditDigitalPresence(businessData);
+    } catch (auditError) {
+      const safeMsg = auditError?.safeMessage || auditError?.message || 'unknown';
+      console.error('[leads] Refresh: digital audit failed (non-fatal):', safeMsg);
+      auditStatus = 'failed';
+      const canonicalForAudit = CanonicalBusinessProfileService.fromEntityData({ record: businessData });
+      const hasWebsiteForAudit = !!canonicalForAudit.identity.website || !!businessData.digitalPresence?.website || !!businessData.contact?.website;
+      audit = hasWebsiteForAudit
+        ? DigitalAuditService.generateDegradedAudit(businessData)
+        : DigitalAuditService.generateNoWebsiteAudit(businessData);
+    }
+
+    const canonical = CanonicalBusinessProfileService.fromEntityData({ record: businessData });
+
+    // Persist the refreshed analysis onto the lead.
     lead.analysis.brandDNA = brandDNA;
+    lead.analysis.brandStrategyStatus = brandStrategyStatus;
+    lead.analysis.audit = audit;
+    lead.analysis.refreshedAt = new Date().toISOString();
+    lead.contact = {
+      phone: canonical.identity.phone,
+      email: canonical.business.email,
+      website: canonical.identity.website,
+    };
+    lead.businessData = {
+      rating: canonical.reputation.rating,
+      reviewCount: canonical.reputation.reviewCount,
+      services: canonical.business.services,
+      openingHours: canonical.business.hours,
+    };
+    lead.opportunityScore = {
+      total: Math.round((audit.overallScore || 0) * 10),
+      priority: audit.overallScore >= 7 ? 'high' : audit.overallScore >= 4 ? 'medium' : 'low',
+      status: auditStatus === 'ok' ? 'complete' : 'preliminary',
+      explanation: auditStatus === 'ok'
+        ? 'Based on the completed digital audit.'
+        : 'Preliminary score — the digital audit did not complete.',
+    };
     lead.updatedAt = new Date().toISOString();
     leadCache.set(id, lead);
 
     res.json({
       success: true,
-      data: brandDNA,
+      data: lead,
     });
   } catch (error) {
     next(error);

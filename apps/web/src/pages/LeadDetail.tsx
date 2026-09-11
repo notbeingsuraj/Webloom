@@ -42,12 +42,44 @@ export default function LeadDetail() {
   const lead = data?.data;
   const websiteSpecification = lead?.generatedWebsite?.specification;
 
+  const analysisState = lead?.analysis?.brandStrategyStatus || 'not_attempted';
+  const hasBrandDNA = !!lead?.analysis?.brandDNA;
+  const showDna = analysisState === 'ok' && hasBrandDNA;
+  const dnaEmptyText = analysisState === 'failed' ? 'Analysis unavailable' : 'Analysis pending';
+
   const scoreDescription = useMemo(() => {
-    if (!lead?.opportunityScore?.total) return 'Healthy local opportunity with clear digital conversion gaps.';
+    if (lead?.opportunityScore?.total == null) return 'Healthy local opportunity with clear digital conversion gaps.';
     if (lead.opportunityScore.total >= 80) return 'Strong opportunity with visible demand and a clear growth story.';
     if (lead.opportunityScore.total >= 60) return 'Promising lead with moderate urgency and a clear conversion path.';
     return 'There is potential, but the current digital presence needs strategic refinement.';
   }, [lead?.opportunityScore?.total]);
+
+  // Derive the recommended action from real analysis data instead of a
+  // hardcoded string. Falls back to a generic CTA only when nothing is known.
+  const recommendedAction = useMemo(() => {
+    const recs = lead?.analysis?.brandDNA?.strategicRecommendations;
+    if (recs?.length && typeof recs[0] === 'object' && recs[0]?.recommendation) return recs[0].recommendation;
+    const gap = lead?.analysis?.audit?.opportunityGap;
+    if (typeof gap === 'string' && gap) return gap;
+    if (gap && typeof gap === 'object' && (gap as any)?.description) return (gap as any).description;
+    return 'Focus on a conversion-first landing page with a strong local CTA and trust signals.';
+  }, [lead?.analysis?.brandDNA?.strategicRecommendations, lead?.analysis?.audit?.opportunityGap]);
+
+  // Defensive normalization: services may arrive as a JSON-stringified array
+  // from older canonical projections — always coerce to a real array.
+  const services = useMemo(() => {
+    const raw = lead?.businessData?.services;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [raw];
+      } catch {
+        return [raw];
+      }
+    }
+    return [];
+  }, [lead?.businessData?.services]);
 
   if (isLoading) {
     return <div className="rounded-[28px] border border-[#E5E5EA] bg-white p-10 text-center text-sm text-[#6E6E73]">Loading lead workspace...</div>;
@@ -157,12 +189,24 @@ export default function LeadDetail() {
             </div>
 
             <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
-              <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Business DNA</h2>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Business DNA</h2>
+                <StatusBadge status={analysisState} />
+              </div>
+              {analysisState === 'failed' && (
+                <div className="mb-4 rounded-[20px] border border-[#F0C5C2] bg-[#FDECEC] p-4">
+                  <p className="flex items-center gap-2 text-sm font-medium text-[#B42318]">
+                    <AlertCircle className="h-4 w-4" />
+                    Brand DNA generation failed
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[#B42318]/80">The business profile is still valid, but the AI analysis did not complete. Retry to regenerate.</p>
+                </div>
+              )}
               <div className="mt-5 space-y-4">
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Target audience</p>
-                  <p className="mt-2 text-sm leading-6 text-[#111111]">{lead?.analysis?.brandDNA?.audience?.primary?.segment || lead?.analysis?.brandDNA?.audience || 'Analysis pending'}</p>
-                  {lead?.analysis?.brandDNA?.audience?.primary?.demographics && (
+                  <p className="mt-2 text-sm leading-6 text-[#111111]">{showDna ? (lead?.analysis?.brandDNA?.audience?.primary?.segment || lead?.analysis?.brandDNA?.audience || dnaEmptyText) : dnaEmptyText}</p>
+                  {showDna && lead?.analysis?.brandDNA?.audience?.primary?.demographics && (
                     <p className="mt-2 text-xs leading-5 text-[#6E6E73]">
                       {[
                         lead.analysis.brandDNA.audience.primary.demographics.ageRange,
@@ -174,14 +218,14 @@ export default function LeadDetail() {
                 </div>
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Positioning statement</p>
-                  <p className="mt-2 text-sm leading-6 text-[#111111]">{lead?.analysis?.brandDNA?.positioning?.statement || 'Analysis pending'}</p>
-                  {lead?.analysis?.brandDNA?.positioning?.differentiation && (
+                  <p className="mt-2 text-sm leading-6 text-[#111111]">{showDna ? (lead?.analysis?.brandDNA?.positioning?.statement || dnaEmptyText) : dnaEmptyText}</p>
+                  {showDna && lead?.analysis?.brandDNA?.positioning?.differentiation && (
                     <p className="mt-2 text-xs leading-5 text-[#6E6E73]">{lead.analysis.brandDNA.positioning.differentiation}</p>
                   )}
                 </div>
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Brand personality</p>
-                  {lead?.analysis?.brandDNA?.brandPersonality?.primary?.length ? (
+                  {showDna && lead?.analysis?.brandDNA?.brandPersonality?.primary?.length ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {lead.analysis.brandDNA.brandPersonality.primary.map((trait: string) => (
                         <span key={trait} className="inline-flex items-center rounded-full border border-[#E5E5EA] bg-white px-2.5 py-1 text-xs text-[#111111]">{trait}</span>
@@ -190,15 +234,15 @@ export default function LeadDetail() {
                         <span className="inline-flex items-center rounded-full bg-[#EBF3FF] px-2.5 py-1 text-xs text-[#0A84FF]">Archetype: {lead.analysis.brandDNA.brandPersonality.archetype}</span>
                       )}
                     </div>
-                  ) : <p className="mt-2 text-sm leading-6 text-[#111111]">Analysis pending</p>}
+                  ) : <p className="mt-2 text-sm leading-6 text-[#111111]">{dnaEmptyText}</p>}
                 </div>
-                {lead?.analysis?.brandDNA?.toneOfVoice && (
+                {showDna && lead?.analysis?.brandDNA?.toneOfVoice && (
                   <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                     <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Tone of voice</p>
                     <p className="mt-2 text-sm leading-6 text-[#111111]">{lead.analysis.brandDNA.toneOfVoice.characteristics?.join(', ') || '—'}</p>
                   </div>
                 )}
-                {lead?.analysis?.brandDNA?.strategicRecommendations?.length ? (
+                {showDna && lead?.analysis?.brandDNA?.strategicRecommendations?.length ? (
                   <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                     <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Strategic recommendations</p>
                     <ul className="mt-2 space-y-2">
@@ -214,16 +258,16 @@ export default function LeadDetail() {
               </div>
             </div>
 
-            {/* Provenance / Source Information */}
-            {(lead?.analysis?.metrics?.trustSignals || lead?.businessData?.services) && (
+          {/* Provenance / Source Information */}
+            {(lead?.analysis?.metrics?.trustSignals || services.length > 0) && (
               <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
                 <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Business details</h2>
                 <div className="mt-5 space-y-3">
-                  {lead?.businessData?.services && lead.businessData.services.length > 0 && (
+                  {services.length > 0 && (
                     <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Services</p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        {lead.businessData.services.map((s: string) => (
+                        {services.map((s: string) => (
                           <span key={s} className="inline-flex items-center gap-1 rounded-full border border-[#E5E5EA] bg-white px-2.5 py-1 text-xs text-[#111111]">
                             <Tag className="h-3 w-3 text-[#6E6E73]" /> {s}
                           </span>
@@ -271,7 +315,11 @@ export default function LeadDetail() {
             <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
               <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Digital audit</h2>
               <p className="mt-1 text-xs text-[#6E6E73]">
-                {lead?.analysis?.audit?.websiteExists ? `Audited ${lead.analysis.audit.websiteUrl}` : 'No website detected — deterministic audit'}
+                {lead?.analysis?.audit?.status === 'degraded'
+                  ? `Audit incomplete — ${lead.analysis.audit.websiteExists ? 'website detected but not scored' : 'no website detected'}`
+                  : lead?.analysis?.audit?.websiteExists
+                    ? `Audited ${lead.analysis.audit.websiteUrl || ''}`
+                    : 'No website detected — deterministic audit'}
               </p>
               <div className="mt-5 space-y-3">
                 {lead?.analysis?.audit?.categories && Object.keys(lead.analysis.audit.categories).length > 0 ? (
@@ -305,12 +353,22 @@ export default function LeadDetail() {
                 </button>
               </div>
 
-              <div className="mt-5 rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4 text-sm leading-6 text-[#111111]">
-                <p className="flex items-center gap-2 font-medium">
-                  <Sparkles className="h-4 w-4 text-[#0A84FF]" />
-                  Focus on a conversion-first landing page with a strong local CTA and trust signals.
-                </p>
-              </div>
+              {generateDNAMutation.isError ? (
+                <div className="mt-5 rounded-[20px] border border-[#F0C5C2] bg-[#FDECEC] p-4 text-sm leading-6">
+                  <p className="flex items-center gap-2 font-medium text-[#B42318]">
+                    <AlertCircle className="h-4 w-4" />
+                    Refresh failed
+                  </p>
+                  <p className="mt-1 text-xs text-[#B42318]/80">The analysis could not be regenerated. Check the API and try again.</p>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4 text-sm leading-6 text-[#111111]">
+                  <p className="flex items-center gap-2 font-medium">
+                    <Sparkles className="h-4 w-4 text-[#0A84FF]" />
+                    {recommendedAction}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
