@@ -12,6 +12,9 @@ const styles: Record<string, string> = {
   follow_up: 'bg-[#F5F3FF] text-[#6D28D9] border border-[#DDD6FE]',
   high: 'bg-[#EBF3FF] text-[#0A84FF] border border-[#D8E9FF]',
   critical: 'bg-[#FDECEC] text-[#B42318] border border-[#F0C5C2]',
+  complete: 'bg-[#ECFDF5] text-[#067647] border border-[#BAF0C4]',
+  ok: 'bg-[#ECFDF5] text-[#067647] border border-[#BAF0C4]',
+  failed: 'bg-[#FDECEC] text-[#B42318] border border-[#F0C5C2]',
   medium: 'bg-[#FFF7ED] text-[#C2410C] border border-[#FBD4A8]',
   low: 'bg-[#F5F5F7] text-[#6E6E73] border border-[#E5E5EA]',
 };

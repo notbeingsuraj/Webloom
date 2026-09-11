@@ -161,16 +161,56 @@ export default function LeadDetail() {
               <div className="mt-5 space-y-4">
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Target audience</p>
-                  <p className="mt-2 text-sm leading-6 text-[#111111]">{lead?.businessDNA?.targetAudience || 'Analysis pending'}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#111111]">{lead?.analysis?.brandDNA?.audience?.primary?.segment || lead?.analysis?.brandDNA?.audience || 'Analysis pending'}</p>
+                  {lead?.analysis?.brandDNA?.audience?.primary?.demographics && (
+                    <p className="mt-2 text-xs leading-5 text-[#6E6E73]">
+                      {[
+                        lead.analysis.brandDNA.audience.primary.demographics.ageRange,
+                        lead.analysis.brandDNA.audience.primary.demographics.income,
+                        lead.analysis.brandDNA.audience.primary.demographics.location,
+                      ].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Value proposition</p>
-                  <p className="mt-2 text-sm leading-6 text-[#111111]">{lead?.businessDNA?.valueProposition || 'Analysis pending'}</p>
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Positioning statement</p>
+                  <p className="mt-2 text-sm leading-6 text-[#111111]">{lead?.analysis?.brandDNA?.positioning?.statement || 'Analysis pending'}</p>
+                  {lead?.analysis?.brandDNA?.positioning?.differentiation && (
+                    <p className="mt-2 text-xs leading-5 text-[#6E6E73]">{lead.analysis.brandDNA.positioning.differentiation}</p>
+                  )}
                 </div>
                 <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Brand personality</p>
-                  <p className="mt-2 text-sm leading-6 text-[#111111]">{lead?.businessDNA?.brandPersonality || 'Analysis pending'}</p>
+                  {lead?.analysis?.brandDNA?.brandPersonality?.primary?.length ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {lead.analysis.brandDNA.brandPersonality.primary.map((trait: string) => (
+                        <span key={trait} className="inline-flex items-center rounded-full border border-[#E5E5EA] bg-white px-2.5 py-1 text-xs text-[#111111]">{trait}</span>
+                      ))}
+                      {lead.analysis.brandDNA.brandPersonality.archetype && (
+                        <span className="inline-flex items-center rounded-full bg-[#EBF3FF] px-2.5 py-1 text-xs text-[#0A84FF]">Archetype: {lead.analysis.brandDNA.brandPersonality.archetype}</span>
+                      )}
+                    </div>
+                  ) : <p className="mt-2 text-sm leading-6 text-[#111111]">Analysis pending</p>}
                 </div>
+                {lead?.analysis?.brandDNA?.toneOfVoice && (
+                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Tone of voice</p>
+                    <p className="mt-2 text-sm leading-6 text-[#111111]">{lead.analysis.brandDNA.toneOfVoice.characteristics?.join(', ') || '—'}</p>
+                  </div>
+                )}
+                {lead?.analysis?.brandDNA?.strategicRecommendations?.length ? (
+                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Strategic recommendations</p>
+                    <ul className="mt-2 space-y-2">
+                      {lead.analysis.brandDNA.strategicRecommendations.slice(0, 4).map((rec: { recommendation?: string }, i: number) => (
+                        <li key={i} className="flex items-start gap-2 text-sm leading-5 text-[#111111]">
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#067647]" />
+                          {rec.recommendation}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -230,12 +270,25 @@ export default function LeadDetail() {
 
             <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
               <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Digital audit</h2>
+              <p className="mt-1 text-xs text-[#6E6E73]">
+                {lead?.analysis?.audit?.websiteExists ? `Audited ${lead.analysis.audit.websiteUrl}` : 'No website detected — deterministic audit'}
+              </p>
               <div className="mt-5 space-y-3">
-                <AuditRow label="Website" value={lead?.digitalAudit ? 'Weak' : 'Unknown'} tone={lead?.digitalAudit ? 'bad' : 'neutral'} />
-                <AuditRow label="Mobile UX" value={lead?.digitalAudit?.mobileOptimized ? 'Strong' : 'Weak'} tone={lead?.digitalAudit?.mobileOptimized ? 'good' : 'bad'} />
-                <AuditRow label="Conversion" value={lead?.digitalAudit ? 'Needs work' : 'Not reviewed'} tone={lead?.digitalAudit ? 'bad' : 'neutral'} />
-                <AuditRow label="SEO" value={lead?.digitalAudit ? 'Moderate' : 'Pending'} tone={lead?.digitalAudit ? 'neutral' : 'neutral'} />
-                <AuditRow label="Trust" value={lead?.digitalAudit ? 'Strong' : 'Pending'} tone={lead?.digitalAudit ? 'good' : 'neutral'} />
+                {lead?.analysis?.audit?.categories && Object.keys(lead.analysis.audit.categories).length > 0 ? (
+                  (Object.entries(lead.analysis.audit.categories) as Array<[string, { score?: number }]>).map(([key, cat]) => (
+                    <AuditRow
+                      key={key}
+                      label={key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())}
+                      value={cat.score != null ? `${cat.score}/10` : '—'}
+                      tone={cat.score != null ? (cat.score >= 7 ? 'good' : cat.score >= 4 ? 'neutral' : 'bad') : 'neutral'}
+                    />
+                  ))
+                ) : (
+                  <>
+                    <AuditRow label="Website" value={lead?.analysis?.audit?.websiteExists ? 'Present' : 'Missing'} tone={lead?.analysis?.audit?.websiteExists ? 'good' : 'bad'} />
+                    <AuditRow label="Overall score" value={lead?.analysis?.audit?.overallScore != null ? `${lead.analysis.audit.overallScore}/10` : 'Not reviewed'} tone="neutral" />
+                  </>
+                )}
               </div>
             </div>
 
@@ -299,15 +352,86 @@ export default function LeadDetail() {
             </div>
           </div>
 
+          {/* Brand DNA deep dive */}
+          {lead?.analysis?.brandDNA && (
+            <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Brand DNA deep dive</h2>
+                <StatusBadge status={lead?.analysis?.brandStrategyStatus || 'new'} />
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {lead.analysis.brandDNA.customerIntent && (
+                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Customer intent</p>
+                    <p className="mt-2 text-sm leading-6 text-[#111111]">{typeof lead.analysis.brandDNA.customerIntent === 'string' ? lead.analysis.brandDNA.customerIntent : JSON.stringify(lead.analysis.brandDNA.customerIntent)}</p>
+                  </div>
+                )}
+                {lead.analysis.brandDNA.purchaseTriggers && (
+                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Purchase triggers</p>
+                    <p className="mt-2 text-sm leading-6 text-[#111111]">{typeof lead.analysis.brandDNA.purchaseTriggers === 'string' ? lead.analysis.brandDNA.purchaseTriggers : JSON.stringify(lead.analysis.brandDNA.purchaseTriggers)}</p>
+                  </div>
+                )}
+                {lead.analysis.brandDNA.painPoints?.length ? (
+                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Pain points</p>
+                    <ul className="mt-2 space-y-1.5">
+                      {lead.analysis.brandDNA.painPoints.slice(0, 5).map((pp: { pain?: string } | string, i: number) => (
+                        <li key={i} className="flex items-start gap-2 text-sm leading-5 text-[#111111]">
+                          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#B42318]" />
+                          {typeof pp === 'string' ? pp : pp.pain || ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {lead.analysis.brandDNA.competitiveAdvantages?.length ? (
+                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Competitive advantages</p>
+                    <ul className="mt-2 space-y-1.5">
+                      {lead.analysis.brandDNA.competitiveAdvantages.slice(0, 5).map((adv: { advantage?: string } | string, i: number) => (
+                        <li key={i} className="flex items-start gap-2 text-sm leading-5 text-[#111111]">
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#067647]" />
+                          {typeof adv === 'string' ? adv : adv.advantage || ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {lead.analysis.brandDNA.conversionStrategy?.primaryCTA && (
+                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Primary CTA</p>
+                    <p className="mt-2 text-sm font-medium text-[#111111]">{lead.analysis.brandDNA.conversionStrategy.primaryCTA.text || lead.analysis.brandDNA.conversionStrategy.primaryCTA.action}</p>
+                    {lead.analysis.brandDNA.conversionStrategy.primaryCTA.reasoning && (
+                      <p className="mt-1 text-xs leading-5 text-[#6E6E73]">{lead.analysis.brandDNA.conversionStrategy.primaryCTA.reasoning}</p>
+                    )}
+                  </div>
+                )}
+                {lead.analysis.brandDNA.visualDirection && (
+                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Visual direction</p>
+                    <p className="mt-2 text-sm leading-6 text-[#111111]">{typeof lead.analysis.brandDNA.visualDirection === 'string' ? lead.analysis.brandDNA.visualDirection : JSON.stringify(lead.analysis.brandDNA.visualDirection)}</p>
+                  </div>
+                )}
+                {lead.analysis.brandDNA.websiteObjectives && (
+                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Website objectives</p>
+                    <p className="mt-2 text-sm leading-6 text-[#111111]">{typeof lead.analysis.brandDNA.websiteObjectives === 'string' ? lead.analysis.brandDNA.websiteObjectives : JSON.stringify(lead.analysis.brandDNA.websiteObjectives)}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Research / Analysis Details */}
           {lead?.analysis?.metrics?.facts && lead.analysis.metrics.facts.length > 0 && (
             <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
               <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Key findings</h2>
               <div className="mt-4 space-y-2">
-                {lead.analysis.metrics.facts.slice(0, 8).map((fact: string, i: number) => (
+                {lead.analysis.metrics.facts.slice(0, 8).map((fact: any, i: number) => (
                   <div key={i} className="flex items-start gap-2.5 rounded-xl border border-[#E5E5EA] bg-[#F7F7F8] px-4 py-3 text-sm text-[#111111]">
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-[#067647] mt-0.5" />
-                    <span className="leading-6">{fact}</span>
+                    <span className="leading-6">{typeof fact === 'string' ? fact : fact.claim}</span>
                   </div>
                 ))}
               </div>

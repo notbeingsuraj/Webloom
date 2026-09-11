@@ -105,7 +105,7 @@ export default function Dashboard() {
                   </div>
                   <div className="text-sm text-[#6E6E73]">{lead.businessCategory || 'N/A'}</div>
                   <div className="text-sm text-[#6E6E73]">{lead.location?.city || 'N/A'}</div>
-                  <div className="text-sm font-medium text-[#111111]">{lead.opportunityScore?.total ?? 82}</div>
+                  <div className="text-sm font-medium text-[#111111]">{lead.opportunityScore?.total ?? '—'}</div>
                   <div><StatusBadge status={lead.status || 'new'} /></div>
                   <div className="md:text-right">
                     <Link to={`/leads/${lead._id}`} className="inline-flex items-center justify-center rounded-full bg-[#111111] px-3 py-2 text-xs font-medium text-white transition hover:bg-[#2A2A2A]">

@@ -10,6 +10,7 @@ export interface Lead {
     priority: string;
   };
   location?: {
+    address?: string;
     city?: string;
     state?: string;
   };
@@ -21,6 +22,69 @@ export interface Lead {
   businessData?: {
     rating?: number;
     reviewCount?: number;
+    services?: string[];
+    openingHours?: unknown;
+  };
+  analysis?: {
+    brandStrategyStatus?: string;
+    brandDNA?: {
+      businessIdentity?: Record<string, unknown>;
+      audience?: {
+        primary?: {
+          segment?: string;
+          demographics?: { ageRange?: string; income?: string; location?: string };
+          psychographics?: { values?: string[]; lifestyle?: string };
+        };
+        secondary?: Array<{ segment?: string }>;
+      };
+      customerIntent?: unknown;
+      painPoints?: Array<{ pain?: string; severity?: string; source?: string }>;
+      purchaseTriggers?: unknown;
+      services?: unknown;
+      competitiveAdvantages?: Array<{ advantage?: string; category?: string }>;
+      trustSignals?: unknown;
+      brandPersonality?: {
+        primary?: string[];
+        secondary?: string[];
+        avoid?: string[];
+        archetype?: string;
+      };
+      toneOfVoice?: {
+        characteristics?: string[];
+        doUse?: string[];
+        dontUse?: string[];
+      };
+      visualDirection?: unknown;
+      positioning?: {
+        statement?: string;
+        differentiation?: string;
+      };
+      websiteObjectives?: unknown;
+      conversionStrategy?: {
+        primaryCTA?: { action?: string; text?: string; reasoning?: string };
+      };
+      strategicRecommendations?: Array<{ recommendation?: string; category?: string; impact?: string; effort?: string }>;
+      confidence?: Record<string, unknown>;
+    };
+    audit?: {
+      websiteExists?: boolean;
+      websiteUrl?: string;
+      overallScore?: number;
+      categories?: Record<string, { score?: number; notes?: string; verified?: boolean }>;
+      strengths?: string[];
+      weaknesses?: string[];
+      criticalIssues?: string[];
+      recommendations?: string[];
+      opportunityGap?: string;
+    };
+    metrics?: {
+      trustSignals?: string[];
+      facts?: Array<{ claim?: string; source?: string; verified?: boolean }>;
+      unknowns?: string[];
+      digitalPresence?: Record<string, unknown>;
+      positioning?: unknown;
+      source?: unknown;
+    };
   };
   generatedWebsite?: {
     specification?: {
