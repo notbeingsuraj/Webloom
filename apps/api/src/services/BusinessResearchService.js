@@ -969,6 +969,34 @@ class BusinessResearchService {
   }
 
   /**
+   * Detect address-looking strings that sometimes leak into the name field.
+   * A street address is a location datum, not a business identity — it must
+   * never become (or replace) the canonical business name.
+   *
+   * Heuristics (conservative, avoids false positives on legal names that
+   * merely contain a street word like "High Street Market"):
+   *   A) number-led:      "5 Main St", "No. 5 Park Road", "#12 ..."
+   *   B) street→number:   "Street No. 5", "Road #4", "Main St 5"
+   *   C) number→locality: "5 Nagar", "5-B Colony", "Phase 7"
+   */
+  _looksLikeStreetAddress(name) {
+    if (!name || typeof name !== 'string') return false;
+    const trimmed = name.trim();
+    if (trimmed.length === 0) return false;
+
+    // A) "5 Main St", "No. 5 Park Road", "#12 something"
+    if (/^(no\.?\s*|#\s*)?\d{1,5}[a-z]?\b/i.test(trimmed)) return true;
+
+    // B) street word immediately followed by a number: "Street No. 5", "Road #4", "Main St 5"
+    if (/(street|st\.?|road|rd\.?|lane|ln\.?|avenue|ave\.?|boulevard|blvd\.?|drive|dr\.?|highway|hwy\.?|nagar|colony|sector|phase|block|chowk|basti|mohalla|gram|gaon)\s*(no\.?\s*|#\s*)?\d{1,5}[a-z]?\b/i.test(trimmed)) return true;
+
+    // C) number immediately before a locality suffix: "5 Nagar", "5-B Colony"
+    if (/\d{1,5}[a-z]?\s+(nagar|colony|sector|phase|block|chowk|basti|mohalla|gram|gaon|village|township|estate)\b/i.test(trimmed)) return true;
+
+    return false;
+  }
+
+  /**
    * Determine whether a record carries enough identity evidence to safely
    * persist a BusinessEntity.  Returns true when at least one authoritative
    * identity signal is present: a real (non-synthetic) name, a hard provider
@@ -1086,6 +1114,24 @@ class BusinessResearchService {
     const setOrSkip = (fieldPath, value, conf) => {
       if (value == null || value === '') return;
       if (onlyIfMissing && profile.get(fieldPath) != null) return;
+
+      // Data-quality guard: an address-looking string must never replace an
+      // existing real business name. Providers (esp. Geoapify when the search
+      // drifts to a street-level feature) can return a street address in the
+      // `name` field. A URL-derived business name (`identified`) or another
+      // provider's real name already on the profile is authoritative; the
+      // address string is a different datum (the location), not identity.
+      if (fieldPath === 'identity.name') {
+        const existingName = profile.get('identity.name');
+        if (existingName && this._looksLikeStreetAddress(value) && !this._looksLikeStreetAddress(existingName)) {
+          return;
+        }
+        // Never let a bare address become the canonical business name at all.
+        if (!existingName && this._looksLikeStreetAddress(value)) {
+          return;
+        }
+      }
+
       profile.set(fieldPath, value, effectiveProvenance, conf, sourceInfo);
     };
 
