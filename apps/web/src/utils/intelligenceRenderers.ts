@@ -48,11 +48,11 @@ const toString = (v: unknown): string | null =>
 export function toIntentItems(raw: unknown): IntentItem[] | null {
   if (Array.isArray(raw)) {
     const items = raw
-      .map((entry) =>
+      .map<IntentItem>((entry) =>
         typeof entry === 'string'
           ? { intent: entry, urgency: null, frequency: null }
           : {
-              intent: toString(entry?.intent),
+              intent: toString(entry?.intent) ?? '',
               urgency: toString(entry?.urgency),
               frequency: toString(entry?.frequency),
             },
@@ -70,11 +70,11 @@ export function toIntentItems(raw: unknown): IntentItem[] | null {
 export function toTriggerItems(raw: unknown): TriggerItem[] | null {
   if (Array.isArray(raw)) {
     const items = raw
-      .map((entry) =>
+      .map<TriggerItem>((entry) =>
         typeof entry === 'string'
           ? { trigger: entry, type: null, strength: null }
           : {
-              trigger: toString(entry?.trigger),
+              trigger: toString(entry?.trigger) ?? '',
               type: toString(entry?.type),
               strength: toString(entry?.strength),
             },
@@ -92,11 +92,11 @@ export function toTriggerItems(raw: unknown): TriggerItem[] | null {
 export function toObjectiveItems(raw: unknown): ObjectiveItem[] | null {
   if (Array.isArray(raw)) {
     const items = raw
-      .map((entry) =>
+      .map<ObjectiveItem>((entry) =>
         typeof entry === 'string'
-          ? { objective: entry, priority: null, metrics: [] as string[] }
+          ? { objective: entry, priority: null, metrics: [] }
           : {
-              objective: toString(entry?.objective),
+              objective: toString(entry?.objective) ?? '',
               priority: toString(entry?.priority),
               metrics: Array.isArray(entry?.metrics)
                 ? entry.metrics.filter((m: unknown): m is string => typeof m === 'string')
@@ -115,7 +115,9 @@ export function toObjectiveItems(raw: unknown): ObjectiveItem[] | null {
  */
 export function toVisualDirectionData(raw: unknown): VisualDirectionData | null {
   if (!raw) return null;
-  if (typeof raw === 'string') return { mood: raw };
+  if (typeof raw === 'string') {
+    return { mood: raw, imagerySubjects: [], imageryAvoid: [] };
+  }
   if (typeof raw !== 'object') return null;
 
   const vd = raw as {

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Globe, Mail, MapPin, Phone, Sparkles, Trash2, Star, Clock, Tag, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react';
-import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import ScoreIndicator from '../components/ui/ScoreIndicator';
 import AuditRow from '../components/ui/AuditRow';
@@ -70,7 +69,6 @@ export default function LeadDetail() {
   }, [score]);
 
   // ----- Website generation state -----
-  const websiteState = lead?.generatedWebsite;
   const websiteGenerateError = generateWebsiteMutation.isError
     ? (generateWebsiteMutation.error as any)?.response?.data?.message ||
       (generateWebsiteMutation.error as any)?.response?.data?.error ||
@@ -334,9 +332,8 @@ export default function LeadDetail() {
           <div className="space-y-6">
             <ScoreIndicator
               score={score.value ?? 0}
-              label="Opportunity"
+              label={`Opportunity${score.state === 'preliminary' ? ' — Preliminary' : ''}`}
               description={scoreDescription}
-              suffix={score.state === 'preliminary' ? 'Preliminary' : undefined}
             />
 
             <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
@@ -448,13 +445,17 @@ export default function LeadDetail() {
                 {lead.analysis.brandDNA.customerIntent && (
                   <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                     <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Customer intent</p>
-                    <p className="mt-2 text-sm leading-6 text-[#111111]">{typeof lead.analysis.brandDNA.customerIntent === 'string' ? lead.analysis.brandDNA.customerIntent : JSON.stringify(lead.analysis.brandDNA.customerIntent)}</p>
+                    <div className="mt-2">
+                      <IntentList items={toIntentItems(lead.analysis.brandDNA.customerIntent)} />
+                    </div>
                   </div>
                 )}
                 {lead.analysis.brandDNA.purchaseTriggers && (
                   <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                     <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Purchase triggers</p>
-                    <p className="mt-2 text-sm leading-6 text-[#111111]">{typeof lead.analysis.brandDNA.purchaseTriggers === 'string' ? lead.analysis.brandDNA.purchaseTriggers : JSON.stringify(lead.analysis.brandDNA.purchaseTriggers)}</p>
+                    <div className="mt-2">
+                      <TriggerList items={toTriggerItems(lead.analysis.brandDNA.purchaseTriggers)} />
+                    </div>
                   </div>
                 )}
                 {lead.analysis.brandDNA.painPoints?.length ? (
@@ -495,13 +496,17 @@ export default function LeadDetail() {
                 {lead.analysis.brandDNA.visualDirection && (
                   <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                     <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Visual direction</p>
-                    <p className="mt-2 text-sm leading-6 text-[#111111]">{typeof lead.analysis.brandDNA.visualDirection === 'string' ? lead.analysis.brandDNA.visualDirection : JSON.stringify(lead.analysis.brandDNA.visualDirection)}</p>
+                    <div className="mt-2">
+                      <VisualDirectionPanel data={toVisualDirectionData(lead.analysis.brandDNA.visualDirection)} />
+                    </div>
                   </div>
                 )}
                 {lead.analysis.brandDNA.websiteObjectives && (
                   <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                     <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Website objectives</p>
-                    <p className="mt-2 text-sm leading-6 text-[#111111]">{typeof lead.analysis.brandDNA.websiteObjectives === 'string' ? lead.analysis.brandDNA.websiteObjectives : JSON.stringify(lead.analysis.brandDNA.websiteObjectives)}</p>
+                    <div className="mt-2">
+                      <ObjectiveList items={toObjectiveItems(lead.analysis.brandDNA.websiteObjectives)} />
+                    </div>
                   </div>
                 )}
               </div>
@@ -540,58 +545,12 @@ export default function LeadDetail() {
       )}
 
       {activeTab === 'Website' && (
-        <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Website preview</h2>
-            <div className="flex items-center gap-2 rounded-full border border-[#E5E5EA] bg-[#F7F7F8] p-1">
-              {['Desktop', 'Tablet', 'Mobile'].map((viewport) => (
-                <button key={viewport} type="button" className="rounded-full px-3 py-1.5 text-xs font-medium text-[#6E6E73] hover:text-[#111111]">
-                  {viewport}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.5fr_0.8fr]">
-            <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Sections</p>
-              <div className="mt-4 space-y-2 text-sm text-[#111111]">
-                {websiteSpecification?.sections?.length ? websiteSpecification.sections.map((section: { type?: string }) => (
-                  <div key={section.type} className="rounded-xl border border-[#E5E5EA] bg-white px-3 py-2">{section.type || 'Section'}</div>
-                )) : <div className="rounded-xl border border-[#E5E5EA] bg-white px-3 py-2 text-[#6E6E73]">Unavailable</div>}
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-              <div className="rounded-[20px] border border-[#E5E5EA] bg-white p-4 shadow-[0_14px_40px_rgba(17,17,17,0.04)]">
-                <div className="rounded-[14px] bg-[#111111] p-6 text-white">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/70">{lead?.businessCategory || 'Business category unavailable'}</p>
-                  <h3 className="mt-3 text-3xl font-semibold tracking-[-0.06em]">{websiteSpecification?.pageTitle || lead?.businessName || 'Website specification unavailable'}</h3>
-                  <p className="mt-3 max-w-md text-sm text-white/80">{websiteSpecification?.pageDescription || 'Website specification unavailable.'}</p>
-                  <div className="mt-6 flex gap-3">
-                    <button type="button" className="rounded-full bg-white px-4 py-2 text-sm font-medium text-[#111111]">{websiteSpecification?.primaryCTA?.text || 'Unavailable'}</button>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  {(websiteSpecification?.sections || []).filter((section: { type?: string }) => section.type === 'trustIndicators' || section.type === 'services' || section.type === 'location').slice(0, 3).map((section: { type?: string }) => (
-                    <div key={section.type} className="rounded-2xl border border-[#E5E5EA] bg-[#F7F7F8] p-3 text-sm text-[#111111]">{section.type}</div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Appearance</p>
-              <div className="mt-4 space-y-3 text-sm text-[#111111]">
-                <div className="rounded-xl border border-[#E5E5EA] bg-white px-3 py-2">Typography</div>
-                <div className="rounded-xl border border-[#E5E5EA] bg-white px-3 py-2">Theme</div>
-                <div className="rounded-xl border border-[#E5E5EA] bg-white px-3 py-2">CTA</div>
-                <Button variant="secondary" size="sm" className="mt-2 w-full">Regenerate</Button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <WebsitePreview
+          website={lead?.generatedWebsite}
+          isGenerating={generateWebsiteMutation.isPending}
+          onGenerate={() => generateWebsiteMutation.mutate()}
+          generateError={websiteGenerateError}
+        />
       )}
 
       {activeTab === 'Outreach' && (

@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2, TrendingUp, Target } from 'lucide-react';
+import { CheckCircle2, TrendingUp, Target } from 'lucide-react';
 import type { IntentItem, TriggerItem, ObjectiveItem, VisualDirectionData } from '../utils/intelligenceRenderers';
 
 // ---------------------------------------------------------------------------

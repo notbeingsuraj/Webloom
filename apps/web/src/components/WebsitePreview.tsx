@@ -136,7 +136,7 @@ export default function WebsitePreview({
 
         {/* Preview */}
         <div className={`rounded-[28px] border border-[#E5E5EA] bg-[#F7F7F8] p-4 ${viewport === 'Mobile' ? 'max-w-sm' : viewport === 'Tablet' ? 'max-w-2xl' : ''}`}>
-          <PreviewCanvas spec={spec} viewport={viewport} />
+          <PreviewCanvas spec={spec} />
         </div>
 
         {/* Appearance + regenerate */}
@@ -197,7 +197,7 @@ export default function WebsitePreview({
 // Canvas
 // ---------------------------------------------------------------------------
 
-function PreviewCanvas({ spec, viewport }: { spec: WebsiteSpecification; viewport: 'Desktop' | 'Tablet' | 'Mobile' }) {
+function PreviewCanvas({ spec }: { spec: WebsiteSpecification }) {
   const hero = spec.sections?.find((s) => s.type === 'hero');
   const servicesSection = spec.sections?.find((s) => s.type === 'services');
   const cta = spec.sections?.find((s) => s.type === 'cta');
@@ -219,7 +219,7 @@ function PreviewCanvas({ spec, viewport }: { spec: WebsiteSpecification; viewpor
       {/* Hero */}
       <div className="bg-[#111111] px-6 py-8 text-white md:px-8 md:py-10">
         <p className="text-[11px] uppercase tracking-[0.18em] text-white/70">
-          {spec.businessCategory || spec.categories?.[0] || 'Local business'}
+          {spec.businessCategory || 'Local business'}
         </p>
         <h3 className="mt-3 text-2xl font-semibold tracking-[-0.05em] md:text-3xl">
           {hero?.headline || spec.headline || spec.businessName || 'Website specification unavailable'}
