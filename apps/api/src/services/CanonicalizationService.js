@@ -127,12 +127,38 @@ function normalizeFieldValue(fieldPath, value) {
 }
 
 /**
+ * Compare two phone values for equivalence.
+ *
+ * normalizePhone() returns null for ambiguous local numbers that lack a
+ * country hint (e.g. a bare US 10-digit number). If we compared normalized
+ * values directly, two DIFFERENT local numbers would both collapse to null
+ * (false equivalence) while an identical number in local vs E.164 form would
+ * compare null vs "+1415..." (false conflict). Instead, compare a digit-only
+ * key that drops the NANP country code when the number is a US-style
+ * 11-digit form, so local 10-digit and E.164 representations align.
+ */
+function phoneEquivalenceKey(value) {
+  let digits = String(value).replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.length === 11 && digits.startsWith('1')) {
+    digits = digits.slice(1);
+  }
+  return digits;
+}
+
+/**
  * Check if two normalized values are equivalent
  */
 function areValuesEquivalent(fieldPath, value1, value2) {
   if (value1 === value2) return true;
   if (value1 == null || value2 == null) return false;
-  
+
+  if (fieldPath === 'contact.phone') {
+    const key1 = phoneEquivalenceKey(value1);
+    const key2 = phoneEquivalenceKey(value2);
+    if (key1 && key2) return key1 === key2;
+  }
+
   const norm1 = normalizeFieldValue(fieldPath, value1);
   const norm2 = normalizeFieldValue(fieldPath, value2);
   return norm1 === norm2;
