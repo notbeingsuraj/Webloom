@@ -12,6 +12,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { eq, and, desc, sql, inArray } from 'drizzle-orm';
+import { looksLikeStreetAddress } from '../utils/streetAddressDetector.js';
 import { 
   BusinessEntity, 
   ProviderIdentity, 
@@ -1609,6 +1610,15 @@ export class IdentityRepository {
     
     const canonicalFields = this.getCanonicalFields(entityId);
     for (const field of canonicalFields) {
+      // Data-quality guard (defense-in-depth): a persisted street-address
+      // string must never be re-loaded as the canonical business name —
+      // even when it was written to canonical_field in the past, and even
+      // though canonical storage is normally authoritative. An address is a
+      // location datum, not identity; skipping it lets a real name already
+      // on the profile survive.
+      if (field.fieldPath === 'identity.name' && looksLikeStreetAddress(field.value)) {
+        continue;
+      }
       // Canonical storage is authoritative over fresh provider values.
       profile.set(field.fieldPath, field.value, field.provenance, field.confidence, {
         sourceId: field.sourceId,

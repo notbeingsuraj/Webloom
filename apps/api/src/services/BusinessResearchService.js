@@ -17,6 +17,7 @@ import { initializeDatabase, getDb } from '../db/client.js';
 import { IdentityRepository, NotFoundError, DuplicateError, ValidationError } from '../db/IdentityRepository.js';
 import { CanonicalizationService } from './CanonicalizationService.js';
 import { analyzeEntityRelocation, TEMPORAL_VERDICT } from './TemporalRelocationAnalyzer.js';
+import { looksLikeStreetAddress } from '../utils/streetAddressDetector.js';
 
 class BusinessResearchService {
   /**
@@ -985,27 +986,14 @@ class BusinessResearchService {
    * A street address is a location datum, not a business identity — it must
    * never become (or replace) the canonical business name.
    *
-   * Heuristics (conservative, avoids false positives on legal names that
-   * merely contain a street word like "High Street Market"):
-   *   A) number-led:      "5 Main St", "No. 5 Park Road", "#12 ..."
-   *   B) street→number:   "Street No. 5", "Road #4", "Main St 5"
-   *   C) number→locality: "5 Nagar", "5-B Colony", "Phase 7"
+   * Delegates to the shared detector so the same guard applies in the
+   * CanonicalizationService write path and loadCanonicalFieldsIntoProfile.
+   *
+   * @param {string|null} name
+   * @returns {boolean}
    */
   _looksLikeStreetAddress(name) {
-    if (!name || typeof name !== 'string') return false;
-    const trimmed = name.trim();
-    if (trimmed.length === 0) return false;
-
-    // A) "5 Main St", "No. 5 Park Road", "#12 something"
-    if (/^(no\.?\s*|#\s*)?\d{1,5}[a-z]?\b/i.test(trimmed)) return true;
-
-    // B) street word immediately followed by a number: "Street No. 5", "Road #4", "Main St 5"
-    if (/(street|st\.?|road|rd\.?|lane|ln\.?|avenue|ave\.?|boulevard|blvd\.?|drive|dr\.?|highway|hwy\.?|nagar|colony|sector|phase|block|chowk|basti|mohalla|gram|gaon)\s*(no\.?\s*|#\s*)?\d{1,5}[a-z]?\b/i.test(trimmed)) return true;
-
-    // C) number immediately before a locality suffix: "5 Nagar", "5-B Colony"
-    if (/\d{1,5}[a-z]?\s+(nagar|colony|sector|phase|block|chowk|basti|mohalla|gram|gaon|village|township|estate)\b/i.test(trimmed)) return true;
-
-    return false;
+    return looksLikeStreetAddress(name);
   }
 
   /**

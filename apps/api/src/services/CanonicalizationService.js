@@ -12,6 +12,7 @@
 import { Source, Evidence, Claim, Conflict, SourceIndependenceAnalyzer } from './EvidenceModels.js';
 import { normalizePhone, normalizeWebsite } from './EntityResolution.js';
 import { IdentityRepository } from '../db/IdentityRepository.js';
+import { looksLikeStreetAddress } from '../utils/streetAddressDetector.js';
 
 /**
  * Field classification for conflict resolution
@@ -235,7 +236,7 @@ export class CanonicalizationService {
     const observations = [];
     
     if (record.business) {
-      if (record.business.name) {
+      if (record.business.name && !looksLikeStreetAddress(record.business.name)) {
         observations.push({ fieldPath: 'identity.name', value: record.business.name, provenance: 'discovered', confidence: baseConfidence * 0.95 });
       }
       if (record.business.category) {
