@@ -809,29 +809,6 @@ class CanonicalBusinessProfileService {
   // --- enrichment (AI quarantine metadata survives; never upgraded) ---
   Object.assign(projection.enrichment, buildEnrichment(source));
 
-  // --- P1.9: reputation status/provenance (computed AFTER provenance map) ---
-  // Truthful state string derived from what actually projected. Never claims
-  // verified when the value came from AI evidence extraction; never rewrites
-  // ai_generated to a higher tier.
-  const repRatingProv = projection.provenance['ratings.rating']?.provenance ?? null;
-  const repCountProv = projection.provenance['ratings.review_count']?.provenance ?? null;
-  if (projection.reputation.rating != null || projection.reputation.reviewCount != null) {
-    const provLabel = repRatingProv || repCountProv || null;
-    projection.reputation.status =
-      provLabel === 'ai_generated'
-        ? 'ai_extracted_from_evidence'
-        : 'source_extracted';
-  } else if (projection.reputation.reviews.length > 0) {
-    projection.reputation.status = 'partial';
-  } else {
-    projection.reputation.status = 'unavailable';
-  }
-  projection.reputation.provenance = repRatingProv ?? repCountProv ?? (projection.reputation.rating != null ? 'discovered' : null);
-  projection.reputation.confidence =
-    projection.confidence['ratings.rating'] ??
-    projection.confidence['ratings.review_count'] ??
-    (projection.reputation.rating != null ? 0.85 : null);
-
   // --- P1.8: fallback evidence survives projection (field-level provenance) ---
   // The source-grounded fallback extractor attaches per-field evidence
   // snapshots (extractionMethod, confidence, sourceUrl, evidenceSnippet) to
@@ -863,6 +840,29 @@ class CanonicalBusinessProfileService {
   if (Array.isArray(canonicalFields)) {
     this._applyCanonicalFields(projection, canonicalFields);
   }
+
+  // --- P1.9: reputation status/provenance (computed AFTER canonical fields) ---
+  // Truthful state string derived from what actually projected. Never claims
+  // verified when the value came from AI evidence extraction; never rewrites
+  // ai_generated to a higher tier.
+  const repRatingProv = projection.provenance['ratings.rating']?.provenance ?? null;
+  const repCountProv = projection.provenance['ratings.review_count']?.provenance ?? null;
+  if (projection.reputation.rating != null || projection.reputation.reviewCount != null) {
+    const provLabel = repRatingProv || repCountProv || null;
+    projection.reputation.status =
+      provLabel === 'ai_generated'
+        ? 'ai_extracted_from_evidence'
+        : 'source_extracted';
+  } else if (projection.reputation.reviews.length > 0) {
+    projection.reputation.status = 'partial';
+  } else {
+    projection.reputation.status = 'unavailable';
+  }
+  projection.reputation.provenance = repRatingProv ?? repCountProv ?? (projection.reputation.rating != null ? 'discovered' : null);
+  projection.reputation.confidence =
+    projection.confidence['ratings.rating'] ??
+    projection.confidence['ratings.review_count'] ??
+    (projection.reputation.rating != null ? 0.85 : null);
 
     return projection;
   }
