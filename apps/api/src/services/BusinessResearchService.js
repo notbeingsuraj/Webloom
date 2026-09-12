@@ -664,6 +664,60 @@ class BusinessResearchService {
       }
     }
 
+    // --- LEVEL 3.9: P1.9 Google reputation extraction (rating/reviews) ---
+    // Google Maps visibly contains ratings + reviews, but the provider chain
+    // (Geoapify rarely returns ratings; web extraction omits them). Recover
+    // reputation ONLY from actual evidence: structured provider record first,
+    // then deterministic source-text parsing, then evidence-grounded AI.
+    // AI NEVER guesses a rating or estimates a review count.
+    {
+      const { extractReputation } = await import('./GoogleMapsReputationExtractor.js');
+      const providerRecordForReputation = geoapifyRecord || webRecord || null;
+
+      // Reuse the same evidence sourceText fetched for the P1.8 fallback (never
+      // double-fetch when web extraction already retrieved visible text).
+      let reputationSourceText = webRecord?.metadata?.sourceText || null;
+      if (!reputationSourceText && sourceUrl && !sourceText) {
+        try {
+          const { default: extractor } = await import('./BusinessDataExtractor.js');
+          const pageData = await extractor.fetchPage(sourceUrl);
+          reputationSourceText = (pageData.html || '').replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 6000);
+        } catch {
+          reputationSourceText = null;
+        }
+      } else {
+        reputationSourceText = sourceText || reputationSourceText;
+      }
+
+      const repResult = await extractReputation({
+        providerRecord: providerRecordForReputation,
+        sourceText: reputationSourceText,
+        sourceUrl,
+        existingCanonicalProfile: profile.toObject(),
+      });
+
+      if (repResult?.reputation) {
+        const rep = repResult.reputation;
+        const merged = this._mergeReputation(profile, rep, repResult);
+        providerTrace.reputation = {
+          status: rep.status || 'unavailable',
+          provenance: rep.provenance || null,
+          aiExtracted: Boolean(repResult.aiExtracted),
+          rating: rep.rating ?? null,
+          reviewCount: rep.reviewCount ?? null,
+          reviewCountSamples: Array.isArray(rep.reviews) ? rep.reviews.length : 0,
+          source: rep.source || null,
+          merged: merged,
+        };
+      }
+    }
+
     // --- LEVEL 4: AI enrichment of gaps (does not overwrite high-confidence data) ---
     if (this._hasGaps(profile)) {
       await this._enrichMissingWithAI(profile, sourceUrl);
