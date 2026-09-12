@@ -22,7 +22,7 @@ const leadCache = new Map();
  */
 router.post('/', async (req, res, next) => {
   try {
-    const { googleMapsUrl, leadName, internalNotes, customInstructions } = req.body;
+    const { googleMapsUrl, leadName, internalNotes, customInstructions, forceRefresh } = req.body;
     
     if (!googleMapsUrl) {
       return res.status(400).json({ 
@@ -39,18 +39,13 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    // Extract business data.
-    // Use the orchestrated provider path (deterministic URL hints → Geoapify →
-    // web extraction → AI enrichment), the same robust pipeline as
-    // /api/business/analyze. The single-path AI-dependent extractor
-    // (extractFromGoogleMapsUrl) can return an empty acquisition when the AI
-    // gateway is unavailable; the orchestrated path still resolves identity
-    // from the URL + provider records, so the demo flow keeps working.
+    // Extract business data with optional forceRefresh
     let extractedData = null;
     let extractionTrace = null;
     try {
       const result = await BusinessResearchService.extractBusinessIntelligenceWithProviders({
         googleMapsUrl,
+        forceRefresh,
       });
       extractedData = result.intelligence;
       extractionTrace = result.provider || null;
