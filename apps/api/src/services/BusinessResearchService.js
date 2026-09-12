@@ -483,7 +483,10 @@ class BusinessResearchService {
     // --- LEVEL 3: web-extraction fallback / completion of gaps ---
     let webRecord = null;
     if (sourceUrl) {
-      const webResult = await WebExtractionProvider.search({ googleMapsUrl: sourceUrl });
+      const webResult = await WebExtractionProvider.search({
+        googleMapsUrl: sourceUrl,
+        forceRefresh,
+      });
       // Lossless contract: webResult.status is now one of ACQUISITION_STATUS.
       // Only a SUCCESS (or PARTIAL with evidence) yields records.
       if (
