@@ -46,6 +46,10 @@ class BusinessProfile {
       ratings: {
         rating: { value: null, provenance: null, confidence: 0 },
         review_count: { value: null, provenance: null, confidence: 0 },
+        reviews: { value: [], provenance: null, confidence: 0 },
+        review_summary: { value: null, provenance: null, confidence: 0 },
+        sentiment: { value: null, provenance: null, confidence: 0 },
+        themes: { value: [], provenance: null, confidence: 0 },
       },
       hours: { value: {}, provenance: null, confidence: 0 },
       social_links: { value: [], provenance: null, confidence: 0 },

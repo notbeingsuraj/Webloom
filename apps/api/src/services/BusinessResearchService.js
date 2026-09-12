@@ -1493,6 +1493,73 @@ class BusinessResearchService {
   }
 
   /**
+   * Merge P1.9 reputation extraction results into the profile with provenance.
+   *
+   * Authority: structured provider (observed) > source-text parser (observed)
+   * > AI evidence extraction (ai_generated). AI never upgrades to observed.
+   * Gaps-only: never overwrite an existing higher-tier rating/review count.
+   *
+   * @param {BusinessProfile} profile
+   * @param {Object} rep - reputation block from GoogleMapsReputationExtractor
+   * @param {Object} result - { provenance, aiExtracted }
+   * @returns {boolean} merged anything
+   */
+  _mergeReputation(profile, rep, result = {}) {
+    if (!rep || typeof rep !== 'object') return false;
+    let merged = false;
+    const provenances = { observed: 3, parsed: 2, ai_generated: 0.5 };
+
+    const isNewerOrMissing = (path, prov) => {
+      const existing = profile.getField(path);
+      if (!existing || existing.value == null) return true;
+      const existingPriority = provenances[existing.provenance] ?? 0;
+      const newPriority = provenances[prov] ?? 0;
+      return newPriority > existingPriority;
+    };
+
+    const prov = result.provenance === 'ai_generated' ? 'ai_generated' : 'discovered';
+    const sourceInfo = {
+      sourceUrl: rep.sourceUrl || undefined,
+      provider: rep.source === 'provider_record' ? 'structured_provider' : 'google_maps',
+      extractionMethod: rep.source === 'provider_record' ? 'provider' : (result.aiExtracted ? 'ai_evidence_extraction' : 'parser'),
+      metadata: {
+        reputation: true,
+        provenance: result.provenance || 'observed',
+        confidence: rep.confidence ?? 0,
+        status: rep.status ?? null,
+        evidence: rep.evidence ?? null,
+      },
+    };
+
+    if (rep.rating != null && isNewerOrMissing('ratings.rating', prov)) {
+      profile.set('ratings.rating', rep.rating, prov, rep.confidence ?? 0.7, sourceInfo);
+      merged = true;
+    }
+    if (rep.reviewCount != null && isNewerOrMissing('ratings.review_count', prov)) {
+      profile.set('ratings.review_count', rep.reviewCount, prov, rep.confidence ?? 0.7, sourceInfo);
+      merged = true;
+    }
+    if (Array.isArray(rep.reviews) && rep.reviews.length > 0) {
+      profile.set('ratings.reviews', rep.reviews, prov, rep.confidence ?? 0.6, sourceInfo);
+      merged = true;
+    }
+    if (rep.reviewSummary != null) {
+      profile.set('ratings.review_summary', rep.reviewSummary, prov, rep.confidence ?? 0.5, sourceInfo);
+      merged = true;
+    }
+    if (rep.sentiment != null) {
+      profile.set('ratings.sentiment', rep.sentiment, prov, rep.confidence ?? 0.5, sourceInfo);
+      merged = true;
+    }
+    if (Array.isArray(rep.themes) && rep.themes.length > 0) {
+      profile.set('ratings.themes', rep.themes, prov, rep.confidence ?? 0.5, sourceInfo);
+      merged = true;
+    }
+
+    return merged;
+  }
+
+  /**
    * Enrich missing profile fields without overwriting provider facts.
    */
   async _enrichMissingWithAI(profile, sourceUrl) {
@@ -1605,6 +1672,10 @@ class BusinessResearchService {
     const coordinates = profile.get('location.coordinates');
     const rating = profile.get('ratings.rating');
     const reviewCount = profile.get('ratings.review_count');
+    const reviews = profile.get('ratings.reviews') || [];
+    const reviewSummary = profile.get('ratings.review_summary') || null;
+    const sentiment = profile.get('ratings.sentiment') || null;
+    const themes = profile.get('ratings.themes') || [];
     const services = profile.get('identity.services') || [];
 
     // Get enhanced field info with provenance and conflict info
