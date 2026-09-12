@@ -233,16 +233,46 @@ const RATING_SOURCES = [
   (r) => r?.ratings?.rating,
   (r) => unwrapValue(r?.ratings?.rating),
   (r) => r?.rating,
+  (r) => r?.reputation?.rating,
+  (r) => r?.averageRating,
+  (r) => r?.googleRating,
+  (r) => r?.userRating,
+  (r) => r?.ratings?.googleRating,
+  (r) => r?.ratings?.userRating,
 ];
 const REVIEW_COUNT_SOURCES = [
   (r) => r?.ratings?.review_count,
   (r) => unwrapValue(r?.ratings?.review_count),
   (r) => r?.reviewCount,
   (r) => r?.review_count,
+  (r) => r?.reputation?.reviewCount,
+  (r) => r?.user_ratings_total,
+  (r) => r?.userRatingCount,
+  (r) => r?.ratings?.user_ratings_total,
+  (r) => r?.ratings?.userRatingCount,
+  (r) => r?.totalReviews,
+  (r) => r?.ratings?.totalReviews,
 ];
 const REVIEWS_SOURCES = [
   (r) => r?.ratings?.reviews,
   (r) => r?.reviews,
+  (r) => r?.reputation?.reviews,
+];
+const REVIEW_SUMMARY_SOURCES = [
+  (r) => r?.ratings?.review_summary,
+  (r) => r?.reviewSummary,
+  (r) => unwrapValue(r?.ratings?.review_summary),
+  (r) => r?.reputation?.reviewSummary,
+];
+const REVIEW_SENTIMENT_SOURCES = [
+  (r) => r?.ratings?.sentiment,
+  (r) => r?.sentiment,
+  (r) => r?.reputation?.sentiment,
+];
+const REVIEW_THEMES_SOURCES = [
+  (r) => r?.ratings?.themes,
+  (r) => r?.themes,
+  (r) => r?.reputation?.themes,
 ];
 
 /**
@@ -687,10 +717,25 @@ class CanonicalBusinessProfileService {
     // --- reputation ---
     const rating = firstDefined(RATING_SOURCES, source);
     const reviewCount = firstDefined(REVIEW_COUNT_SOURCES, source);
-    projection.reputation.rating = typeof rating === 'number' ? rating : rating ?? null;
+    const reviewsRaw = firstDefined(REVIEWS_SOURCES, source);
+    projection.reputation.rating = typeof rating === 'number' ? rating : (rating != null ? Number(rating) : null);
     projection.reputation.reviewCount =
       typeof reviewCount === 'number' ? reviewCount : reviewCount != null ? Number(reviewCount) : null;
-    projection.reputation.reviews = asObjectArray(firstDefined(REVIEWS_SOURCES, source));
+    const reviews = asObjectArray(reviewsRaw).map((r) => ({
+      rating: r?.rating != null ? (typeof r.rating === 'number' ? r.rating : Number(r.rating)) : null,
+      text: r?.text ?? null,
+      author: r?.author ?? r?.authorName ?? null,
+      publishedAt: r?.publishedAt ?? r?.publishTime ?? r?.relativeTimeDescription ?? null,
+      source: r?.source ?? 'google_maps',
+      sourceUrl: r?.sourceUrl ?? null,
+      provenance: r?.provenance ?? null,
+      confidence: typeof r?.confidence === 'number' ? r.confidence : null,
+      verified: Boolean(r?.verified),
+    }));
+    projection.reputation.reviews = reviews;
+    projection.reputation.reviewSummary = firstDefined(REVIEW_SUMMARY_SOURCES, source) ?? null;
+    projection.reputation.sentiment = firstDefined(REVIEW_SENTIMENT_SOURCES, source) ?? null;
+    projection.reputation.themes = asStringArray(firstDefined(REVIEW_THEMES_SOURCES, source));
 
     // --- providers (provider IDs are ALWAYS provider metadata, never identity) ---
     const persistedProviders = Array.isArray(providerIdentities)
@@ -758,6 +803,31 @@ class CanonicalBusinessProfileService {
 
   // --- enrichment (AI quarantine metadata survives; never upgraded) ---
   Object.assign(projection.enrichment, buildEnrichment(source));
+
+  // --- P1.9: reputation status/provenance (computed AFTER provenance map) ---
+  // Truthful state string derived from what actually projected. Never claims
+  // verified when the value came from AI evidence extraction; never rewrites
+  // ai_generated to a higher tier.
+  const repRatingProv = projection.provenance['ratings.rating']?.provenance ?? null;
+  const repCountProv = projection.provenance['ratings.review_count']?.provenance ?? null;
+  if (projection.reputation.rating != null || projection.reputation.reviewCount != null) {
+    const provLabel = repRatingProv || repCountProv || null;
+    projection.reputation.status =
+      provLabel === 'ai_generated'
+        ? 'ai_extracted_from_evidence'
+        : provLabel === 'identified' || provLabel === 'discovered' || provLabel === 'verified' || provLabel === 'user_provided'
+          ? 'source_extracted'
+          : 'partial';
+  } else if (projection.reputation.reviews.length > 0) {
+    projection.reputation.status = 'partial';
+  } else {
+    projection.reputation.status = 'unavailable';
+  }
+  projection.reputation.provenance = repRatingProv ?? repCountProv ?? null;
+  projection.reputation.confidence =
+    projection.confidence['ratings.rating'] ??
+    projection.confidence['ratings.review_count'] ??
+    null;
 
   // --- P1.8: fallback evidence survives projection (field-level provenance) ---
   // The source-grounded fallback extractor attaches per-field evidence
@@ -1066,7 +1136,17 @@ class CanonicalBusinessProfileService {
         pricing: null,
         bookingUrl: null,
       },
-      reputation: { rating: null, reviewCount: null, reviews: [] },
+      reputation: {
+        rating: null,
+        reviewCount: null,
+        reviews: [],
+        reviewSummary: null,
+        sentiment: null,
+        themes: [],
+        provenance: null,
+        confidence: null,
+        status: 'unavailable',
+      },
       providers: [],
       provenance: {},
       confidence: { entity: null },
@@ -1238,6 +1318,10 @@ function assignCanonicalField(projection, fieldPath, value, provenance, confiden
   // ratings
   else if (fieldPath === 'ratings.rating') projection.reputation.rating = typeof value === 'number' ? value : (value != null ? Number(value) : null);
   else if (fieldPath === 'ratings.review_count') projection.reputation.reviewCount = typeof value === 'number' ? value : (value != null ? Number(value) : null);
+  else if (fieldPath === 'ratings.reviews') projection.reputation.reviews = Array.isArray(value) ? value : [];
+  else if (fieldPath === 'ratings.review_summary') projection.reputation.reviewSummary = value ?? null;
+  else if (fieldPath === 'ratings.sentiment') projection.reputation.sentiment = value ?? null;
+  else if (fieldPath === 'ratings.themes') projection.reputation.themes = Array.isArray(value) ? value.map(String) : [];
 
   // hours / social
   else if (fieldPath === 'hours') projection.business.hours = normalizeHoursShape(value);

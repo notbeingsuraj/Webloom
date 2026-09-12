@@ -1701,6 +1701,26 @@ class BusinessResearchService {
     const ratingInfo = getFieldWithProvenance('ratings.rating');
     const reviewCountInfo = getFieldWithProvenance('ratings.review_count');
 
+    // P1.9: Aggregate reputation provenance for the intelligence shape.
+    // Surface the full reputation block alongside the flat rating/reviewCount
+    // so downstream consumers (canonical projection, routes, frontend) can
+    // distinguish structured-provider, parsed, and AI-extracted reputation data.
+    const reputationData = {
+      rating: ratingInfo.value,
+      reviewCount: reviewCountInfo.value,
+      reviews: Array.isArray(reviews) ? reviews : [],
+      reviewSummary,
+      sentiment,
+      themes,
+      provenance: ratingInfo.provenance || reviewCountInfo.provenance || null,
+      confidence: Math.max(ratingInfo.confidence || 0, reviewCountInfo.confidence || 0),
+      status: ratingInfo.value != null || reviewCountInfo.value != null
+        ? (ratingInfo.provenance === 'ai_generated' || reviewCountInfo.provenance === 'ai_generated'
+            ? 'ai_extracted_from_evidence'
+            : 'source_extracted')
+        : 'unavailable',
+    };
+
     return {
       source: {
         query: hints.query || null,
@@ -1776,8 +1796,12 @@ class BusinessResearchService {
       unknowns: this.identifyUnknownsIntelligence({ website: websiteInfo.value, phone: phoneInfo.value, email: null }),
       rating: ratingInfo.value,
       reviewCount: reviewCountInfo.value,
+      reviews,
+      reviewSummary,
+      sentiment,
+      themes,
+      reputation: reputationData,
       openingHours: profile.get('hours') || null,
-      reviews: [],
       photos: [],
       confidence: { overall: name ? 0.9 : 0 },
       validationIssues: [],
