@@ -258,6 +258,221 @@ class BusinessDataExtractor {
   }
 
   /**
+   * Direct Google Maps HTML extraction when r.jina.ai proxy fails
+   * Fetches Google Maps directly with browser-like headers and extracts
+   * business data from the initial HTML/JSON state
+   * @private
+   */
+  async extractFromDirectGoogleMapsHtml(googleMapsUrl) {
+    console.log('[BusinessDataExtractor] Fetching Google Maps directly with browser headers...');
+    try {
+      const response = await this.client.get(googleMapsUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': '1',
+        },
+        timeout: 15000,
+        validateStatus: (status) => status < 500,
+      });
+
+      const html = response.data;
+      
+      // Parse metadata from the direct HTML
+      const metadata = this.extractMetadata(html);
+      metadata.sourceUrl = googleMapsUrl;
+
+      // Extract additional data from Google Maps' embedded JSON state
+      const embeddedData = this.extractGoogleMapsEmbeddedData(html);
+      if (embeddedData) {
+        metadata.embedded = embeddedData;
+      }
+
+      // Extract phone numbers, addresses, ratings from visible text and embedded data
+      const extractedFields = this.extractFieldsFromDirectHtml(html, embeddedData);
+      metadata.extractedFields = extractedFields;
+
+      return metadata;
+    } catch (error) {
+      console.error('[BusinessDataExtractor] Direct Google Maps extraction failed:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Extract embedded JSON data from Google Maps initial state
+   * Google Maps embeds business data in window.APP_INITIALIZATION_STATE
+   * @private
+   */
+  extractGoogleMapsEmbeddedData(html) {
+    try {
+      // Look for the initialization state
+      const matches = html.match(/window\.APP_INITIALIZATION_STATE\s*=\s*(\[[\s\S]*?\]);\s*window/);
+      if (matches && matches[1]) {
+        const state = JSON.parse(matches[1]);
+        return state;
+      }
+
+      // Also check for other common patterns
+      const altMatches = html.match(/window\.APP_OPTIONS\s*=\s*({[\s\S]*?});\s*window/);
+      if (altMatches && altMatches[1]) {
+        return JSON.parse(altMatches[1]);
+      }
+
+      return null;
+    } catch (error) {
+      console.log('[BusinessDataExtractor] Could not extract embedded JSON from Google Maps');
+      return null;
+    }
+  }
+
+  /**
+   * Extract phone, address, rating, reviews from direct HTML and embedded data
+   * @private
+   */
+  extractFieldsFromDirectHtml(html, embeddedData = null) {
+    const fields = {
+      phone: null,
+      address: null,
+      city: null,
+      state: null,
+      postalCode: null,
+      country: null,
+      rating: null,
+      reviewCount: null,
+      reviews: [],
+      hours: {},
+    };
+
+    const fullText = html;
+
+    // Phone number extraction (Indian format + international)
+    const phonePatterns = [
+      /(?:\+91[\s-]?)?[6-9]\d{4}[\s-]?\d{5}/g,  // Indian mobile
+      /(?:\+91[\s-]?)?\d{3}[\s-]?\d{3}[\s-]?\d{4}/g,  // Indian landline
+      /\b\d{10}\b/g,  // Raw 10 digits
+    ];
+
+    for (const pattern of phonePatterns) {
+      const matches = fullText.match(pattern);
+      if (matches && matches.length > 0) {
+        // Take the first valid-looking phone
+        for (const match of matches) {
+          const clean = match.replace(/[\s-]/g, '');
+          if (clean.length >= 10) {
+            fields.phone = match;
+            break;
+          }
+        }
+        if (fields.phone) break;
+      }
+    }
+
+    // Address patterns - look for Indian address components
+    const addressMatch = fullText.match(/[A-Za-z\s]+,\s*[A-Za-z\s]+,\s*[A-Za-z\s]+,\s*[A-Za-z\s]+\s+\d{6}/);
+    if (addressMatch) {
+      fields.address = addressMatch[0];
+      const parts = addressMatch[0].split(',').map(p => p.trim());
+      if (parts.length >= 4) {
+        fields.city = parts[parts.length - 3];
+        fields.state = parts[parts.length - 2];
+        const pinMatch = parts[parts.length - 1].match(/\d{6}/);
+        if (pinMatch) fields.postalCode = pinMatch[0];
+      }
+    }
+
+    // Rating extraction
+    const ratingMatch = fullText.match(/(?:rating|Rating|★)\s*[:]\s*([0-9]\.[0-9])/);
+    if (!ratingMatch) {
+      // Try to find "4.1" style rating
+      const ratingPatterns = [
+        /"ratingValue"\s*:\s*"([0-9]\.[0-9])"/,
+        /"rating"\s*:\s*([0-9]\.[0-9])/,
+        /([0-9]\.[0-9])\s*out of\s*5/,
+      ];
+      for (const pattern of ratingPatterns) {
+        const match = fullText.match(pattern);
+        if (match) {
+          fields.rating = parseFloat(match[1]);
+          break;
+        }
+      }
+    } else {
+      fields.rating = parseFloat(ratingMatch[1]);
+    }
+
+    // Review count
+    const reviewCountMatch = fullText.match(/"reviewCount"\s*:\s*"([0-9,]+)"/);
+    if (!reviewCountMatch) {
+      const altPatterns = [
+        /([0-9,]+)\s*(?:reviews|ratings)/i,
+        /"review_count"\s*:\s*([0-9]+)/,
+      ];
+      for (const pattern of altPatterns) {
+        const match = fullText.match(pattern);
+        if (match) {
+          fields.reviewCount = parseInt(match[1].replace(/,/g, ''), 10);
+          break;
+        }
+      }
+    } else {
+      fields.reviewCount = parseInt(reviewCountMatch[1].replace(/,/g, ''), 10);
+    }
+
+    // Extract reviews if available in embedded data
+    if (embeddedData) {
+      try {
+        // Google Maps stores reviews in various places in the state
+        // This is a best-effort extraction
+        const stateStr = JSON.stringify(embeddedData);
+        const reviewMatches = stateStr.match(/"text"\s*:\s*"([^"]{20,500})"/g);
+        if (reviewMatches) {
+          for (const match of reviewMatches.slice(0, 10)) {
+            const textMatch = match.match(/"text"\s*:\s*"([^"]+)"/);
+            if (textMatch && textMatch[1] && textMatch[1].length > 10) {
+              fields.reviews.push({
+                text: textMatch[1].replace(/\\u003c[^>]*\\u003e/g, '').replace(/\\n/g, ' '),
+                rating: null,
+                author: null,
+                date: null,
+              });
+            }
+          }
+        }
+      } catch {
+        // Ignore review extraction errors
+      }
+    }
+
+    // Extract hours from embedded data if available
+    if (embeddedData) {
+      try {
+        const stateStr = JSON.stringify(embeddedData);
+        const hoursMatch = stateStr.match(/"openingHours"\s*:\s*({[\s\S]*?})/);
+        if (hoursMatch) {
+          const hoursData = JSON.parse(hoursMatch[1]);
+          const dayMap = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+          for (const day of dayMap) {
+            if (hoursData[day]) {
+              fields.hours[day] = hoursData[day];
+            }
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    return fields;
+  }
+
+  /**
    * Build AI extraction prompt from Google Maps page content
    */
   buildExtractionPrompt(metadata, sourceUrl) {

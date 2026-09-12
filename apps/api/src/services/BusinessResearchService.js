@@ -400,7 +400,8 @@ class BusinessResearchService {
    * @returns {Promise<Object>} { success, profile (BusinessProfile), intelligence, provider, validation }
    */
   async extractBusinessIntelligenceWithProviders(input = {}) {
-    const hints = await this._buildHints(input);
+    const { forceRefresh = false, ...restInput } = input;
+    const hints = await this._buildHints(restInput);
     const profile = new BusinessProfile();
     const providerTrace = { geoapify: null, webExtraction: null, aiEnrichment: false };
     const sourceUrl = input.googleMapsUrl || input.sourceUrl || null;
