@@ -82,8 +82,8 @@ export function isNonPhoneSignal(raw) {
   if (/^-?\d+\.\d+\s*,\s*-?\d+\.\d+$/.test(t)) return true;
   // "Plus code" (e.g. "849VVC4X+8G" or "849V VC4X+8G")
   if (/^[A-Z0-9]{4,}\+[A-Z0-9]{2,}$/i.test(t)) return true;
-  // US ZIP (5 digits or ZIP+4)
-  if (/^\d{5}(-\d{4})?$/.test(t)) return true;
+  // Postal codes: US ZIP (5 or ZIP+4), Indian PIN (6 or PIN+4), etc.
+  if (/^\d{5,6}(-\d{4})?$/.test(t)) return true;
   // Postal code with letters that isn't a phone (e.g. "M5V 2T6" — but keep
   // short alphanumeric only when < 6 chars; real phone numbers have ≥ 7 digits)
   const digits = t.replace(/\D/g, '');
@@ -127,11 +127,15 @@ export function isValidEmail(raw) {
   if (!raw || typeof raw !== 'string') return false;
   const t = raw.trim();
   if (!t) return false;
-  // Reject placeholders / obviously generated addresses.
-  if (/^(test|example|user|info|contact|hello|email|mail|name|your|someone)@/i.test(t)) {
-    return false;
+  // Reject obvious placeholders / generated addresses. Detection keys on the
+  // DOMAIN + clearly-synthetic local parts. Legitimate business prefixes such
+  // as info@ / contact@ / sales@ / hello@ with a real domain are accepted.
+  if (/(^|\s)(test|example|user|someone|yourname|your-name)@/i.test(t)) return false;
+  if (/@(example|test|localhost|invalid|yourdomain|your-domain|domain)\./i.test(t)) return false;
+  if (/@(gmail\.com|yahoo\.com|hotmail\.com)$/.test(t)) {
+    // Generic webmail with a placeholder-looking local part is still a real
+    // email if the local part is meaningful — accept. (No synthetic pattern.)
   }
-  if (/@(example|test|localhost|invalid)\./i.test(t)) return false;
   if (t.includes('..') || t.includes('@.') || t.endsWith('.') || t.startsWith('.')) return false;
   // Basic syntax.
   const match = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.exec(t);
@@ -191,6 +195,37 @@ export function validateWebsite(raw, knownOfficialDomains = []) {
     status: isDirectory && !knownDomainMatch ? 'rejected_directory' : 'valid',
     isDirectory: isDirectory && !knownDomainMatch,
   };
+}
+
+/**
+ * Record-level hard identity gate for a provider record.
+ *
+ * Returns true when the record's location (city/state/postalCode/coordinates)
+ * or provider ID conflicts with the authoritative identity. Such a record must
+ * not inject ANY field — a wrong-city or mismatched-ID record cannot supply a
+ * phone, email, website, or category either (P1.2 quarantine).
+ *
+ * @param {Object} rec - provider flat record
+ * @param {Object} authoritative - existing canonical identity signals
+ * @returns {boolean}
+ */
+function isRecordIdentityConflicting(rec, authoritative) {
+  if (!rec || !authoritative) return false;
+  const conflict = detectConflicts(
+    {
+      city: rec.location?.city,
+      state: rec.location?.state,
+      postalCode: rec.location?.postal_code ?? rec.location?.postalCode,
+      coordinates:
+        rec.location?.coordinates ??
+        (rec.location?.latitude != null && rec.location?.longitude != null
+          ? { lat: rec.location.latitude, lng: rec.location.longitude }
+          : null),
+      providerRecordId: rec.provider?.placeId ?? rec.provider?.id,
+    },
+    authoritative,
+  );
+  return conflict.conflicting;
 }
 
 /**
@@ -375,8 +410,10 @@ export function extractDeterministicFallback({
     confidence.name = 0.9;
   }
 
-  // Coordinates: exact source/provider only.
-  if (sourceIdentity?.coordinates) {
+  // Coordinates: exact source/provider only — gap-only fill (never replaces an
+  // authoritative coordinate set; /place/ URL coords pin the identity, so an
+  // already-pinned canonical profile keeps its own).
+  if (sourceIdentity?.coordinates && authoritative.coordinates == null) {
     const conflict = detectConflicts({ coordinates: sourceIdentity.coordinates }, authoritative);
     if (!conflict.conflicting) {
       fields.coordinates = sourceIdentity.coordinates;
@@ -390,7 +427,10 @@ export function extractDeterministicFallback({
   }
 
   // --- Provider record (Geoapify) ---
-  if (providerRecord) {
+  // Record-level hard identity gate: a record whose location or provider ID
+  // conflicts with the authoritative identity is rejected ENTIRELY — it must
+  // not inject address, phone, email, website, or category (P1.2 quarantine).
+  if (providerRecord && !isRecordIdentityConflicting(providerRecord, authoritative)) {
     const rec = providerRecord;
 
     // Address (full + components)
@@ -453,7 +493,7 @@ export function extractDeterministicFallback({
       const validated = validateCoordinates(recCoords);
       if (validated) {
         const conflict = detectConflicts({ coordinates: validated }, authoritative);
-        if (!conflict.conflicting && fields.coordinates == null) {
+        if (!conflict.conflicting && fields.coordinates == null && authoritative.coordinates == null) {
           fields.coordinates = validated;
           evidence.coordinates = {
             value: validated,

@@ -371,9 +371,12 @@ check('13. AI cannot replace authoritative provider IDs', () => {
       location: { coordinates: { lat: 29.9165, lng: 73.8789 } },
     },
   });
-  // Hard conflict (provider ID differs) → fallback cannot merge this record.
+  // Hard conflict (provider ID differs) → the whole record is gated out:
+  // no address, no phone, no website from a mismatched-ID record.
   assert.equal(result.fields.address, undefined);
   assert.equal(result.fields.phone, undefined);
+  assert.equal(result.fields.website, undefined);
+  assert.equal(result.fields.category, undefined);
 });
 
 /* ================================================================== *
@@ -531,17 +534,19 @@ check('26. Conflicting coordinates are rejected', () => {
   assert.ok(conflict.fields.includes('coordinates'));
 });
 
-check('27. No name-only fallback is used', () => {
+check('27. No name-only fallback is used (address/phone must stay null)', () => {
   // A provider record with ONLY a name and no identity corroboration must
-  // not produce latitude/address/phone.
+  // not produce address/phone. The /place/ URL coords ARE authoritative
+  // (P1.7) and may pin coordinates — that is the correct fill behavior.
   const result = extractDeterministicFallback({
     sourceUrl: MANAN_MAPS_URL,
     providerRecord: geoapifyNameOnly,
     existingCanonicalProfile: { identity: { name: 'Manan Furnitures' }, location: {} },
   });
-  assert.equal(result.fields.coordinates, undefined);
   assert.equal(result.fields.address, undefined);
   assert.equal(result.fields.phone, undefined);
+  // URL-derived coordinates in a /place/ URL are authoritative (P1.7):
+  assert.deepEqual(result.fields.coordinates, { lat: 29.9165, lng: 73.8789 });
 });
 
 check('28. Stale cache does not fill fields from another lead', () => {
