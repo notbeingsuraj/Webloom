@@ -297,6 +297,13 @@ class BusinessDataExtractor {
       // Extract phone numbers, addresses, ratings from visible text and embedded data
       const extractedFields = this.extractFieldsFromDirectHtml(html, embeddedData);
       metadata.extractedFields = extractedFields;
+      // Direct Maps HTML embeds the selected place name/CID in its initial
+      // state even when the visible panel is unavailable. Preserve that as
+      // source evidence rather than asking AI to infer identity.
+      const placeNameMatch = html.match(/\\[\\\"[^\\\"]+\\\",\\\"([^\\\"]{2,120})\\\",\\[/);
+      if (placeNameMatch?.[1]) {
+        extractedFields.name = placeNameMatch[1];
+      }
       // Make deterministic direct fields part of the evidence supplied to AI.
       // The model may only use these values when they are explicitly present.
       const evidenceLines = [];
@@ -861,6 +868,33 @@ Rules:
         aiExtracted = true;
 
         // Validate and clean
+        extractedProfile = this.validateProfile(extractedProfile);
+      }
+
+      // Deterministic direct-HTML fields outrank AI output and are merged only
+      // into gaps. This prevents contact/address data present in the supplied
+      // source from being lost when the AI sees a sparse Maps shell.
+      const directFields = metadata?.extractedFields;
+      if (directFields && typeof directFields === 'object') {
+        extractedProfile = extractedProfile || this.emptyExtractionProfile(googleMapsUrl, {
+          category: 'EMPTY_RESULT',
+          safeMessage: 'No AI profile was returned; direct source fields preserved.',
+          provider: 'direct_google_maps',
+          model: config.omniroute.models.reasoning,
+        });
+        extractedProfile.business = extractedProfile.business || {};
+        extractedProfile.contact = extractedProfile.contact || {};
+        extractedProfile.location = extractedProfile.location || {};
+        extractedProfile.ratings = extractedProfile.ratings || {};
+        if (!extractedProfile.business.name && directFields.name) extractedProfile.business.name = directFields.name;
+        if (!extractedProfile.contact.phone && directFields.phone) extractedProfile.contact.phone = directFields.phone;
+        if (!extractedProfile.location.full_address && directFields.address) extractedProfile.location.full_address = directFields.address;
+        if (!extractedProfile.location.city && directFields.city) extractedProfile.location.city = directFields.city;
+        if (!extractedProfile.location.state && directFields.state) extractedProfile.location.state = directFields.state;
+        if (!extractedProfile.location.postal_code && directFields.postalCode) extractedProfile.location.postal_code = directFields.postalCode;
+        if (extractedProfile.ratings.rating == null && directFields.rating != null) extractedProfile.ratings.rating = directFields.rating;
+        if (extractedProfile.ratings.review_count == null && directFields.reviewCount != null) extractedProfile.ratings.review_count = directFields.reviewCount;
+        if ((!Array.isArray(extractedProfile.reviews) || extractedProfile.reviews.length === 0) && directFields.reviews?.length) extractedProfile.reviews = directFields.reviews;
         extractedProfile = this.validateProfile(extractedProfile);
       }
       
