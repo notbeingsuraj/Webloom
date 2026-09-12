@@ -68,10 +68,20 @@ export function validateReview(review) {
   const ratingCheck = review.rating != null ? validateRating(review.rating) : null;
   const text = typeof review.text === 'string' && review.text.trim().length > 0
     ? review.text.trim() : null;
+  // Accept Google Places' authorName as author
   const author = typeof review.author === 'string' && review.author.trim().length > 0
-    ? review.author.trim() : null;
+    ? review.author.trim()
+    : (typeof review.authorName === 'string' && review.authorName.trim().length > 0
+      ? review.authorName.trim()
+      : null);
+  // Accept Google Places' relativeTimeDescription or publishTime
   const publishedAt = typeof review.publishedAt === 'string' && review.publishedAt.trim().length > 0
-    ? review.publishedAt.trim() : null;
+    ? review.publishedAt.trim()
+    : (typeof review.relativeTimeDescription === 'string' && review.relativeTimeDescription.trim().length > 0
+      ? review.relativeTimeDescription.trim()
+      : (typeof review.publishTime === 'string' && review.publishTime.trim().length > 0
+        ? review.publishTime.trim()
+        : null));
 
   // A review must have at least one meaningful field (text, rating, or author)
   if (!text && (!ratingCheck || !ratingCheck.valid) && !author) return null;

@@ -815,19 +815,17 @@ class CanonicalBusinessProfileService {
     projection.reputation.status =
       provLabel === 'ai_generated'
         ? 'ai_extracted_from_evidence'
-        : provLabel === 'identified' || provLabel === 'discovered' || provLabel === 'verified' || provLabel === 'user_provided'
-          ? 'source_extracted'
-          : 'partial';
+        : 'source_extracted';
   } else if (projection.reputation.reviews.length > 0) {
     projection.reputation.status = 'partial';
   } else {
     projection.reputation.status = 'unavailable';
   }
-  projection.reputation.provenance = repRatingProv ?? repCountProv ?? null;
+  projection.reputation.provenance = repRatingProv ?? repCountProv ?? (projection.reputation.rating != null ? 'discovered' : null);
   projection.reputation.confidence =
     projection.confidence['ratings.rating'] ??
     projection.confidence['ratings.review_count'] ??
-    null;
+    (projection.reputation.rating != null ? 0.85 : null);
 
   // --- P1.8: fallback evidence survives projection (field-level provenance) ---
   // The source-grounded fallback extractor attaches per-field evidence
