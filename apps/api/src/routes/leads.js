@@ -199,11 +199,16 @@ router.post('/', async (req, res, next) => {
       },
       // P1.5: Canonical business facts only. Analysis-specific metadata
       // (trustSignals, facts, unknowns) moves to analysis.metrics.
+      // P1.9: reputation block carries rating, reviewCount, reviews,
+      // reviewSummary, sentiment, themes, provenance, confidence, status.
       businessData: {
         rating: canonical.reputation.rating,
         reviewCount: canonical.reputation.reviewCount,
         services: canonical.business.services,
         openingHours: canonical.business.hours,
+        reputation: canonical.reputation,
+        reviews: canonical.reputation.reviews,
+        reviewSummary: canonical.reputation.reviewSummary,
       },
       analysis: {
         businessData,
@@ -486,6 +491,10 @@ router.post('/:id/brand-dna', async (req, res, next) => {
       reviewCount: canonical.reputation.reviewCount,
       services: canonical.business.services,
       openingHours: canonical.business.hours,
+      // P1.9: full reputation block survives lead refresh.
+      reputation: canonical.reputation,
+      reviews: canonical.reputation.reviews,
+      reviewSummary: canonical.reputation.reviewSummary,
     };
     lead.opportunityScore = {
       total: Math.round((audit.overallScore || 0) * 10),

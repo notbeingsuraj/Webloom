@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Globe, Mail, MapPin, Phone, Sparkles, Trash2, Star, Clock, Tag, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Globe, Mail, MapPin, Phone, Sparkles, Trash2, Clock, Tag, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react';
 import StatusBadge from '../components/ui/StatusBadge';
 import ScoreIndicator from '../components/ui/ScoreIndicator';
 import AuditRow from '../components/ui/AuditRow';
 import WebsitePreview from '../components/WebsitePreview';
+import ReputationPanel from '../components/ReputationPanel';
 import { IntentList, TriggerList, ObjectiveList, VisualDirectionPanel } from '../components/IntelligenceCards';
 import { toIntentItems, toTriggerItems, toObjectiveItems, toVisualDirectionData } from '../utils/intelligenceRenderers';
 import { resolveLeadScore } from '../utils/opportunityScore';
@@ -408,22 +409,6 @@ export default function LeadDetail() {
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Rating</p>
-                <div className="mt-3 flex items-center gap-1.5">
-                  {lead?.businessData?.rating ? (
-                    <>
-                      <Star className="h-4 w-4 text-[#F59E0B] fill-[#F59E0B]" />
-                      <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead.businessData.rating}</span>
-                      <span className="text-sm text-[#6E6E73]">/ 5</span>
-                    </>
-                  ) : <span className="text-2xl font-semibold text-[#6E6E73]">—</span>}
-                </div>
-              </div>
-              <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Reviews</p>
-                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead?.businessData?.reviewCount ?? '—'}</p>
-              </div>
-              <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
                 <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Website</p>
                 <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead?.contact?.website ? 'Present' : 'Missing'}</p>
               </div>
@@ -433,6 +418,9 @@ export default function LeadDetail() {
               </div>
             </div>
           </div>
+
+          {/* P1.9: full reputation panel (rating, review count, samples, status) */}
+          <ReputationPanel lead={lead} />
 
           {/* Brand DNA deep dive */}
           {lead?.analysis?.brandDNA && (

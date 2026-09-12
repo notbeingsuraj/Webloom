@@ -21,10 +21,45 @@ export interface Lead {
     website?: string;
   };
   businessData?: {
-    rating?: number;
-    reviewCount?: number;
+    rating?: number | null;
+    reviewCount?: number | null;
     services?: string[];
     openingHours?: unknown;
+    reviews?: Array<{
+      rating?: number | null;
+      text?: string | null;
+      author?: string | null;
+      publishedAt?: string | null;
+      source?: string;
+      sourceUrl?: string | null;
+      provenance?: string | null;
+      confidence?: number;
+      verified?: boolean;
+      evidenceSnippet?: string | null;
+    }>;
+    reviewSummary?: string | null;
+    reputation?: {
+      rating?: number | null;
+      reviewCount?: number | null;
+      reviews?: Array<{
+        rating?: number | null;
+        text?: string | null;
+        author?: string | null;
+        publishedAt?: string | null;
+        source?: string;
+        sourceUrl?: string | null;
+        provenance?: string | null;
+        confidence?: number;
+        verified?: boolean;
+      }>;
+      reviewSummary?: string | null;
+      sentiment?: { label?: string; positive?: number; negative?: number; neutral?: number } | null;
+      themes?: Array<{ theme?: string; confidence?: number; reviewCount?: number; example?: string | null } | string>;
+      provenance?: string | null;
+      confidence?: number | null;
+      status?: 'verified' | 'source_extracted' | 'ai_extracted_from_evidence' | 'partial' | 'unavailable' | 'conflicting' | null;
+      source?: string | null;
+    };
   };
   analysis?: {
     brandStrategyStatus?: string;

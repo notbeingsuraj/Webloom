@@ -183,6 +183,13 @@ router.post('/analyze', async (req, res, next) => {
           openingHours: rawIntelligence?.openingHours ?? null,
           reviews: rawIntelligence?.reviews ?? [],
           photos: rawIntelligence?.photos ?? [],
+          // P1.9: surface full reputation block (rating, reviewCount, reviews,
+          // reviewSummary, sentiment, themes, provenance, status) without
+          // exposing raw provider payloads.
+          reputation: rawIntelligence?.reputation ?? null,
+          reviewSummary: rawIntelligence?.reviewSummary ?? null,
+          sentiment: rawIntelligence?.sentiment ?? null,
+          themes: rawIntelligence?.themes ?? [],
         },
       },
     });
@@ -263,6 +270,11 @@ router.post('/research', async (req, res, next) => {
           openingHours: result.intelligence?.openingHours ?? null,
           reviews: result.intelligence?.reviews ?? [],
           photos: result.intelligence?.photos ?? [],
+          // P1.9: surface full reputation block.
+          reputation: result.intelligence?.reputation ?? null,
+          reviewSummary: result.intelligence?.reviewSummary ?? null,
+          sentiment: result.intelligence?.sentiment ?? null,
+          themes: result.intelligence?.themes ?? [],
         },
       },
     });
