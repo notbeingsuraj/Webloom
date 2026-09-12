@@ -443,7 +443,10 @@ class BusinessResearchService {
         // hints.coordinatesAuthoritative (set in _buildHints) distinguishes
         // coordinates that anchor identity from coordinates that merely bias
         // the search ranking.
-        const selectedRecord = await GeoapifyProvider.enrichRecord(best);
+        const selectedRecord = await GeoapifyProvider.enrichRecord(best, {
+          lat: hints?.latitude,
+          lng: hints?.longitude,
+        });
         const geoapifyCoords = selectedRecord?.location?.coordinates;
         const urlLat = hints?.latitude;
         const urlLng = hints?.longitude;

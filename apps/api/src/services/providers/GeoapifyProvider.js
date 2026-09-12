@@ -236,14 +236,13 @@ class GeoapifyProvider extends BusinessDataProvider {
   /**
    * Fetch extended place details (phone, website, opening_hours, categories)
    * for a given place_id via the Geoapify `/v2/place-details` endpoint.
-   *
-   * On failure this returns null so the caller can proceed with the geocode
-   * result alone — enrichment is best-effort.
+   * If the place_id is a Google CID, fall back to coordinate lookup.
    *
    * @param {string} placeId
+   * @param {Object} [fallbackCoords] - { lat, lng } for coordinate fallback
    * @returns {Promise<Object|null>} canonical profile or null
    */
-  async _fetchPlaceDetails(placeId) {
+  async _fetchPlaceDetails(placeId, fallbackCoords = null) {
     if (!placeId) return null;
     try {
       const client = this._getClient();
@@ -254,11 +253,41 @@ class GeoapifyProvider extends BusinessDataProvider {
       if (!Array.isArray(features) || features.length === 0) return null;
       return mapGeoapifyFeatureToProfile(features[0]);
     } catch (error) {
-      // Best-effort enrichment — do not fail the whole lookup on details failure
       const status = this._classifyError(error);
+      // Geoapify does not accept Google CID syntax. Use the exact URL pin to
+      // locate nearby structured records instead of accepting a wrong-city name.
+      if (error?.response?.status === 400 && placeId.startsWith('0x') && fallbackCoords) {
+        return this._fetchPlaceDetailsByCoords(fallbackCoords.lat, fallbackCoords.lng);
+      }
       if (status !== GEOAPIFY_STATUS.NO_RESULT && status !== GEOAPIFY_STATUS.TIMEOUT) {
         this._logSafe(status, error);
       }
+      return null;
+    }
+  }
+
+  /**
+   * Retrieve structured commercial records at the exact URL coordinates.
+   * @private
+   */
+  async _fetchPlaceDetailsByCoords(lat, lng) {
+    if (lat == null || lng == null) return null;
+    try {
+      const client = this._getClient();
+      const response = await client.get(config.geoapify.baseUrl, {
+        params: {
+          apiKey: config.geoapify.apiKey,
+          categories: 'commercial',
+          filter: `circle:${lng},${lat},100`,
+          bias: `proximity:${lng},${lat}`,
+          limit: 5,
+        },
+      });
+      const features = response.data?.features;
+      if (!Array.isArray(features) || features.length === 0) return null;
+      const feature = features[0];
+      return mapGeoapifyFeatureToProfile(feature);
+    } catch {
       return null;
     }
   }
@@ -352,12 +381,12 @@ class GeoapifyProvider extends BusinessDataProvider {
    * @param {Object} record - record from search()/selectBestRecord()
    * @returns {Promise<Object>} the (possibly enriched) record
    */
-  async enrichRecord(record) {
+  async enrichRecord(record, fallbackCoords = null) {
     if (!record) return record;
     try {
       const placeId = record?.provider?.placeId;
       if (!placeId) return record;
-      const details = await this._fetchPlaceDetails(placeId);
+      const details = await this._fetchPlaceDetails(placeId, fallbackCoords);
       if (details) return this._mergeDetails(record, details);
       return record;
     } catch {
