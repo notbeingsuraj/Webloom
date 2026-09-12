@@ -53,7 +53,7 @@ router.post('/', async (req, res, next) => {
       // Fall back to the direct extractor so the route still attempts a result
       // when the orchestrated path throws (it should not, but be resilient).
       console.error('[leads] Orchestrated extraction failed, falling back:', extractError?.message || String(extractError));
-      extractedData = await BusinessDataExtractor.extractFromGoogleMapsUrl(googleMapsUrl);
+      extractedData = await BusinessDataExtractor.extractFromGoogleMapsUrl(googleMapsUrl, { forceRefresh });
     }
 
     // Provider chain returned nothing usable → surface a structured
