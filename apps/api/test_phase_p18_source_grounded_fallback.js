@@ -33,16 +33,26 @@ let skipped = 0;
 const failures = [];
 
 function check(name, fn) {
-  try {
-    fn();
-    passed += 1;
-    console.log(`  \u2713 ${name}`);
-  } catch (err) {
-    failed += 1;
-    failures.push({ name, error: err });
-    console.error(`  \u2717 ${name}\n      ${err.message}`);
+  const run = async () => {
+    try {
+      await fn();
+      passed += 1;
+      console.log(`  \u2713 ${name}`);
+    } catch (err) {
+      failed += 1;
+      failures.push({ name, error: err });
+      console.error(`  \u2717 ${name}\n      ${err.message}`);
+    }
+  };
+  // Run sync tests inline; async tests are awaited.
+  if (fn.constructor.name === 'AsyncFunction') {
+    pending.push(run());
+  } else {
+    run();
   }
 }
+
+const pending = [];
 
 async function checkAsync(name, fn) {
   try {
@@ -247,7 +257,7 @@ check('5. Geoapify website missing → source evidence fills it', async () => {
       }),
     },
   });
-  assert.equal(result.fields.website, 'https://www.mananfurnitures.com');
+  assert.equal(result.fields.website, 'https://www.mananfurnitures.com/'); // normalizeWebsite adds trailing slash
   assert.equal(result.evidence.website.extractionMethod, 'ai');
 });
 
@@ -790,11 +800,13 @@ check('40. No network call when evidence is absent', async () => {
 /* ================================================================== *
  * SUMMARY
  * ================================================================== */
-console.log(`\nP1.8 source-grounded fallback: ${passed} passed, ${failed} failed, ${skipped} skipped`);
-if (failed > 0) {
-  console.error('\nFailures:');
-  for (const f of failures) {
-    console.error(`  - ${f.name}: ${f.error?.message || f.error}`);
+Promise.all(pending).then(() => {
+  console.log(`\nP1.8 source-grounded fallback: ${passed} passed, ${failed} failed, ${skipped} skipped`);
+  if (failed > 0) {
+    console.error('\nFailures:');
+    for (const f of failures) {
+      console.error(`  - ${f.name}: ${f.error?.message || f.error}`);
+    }
+    process.exit(1);
   }
-  process.exit(1);
-}
+});
