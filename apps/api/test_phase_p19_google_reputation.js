@@ -375,7 +375,7 @@ checkAsync('19. AI cannot invent review date', async () => {
 });
 
 // --- 20. AI cannot merge another business's reviews ---
-checkAsync('20. AI cannot merge another business's reviews', async () => {
+checkAsync(`20. AI cannot merge another business's reviews`, async () => {
   const ai = aiReturns({
     rating: { value: null, evidence: null, confidence: 0, status: 'missing' },
     reviewCount: { value: null, evidence: null, confidence: 0, status: 'missing' },
