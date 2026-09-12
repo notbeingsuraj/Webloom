@@ -133,34 +133,47 @@ class GoogleMapsUrlParserProvider {
   }
 
   /**
-   * Extract coordinates from URL
+   * Extract coordinates from URL.
+   *
+   * ONLY extracts the map marker/pin coordinates that identify a specific
+   * business:
+   *   - `@lat,lng` in the PATH is the map center/viewport. For a `/place/` URL
+   *     this is the business pin (authoritative). For a `/search/` URL this is
+   *     merely the search viewport (where the map is centered) — it does NOT
+   *     identify any particular business, so it is returned with
+   *     `viewport: true` and callers must never treat it as an identity anchor.
+   *   - query `lat`/`lng` or `ll=lat,lng` params are treated the same way.
+   *
    * @param {string} url - Google Maps URL
-   * @returns {Object|null} { lat, lng } or null
+   * @returns {Object|null} { lat, lng, viewport?: true } or null
    */
   static extractCoordinates(url) {
     try {
       const parsed = new URL(url);
-      
-      // Check @lat,lng,zoom format in path
+      const isSearchUrl = url.includes('/search/');
+
+      // Check @lat,lng,zoom format in path (map pin / center)
       const coordMatch = parsed.pathname.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
       if (coordMatch) {
         return {
           lat: parseFloat(coordMatch[1]),
           lng: parseFloat(coordMatch[2]),
+          ...(isSearchUrl ? { viewport: true } : {}),
         };
       }
-      
+
       // Check query params
       const lat = parsed.searchParams.get('lat') || parsed.searchParams.get('ll')?.split(',')[0];
       const lng = parsed.searchParams.get('lng') || parsed.searchParams.get('ll')?.split(',')[1];
-      
+
       if (lat && lng) {
         return {
           lat: parseFloat(lat),
           lng: parseFloat(lng),
+          ...(isSearchUrl ? { viewport: true } : {}),
         };
       }
-      
+
       return null;
     } catch {
       return null;
