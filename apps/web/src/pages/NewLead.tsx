@@ -100,12 +100,15 @@ export default function NewLead() {
     };
   }, [createLeadMutation.isPending, startTime, elapsedTime]);
 
-  // Request timeout
+  // Long-running analysis warning.
+  // Do NOT reset/cancel the mutation at 90 seconds: the API may still be
+  // finishing valid work (provider fetches + optional enrichment). Resetting
+  // previously orphaned that request, made the first run appear wasted, and
+  // encouraged users to paste the same URL again.
   useEffect(() => {
     if (createLeadMutation.isPending) {
       timeoutTimerRef.current = setTimeout(() => {
-        // Force mutation to abort via error state
-        createLeadMutation.reset();
+        setElapsedTime((current) => Math.max(current, Math.ceil(REQUEST_TIMEOUT_MS / 1000)));
       }, REQUEST_TIMEOUT_MS);
     }
     return () => {
@@ -131,6 +134,10 @@ export default function NewLead() {
     setElapsedTime(0);
     createLeadMutation.mutate({
       googleMapsUrl: trimmed,
+      // A submit always requests a current acquisition. This bypasses stale
+      // source-cache entries, so retrying an analysis does not repeat an old
+      // empty response from Google Maps.
+      forceRefresh: true,
       ...formData,
     });
   };

@@ -103,20 +103,11 @@ class WebExtractionProvider extends BusinessDataProvider {
         });
       }
 
-      // BusinessDataExtractor returns the flattened canonical profile
-      // (toObject shape) with a metadata block — wrap in a single record.
-      const record = { ...result };
-      // Normalize coord fields into location.coordinates if present as lat/lng
-      if (record.location && record.location.latitude != null && record.location.longitude != null && !record.location.coordinates) {
-        record.location.coordinates = {
-          lat: record.location.latitude,
-          lng: record.location.longitude,
-        };
-      }
-      if (record.location && record.location.coordinates && record.location.latitude == null) {
-        record.location.latitude = record.location.coordinates.lat;
-        record.location.longitude = record.location.coordinates.lng;
-      }
+      // BusinessDataExtractor returns BusinessProfile.toObject() dot paths.
+      // Convert them at this provider boundary: every downstream consumer uses
+      // nested canonical records and otherwise silently misses phone/address/
+      // ratings/reviews even though the extractor recovered them.
+      const record = this._inflateFlatProfile(result);
       record.source = 'web_extraction';
       record.retrieval = new Date().toISOString();
 
@@ -168,13 +159,70 @@ class WebExtractionProvider extends BusinessDataProvider {
   }
 
   /**
+   * Inflate BusinessDataExtractor's flat dot-path profile into the nested
+   * canonical shape expected by the rest of the pipeline (BusinessProfile,
+   * CanonicalBusinessProfileService, routes/leads.js, routes/business.js).
+   * The extractor returns flat dot-paths like 'contact.phone',
+   * 'ratings.rating', 'ratings.reviews'; consumers expect nested objects.
+   */
+  _inflateFlatProfile(flat) {
+    const record = {
+      business: {},
+      contact: {},
+      location: {},
+      ratings: {},
+      hours: flat?.hours || {},
+      social_links: flat?.social_links || [],
+      metadata: flat?.metadata || {},
+    };
+
+    // Copy both supported nested fields and BusinessProfile.toObject() dot paths.
+    const setPath = (path, value) => {
+      if (value === undefined) return;
+      const keys = path.split('.');
+      let target = record;
+      for (let index = 0; index < keys.length - 1; index += 1) {
+        const key = keys[index];
+        if (!target[key] || typeof target[key] !== 'object') target[key] = {};
+        target = target[key];
+      }
+      target[keys[keys.length - 1]] = value;
+    };
+    for (const [path, value] of Object.entries(flat || {})) {
+      if (path.startsWith('identity.')) {
+        const businessPath = `business.${path.slice('identity.'.length)}`;
+        setPath(businessPath, value);
+      } else if (path.startsWith('contact.') || path.startsWith('location.') || path.startsWith('ratings.')) {
+        setPath(path, value);
+      }
+    }
+
+    // Preserve already nested data if a caller provided it.
+    for (const key of ['business', 'contact', 'location', 'ratings']) {
+      if (flat?.[key] && typeof flat[key] === 'object') {
+        record[key] = { ...record[key], ...flat[key] };
+      }
+    }
+
+    if (record.location.latitude != null && record.location.longitude != null && !record.location.coordinates) {
+      record.location.coordinates = {
+        lat: record.location.latitude,
+        lng: record.location.longitude,
+      };
+    }
+    if (!Array.isArray(record.ratings.reviews)) record.ratings.reviews = [];
+
+    return record;
+  }
+
+  /**
    * Extract identity-critical flat fields from a canonical record.
    * @param {Object} record - canonical flat profile shape
    * @returns {Object} dot-path field map
    */
   _flattenIdentityFields(record) {
     const fields = {};
-    if (record.identity?.name) fields['identity.name'] = record.identity.name;
+    if (record.business?.name) fields['identity.name'] = record.business.name;
     if (record.contact?.phone) fields['contact.phone'] = record.contact.phone;
     if (record.contact?.website) fields['contact.website'] = record.contact.website;
     if (record.location?.full_address) fields['location.full_address'] = record.location.full_address;
