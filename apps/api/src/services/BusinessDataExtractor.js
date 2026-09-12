@@ -300,7 +300,8 @@ class BusinessDataExtractor {
       // Direct Maps HTML embeds the selected place name/CID in its initial
       // state even when the visible panel is unavailable. Preserve that as
       // source evidence rather than asking AI to infer identity.
-      const placeNameMatch = html.match(/\\[\\\"[^\\\"]+\\\",\\\"([^\\\"]{2,120})\\\",\\[/);
+      // Google Maps embeds: ["<cid>","<place name>",[...]]
+      const placeNameMatch = html.match(new RegExp('\\[\"[^\"]+\",\"([^\"]{2,120})\",\\['));
       if (placeNameMatch?.[1]) {
         extractedFields.name = placeNameMatch[1];
       }
@@ -876,12 +877,25 @@ Rules:
       // source from being lost when the AI sees a sparse Maps shell.
       const directFields = metadata?.extractedFields;
       if (directFields && typeof directFields === 'object') {
-        extractedProfile = extractedProfile || this.emptyExtractionProfile(googleMapsUrl, {
-          category: 'EMPTY_RESULT',
-          safeMessage: 'No AI profile was returned; direct source fields preserved.',
-          provider: 'direct_google_maps',
-          model: config.omniroute.models.reasoning,
-        });
+        // The direct metadata path can be the only usable source. Do not use
+        // emptyExtractionProfile here because it marks the result as a
+        // provider failure and discards the deterministic source fields.
+        extractedProfile = extractedProfile || {
+          business: { name: null, category: null, categories: [], description: null, business_type: null },
+          contact: { phone: null, email: null, website: null },
+          location: { full_address: null, street: null, city: null, state: null, country: null, postal_code: null, latitude: null, longitude: null },
+          ratings: { rating: null, review_count: null },
+          hours: {},
+          reviews: [],
+          services: [],
+          products: [],
+          amenities: [],
+          social_links: [],
+          pricing: null,
+          booking_url: null,
+          source_urls: [googleMapsUrl],
+          confidence: { overall: 0, name: 0, category: 0, phone: 0, website: 0, address: 0, rating: 0 },
+        };
         extractedProfile.business = extractedProfile.business || {};
         extractedProfile.contact = extractedProfile.contact || {};
         extractedProfile.location = extractedProfile.location || {};
@@ -1127,7 +1141,17 @@ Rules:
     const hasStructured = (metadata?.jsonLd?.length || 0) > 0
       || Object.keys(metadata?.microdata || {}).length > 0
       || Object.keys(metadata?.openGraph || {}).length > 0;
-    if (!hasStructured && (!metadata?.visibleText || metadata.visibleText.trim().length < 100)) {
+    // Also consider deterministic direct-HTML fields as valid evidence
+    const hasDirectFields = metadata?.extractedFields && (
+      metadata.extractedFields.phone ||
+      metadata.extractedFields.address ||
+      metadata.extractedFields.city ||
+      metadata.extractedFields.rating != null ||
+      metadata.extractedFields.reviewCount != null ||
+      metadata.extractedFields.reviews?.length ||
+      metadata.extractedFields.name
+    );
+    if (!hasStructured && !hasDirectFields && (!metadata?.visibleText || metadata.visibleText.trim().length < 100)) {
       return true;
     }
     return false;
