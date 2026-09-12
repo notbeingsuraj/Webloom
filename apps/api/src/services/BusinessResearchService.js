@@ -670,14 +670,14 @@ class BusinessResearchService {
     // reputation ONLY from actual evidence: structured provider record first,
     // then deterministic source-text parsing, then evidence-grounded AI.
     // AI NEVER guesses a rating or estimates a review count.
+    // NOTE: sourceText from LEVEL 3.5 is block-scoped; re-derive here from
+    // webRecord metadata or a fresh fetch, never double-fetch when possible.
     {
       const { extractReputation } = await import('./GoogleMapsReputationExtractor.js');
       const providerRecordForReputation = geoapifyRecord || webRecord || null;
 
-      // Reuse the same evidence sourceText fetched for the P1.8 fallback (never
-      // double-fetch when web extraction already retrieved visible text).
       let reputationSourceText = webRecord?.metadata?.sourceText || null;
-      if (!reputationSourceText && sourceUrl && !sourceText) {
+      if (!reputationSourceText && sourceUrl) {
         try {
           const { default: extractor } = await import('./BusinessDataExtractor.js');
           const pageData = await extractor.fetchPage(sourceUrl);
@@ -691,8 +691,6 @@ class BusinessResearchService {
         } catch {
           reputationSourceText = null;
         }
-      } else {
-        reputationSourceText = sourceText || reputationSourceText;
       }
 
       const repResult = await extractReputation({
