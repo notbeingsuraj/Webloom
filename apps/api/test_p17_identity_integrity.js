@@ -172,8 +172,10 @@ check('extractDeterministicHints forwards coordinates from input', () => {
  * ================================================================== */
 console.log('\n[4] Geoapify Coordinate-Anchor Rejection');
 
-check('selectBestRecord rejects candidates > 0.35° from URL coordinates', () => {
-  // Simulate Geoapify returning the wrong "Manan" at Tarn Taran (165 km away)
+check('selectBestRecord rejects candidates > 0.35° when coordinates are authoritative', () => {
+  // Simulate Geoapify returning the wrong "Manan" at Tarn Taran (165 km away).
+  // Explicit operator coordinates are authoritative anchors, so the far
+  // candidate must be rejected outright.
   const wrongResult = {
     records: [
       {
@@ -189,14 +191,14 @@ check('selectBestRecord rejects candidates > 0.35° from URL coordinates', () =>
       },
     ],
   };
-  const hints = { latitude: 29.912783, longitude: 73.881746 };
+  const hints = { latitude: 29.912783, longitude: 73.881746, coordinatesAuthoritative: true };
   const best = GeoapifyProvider.selectBestRecord(wrongResult, hints);
   // With P1.7 fix, this should be rejected (return null) because the candidate
-  // is > 0.35° from the URL coordinates
-  assert.strictEqual(best, null, 'Tarn Taran candidate should be rejected when URL has Sri Ganganagar coordinates');
+  // is > 0.35° from the authoritative coordinates
+  assert.strictEqual(best, null, 'Tarn Taran candidate should be rejected when authoritative coordinates are Sri Ganganagar');
 });
 
-check('selectBestRecord accepts candidates within 0.35° of URL coordinates', () => {
+check('selectBestRecord accepts candidates within 0.35° of authoritative coordinates', () => {
   const nearbyResult = {
     records: [
       {
@@ -212,15 +214,16 @@ check('selectBestRecord accepts candidates within 0.35° of URL coordinates', ()
       },
     ],
   };
-  const hints = { latitude: 29.912783, longitude: 73.881746 };
+  const hints = { latitude: 29.912783, longitude: 73.881746, coordinatesAuthoritative: true };
   const best = GeoapifyProvider.selectBestRecord(nearbyResult, hints);
   assert.ok(best, 'Nearby candidate should be accepted');
   assert.strictEqual(best.business.name, 'Manan Furnitures');
 });
 
-check('selectBestRecord falls back to all candidates when none are within threshold', () => {
-  // When no candidates are within the distance threshold, selectBestRecord
-  // should return the first (best-ranked) candidate rather than null.
+check('selectBestRecord returns null (no fallback) when authoritative coords have no near candidate', () => {
+  // When NO candidate is within the threshold and coordinates are
+  // authoritative, selectBestRecord must return null rather than silently
+  // falling back to a far-away business.
   const farResult = {
     records: [
       {
@@ -239,13 +242,42 @@ check('selectBestRecord falls back to all candidates when none are within thresh
       },
     ],
   };
-  const hints = { latitude: 29.912783, longitude: 73.881746 };
+  const hints = { latitude: 29.912783, longitude: 73.881746, coordinatesAuthoritative: true };
   const best = GeoapifyProvider.selectBestRecord(farResult, hints);
-  // Should return a result (the closest one), not null
-  assert.ok(best, 'Fallback should return the closest candidate when none are within threshold');
+  // Authoritative coordinates never fall back to far candidates
+  assert.strictEqual(best, null, 'Should return null, not a far candidate, when authoritative coords have no near match');
 });
 
-check('selectBestRecord without URL coordinates just picks closest', () => {
+check('selectBestRecord viewport coords (not authoritative) only bias, never reject', () => {
+  // A /search/ URL's viewport center is NOT an authoritative anchor — it only
+  // biases ranking. Even with far candidates, the closest one must be returned.
+  const farResult = {
+    records: [
+      {
+        business: { name: 'Manan' },
+        location: {
+          coordinates: { lat: 31.515746, lng: 74.811488 },
+        },
+        provider: { placeId: 'test-far-1' },
+      },
+      {
+        business: { name: 'Manan' },
+        location: {
+          coordinates: { lat: 31.280454, lng: 75.392824 },
+        },
+        provider: { placeId: 'test-far-2' },
+      },
+    ],
+  };
+  // No coordinatesAuthoritative flag → proximity bias only, never rejection
+  const hints = { latitude: 29.912783, longitude: 73.881746 };
+  const best = GeoapifyProvider.selectBestRecord(farResult, hints);
+  assert.ok(best, 'Viewport coords must only bias ranking, never reject candidates');
+  // The closest candidate (test-far-1, 31.52/74.81) should be picked
+  assert.strictEqual(best.provider.placeId, 'test-far-1', 'Should rank by distance to viewport center');
+});
+
+check('selectBestRecord without coordinates just picks top-ranked candidate', () => {
   const result = {
     records: [
       {
@@ -258,9 +290,8 @@ check('selectBestRecord without URL coordinates just picks closest', () => {
       },
     ],
   };
-  const hints = { latitude: 30.1, longitude: 74.1 };
-  const best = GeoapifyProvider.selectBestRecord(result, hints);
-  assert.strictEqual(best.business.name, 'Business A', 'Should pick closest to hints coordinates');
+  const best = GeoapifyProvider.selectBestRecord(result, {});
+  assert.strictEqual(best.business.name, 'Business A', 'Should pick the top-ranked candidate');
 });
 
 /* ================================================================== *
@@ -298,9 +329,12 @@ check('Entity resolution: Manan Furnitures vs Manan Tarn Taran → different_ent
   const result = calculateMatchScore(ganaganagar, tarnTaran);
   assert.ok(result.score < 0.85, `Expected score < 0.85, got ${result.score}`);
   assert.notStrictEqual(result.matchType, 'same_entity', 'Must not be same_entity');
-  // Should have name contradiction (Manan Furnitures vs Manan)
-  const nameContradiction = result.contradictions.some(c => c.field === 'name');
-  assert.ok(nameContradiction, 'Should detect name contradiction');
+  // Name refinement: "Manan Furnitures" vs "Manan" scores 0.8625 fuzzy
+  // similarity, which is ≥ 0.8 → a `name_fuzzy` POSITIVE signal, NOT a name
+  // contradiction (contradictions only fire below 0.3 similarity). The
+  // different-entity verdict comes from the address/coordinate contradiction.
+  assert.ok(result.signals.name_fuzzy, 'Should produce a name_fuzzy signal (0.8625 similarity)');
+  assert.ok(!result.contradictions.some(c => c.field === 'name'), 'Substring names must NOT be a name contradiction');
   // Should have address contradiction (different cities/states)
   const addressContradiction = result.contradictions.some(c => c.field === 'address');
   assert.ok(addressContradiction, 'Should detect address contradiction (different cities)');
@@ -573,11 +607,14 @@ check('Manan Furnitures and Manan (Tarn Taran) are NOT the same entity', () => {
   const result = calculateMatchScore(ganaganagar, tarnTaran);
   assert.ok(result.score < 0.85, `Score ${result.score} should be < 0.85 for different businesses`);
   assert.ok(result.matchType !== 'same_entity', `Match type ${result.matchType} must not be same_entity`);
-  // Should have contradictions
+  // Should have contradictions (address — different cities/states)
   assert.ok(result.contradictions.length > 0, 'Should detect contradictions');
-  // Specifically: name and address contradictions
   const contradictionFields = result.contradictions.map(c => c.field);
-  assert.ok(contradictionFields.includes('name'), 'Should have name contradiction');
+  // Name refinement: "Manan Furnitures" vs "Manan" → 0.8625 fuzzy similarity
+  // (≥ 0.8) is a name_fuzzy signal, not a name contradiction. Expect the
+  // address contradiction to carry the different-entity verdict.
+  assert.ok(!contradictionFields.includes('name'), 'Substring name should be name_fuzzy, not a name contradiction');
+  assert.ok(result.signals.name_fuzzy, 'Should produce name_fuzzy signal');
   assert.ok(contradictionFields.includes('address'), 'Should have address contradiction');
 });
 

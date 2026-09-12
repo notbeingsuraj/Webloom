@@ -631,10 +631,14 @@ Rules:
     } catch (error) {
       console.error('[BusinessDataExtractor] Extraction failed:', error.message);
       // Return minimal profile with just identified info
+      // P1.7: viewport coordinates from a /search/ URL only describe where the
+      // map was centered — they are NOT a pin for this business. Never carry
+      // them into the canonical profile.
+      const coords = identified.coordinates && !identified.coordinates.viewport ? identified.coordinates : null;
       extractedProfile = {
         business: { name: identified.placeName, category: null, categories: [], description: null, business_type: null },
         contact: { phone: null, email: null, website: null },
-        location: { full_address: null, street: null, city: null, state: null, country: null, postal_code: null, latitude: identified.coordinates?.lat ?? null, longitude: identified.coordinates?.lng ?? null },
+        location: { full_address: null, street: null, city: null, state: null, country: null, postal_code: null, latitude: coords?.lat ?? null, longitude: coords?.lng ?? null },
         ratings: { rating: null, review_count: null },
         hours: {},
         reviews: [],
@@ -657,7 +661,11 @@ Rules:
     if (identified.placeName) {
       profile.set('identity.name', identified.placeName, 'identified', 0.6, { sourceUrl: googleMapsUrl });
     }
-    if (identified.coordinates) {
+    // P1.7: Only coordinates that pin a specific business (a /place/ URL's
+    // @lat,lng or explicit operator coords) become identified location data.
+    // Viewport coordinates from a /search/ URL mark the map center and must
+    // never be written to the profile as the business location.
+    if (identified.coordinates && !identified.coordinates.viewport) {
       profile.set('location.coordinates', identified.coordinates, 'identified', 0.8, { sourceUrl: googleMapsUrl });
     }
 

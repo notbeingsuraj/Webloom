@@ -48,6 +48,11 @@ const TRACKING_PARAM_EXACT = new Set([
   's_cid',
   'ml_subscriber',
   'ml_subscriber_hash',
+  // Google Maps session/tracking parameters. `entry` and `g_ep` carry Google
+  // Maps share/session state (e.g. which entry point opened the map) — they
+  // identify the traffic, not the source, and must never affect cache keys.
+  'entry',
+  'g_ep',
 ]);
 
 function isTrackingParam(name) {
