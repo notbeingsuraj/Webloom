@@ -51,10 +51,42 @@ router.post('/analyze', async (req, res, next) => {
     const rawIntelligence = result.intelligence;
 
     // Provider chain returned nothing usable → 503 provider_unavailable
-    const nothingUsable =
-      result.provider?.geoapify &&
-      result.provider?.geoapify !== 'ok' &&
-      (!rawIntelligence?.contact?.phone && !rawIntelligence?.contact?.website && !rawIntelligence?.location?.address);
+    //
+    // IMPORTANT: 503 must be reserved for GENUINE provider outages — not for a
+    // successful Geoapify search that simply found no nearby candidate. Under
+    // P1.7, selectBestRecord() may legitimately reject every candidate (all
+    // farther than 0.35° from the URL's authoritative coordinates), leaving the
+    // geoapify trace as the raw 'success' status while producing zero enriched
+    // fields. The URL itself is still deterministic evidence: a /place/ URL
+    // carries the business name and authoritative coordinates, which is usable
+    // even when enrichment providers yield nothing.
+    const PROVIDER_DOWN_STATUSES = new Set([
+      'not_configured',
+      'provider_unavailable',
+      'authentication_failed',
+      'auth_failed',
+      'rate_limited',
+      'quota_exhausted',
+      'timeout',
+      'network_error',
+      'internal_failure',
+    ]);
+    const geoStatus = result.provider?.geoapify;
+    const providerDown = geoStatus && PROVIDER_DOWN_STATUSES.has(geoStatus);
+
+    // Deterministic identity carried by the /place/ URL itself (name + coords).
+    const hasUrlIdentity =
+      !!rawIntelligence?.identity?.name &&
+      rawIntelligence?.location?.coordinates?.lat != null &&
+      rawIntelligence?.location?.coordinates?.lng != null;
+
+    const hasProviderEvidence = !!(
+      rawIntelligence?.contact?.phone ||
+      rawIntelligence?.contact?.website ||
+      rawIntelligence?.location?.address
+    );
+
+    const nothingUsable = providerDown && !hasUrlIdentity && !hasProviderEvidence;
 
     if (nothingUsable) {
       const providerError = {

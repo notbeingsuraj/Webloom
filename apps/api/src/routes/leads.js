@@ -63,11 +63,42 @@ router.post('/', async (req, res, next) => {
 
     // Provider chain returned nothing usable → surface a structured
     // provider-unavailable result instead of persisting an empty lead.
-    const nothingUsable =
-      extractionTrace &&
-      extractionTrace.geoapify &&
-      extractionTrace.geoapify !== 'ok' &&
-      (!extractedData?.contact?.phone && !extractedData?.contact?.website && !extractedData?.location?.address);
+    //
+    // IMPORTANT: 503 must be reserved for GENUINE provider outages — not for a
+    // successful Geoapify search that simply found no nearby candidate. Under
+    // P1.7, selectBestRecord() may legitimately reject every candidate (all
+    // farther than 0.35° from the URL's authoritative coordinates), leaving the
+    // geoapify trace as the raw 'success' status while producing zero enriched
+    // fields. The URL itself is still deterministic evidence: a /place/ URL
+    // carries the business name and authoritative coordinates, which is a
+    // usable lead even when enrichment providers yield nothing.
+    const PROVIDER_DOWN_STATUSES = new Set([
+      'not_configured',
+      'provider_unavailable',
+      'authentication_failed',
+      'auth_failed',
+      'rate_limited',
+      'quota_exhausted',
+      'timeout',
+      'network_error',
+      'internal_failure',
+    ]);
+    const geoStatus = extractionTrace?.geoapify;
+    const providerDown = geoStatus && PROVIDER_DOWN_STATUSES.has(geoStatus);
+
+    // Deterministic identity carried by the /place/ URL itself (name + coords).
+    const hasUrlIdentity =
+      !!extractedData?.identity?.name &&
+      extractedData?.location?.coordinates?.lat != null &&
+      extractedData?.location?.coordinates?.lng != null;
+
+    const hasProviderEvidence = !!(
+      extractedData?.contact?.phone ||
+      extractedData?.contact?.website ||
+      extractedData?.location?.address
+    );
+
+    const nothingUsable = providerDown && !hasUrlIdentity && !hasProviderEvidence;
 
     if (nothingUsable) {
       return res.status(503).json({
