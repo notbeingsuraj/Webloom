@@ -9,6 +9,7 @@
 import BusinessProfile from './BusinessProfile.js';
 import GeoapifyProvider from './providers/GeoapifyProvider.js';
 import WebExtractionProvider from './providers/WebExtractionProvider.js';
+import GoogleMapsUrlParserProvider from './GoogleMapsUrlParserProvider.js';
 import { extractDeterministicHints } from './providers/ProviderAdapter.js';
 import { validateBusinessProfile, sanitizeFieldValue } from './BusinessProfileValidator.js';
 import { config } from '../config/env.js';
@@ -539,6 +540,127 @@ class BusinessResearchService {
           webResult.status === 'success' ? 'no_evidence' : webResult.status;
         providerTrace.webExtractionError = webResult.error || null;
         providerTrace.webExtractionDiagnostics = webResult.diagnostics || null;
+      }
+    }
+
+    // --- LEVEL 3.5: P1.8 source-grounded Google Maps fallback ---
+    // When Geoapify omits fields (address/phone/email/website) that the
+    // supplied Google Maps source actually contains, recover them from the
+    // source before any AI enrichment. Deterministic first (URL parser +
+    // provider record), then evidence-grounded AI extraction ONLY when the
+    // retrieved page text contains the missing field.
+    {
+      const { extractFallbackFields, extractGoogleMapsSourceIdentity } = await import('./GoogleMapsFallbackExtractor.js');
+      const parsedSource = sourceUrl
+        ? (() => { try { return GoogleMapsUrlParserProvider.parse(sourceUrl); } catch { return null; } })()
+        : null;
+
+      // Structured source evidence available without any fetch:
+      //   - exact Google Maps source identity (placeId, coordinates)
+      //   - best provider record (Geoapify) for fields Geoapify returned
+      //   - retrieved page text when web extraction visited a Google Maps page
+      const sourceEvidences = [];
+      if (parsedSource) sourceEvidences.push(parsedSource);
+      const providerRecordForFallback = geoapifyRecord || webRecord || null;
+
+      // Fetch the source text ONLY when we have a URL and fields are still
+      // missing. If web extraction already retrieved visible text, reuse it —
+      // never double-fetch.
+      let sourceText = webRecord?.metadata?.sourceText || null;
+      if (!sourceText && sourceUrl && this._hasGaps(profile)) {
+        try {
+          const { default: extractor } = await import('./BusinessDataExtractor.js');
+          const pageData = await extractor.fetchPage(sourceUrl);
+          sourceText = (pageData.html || '').replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 6000);
+        } catch {
+          sourceText = null;
+        }
+      }
+
+      if (sourceUrl || parsedSource || providerRecordForFallback || sourceText) {
+        const fallbackResult = await extractFallbackFields({
+          sourceUrl,
+          sourceType: 'google_maps_url',
+          sourceText,
+          parsedSource: parsedSource || null,
+          providerRecord: providerRecordForFallback,
+          existingCanonicalProfile: profile.toObject(),
+        });
+
+        // Merge recovered fields with FIELD-LEVEL provenance (P1.8 §12).
+        // Never upgrade AI-generated values: their provenance stays
+        // ai_generated even though they were recovered by the fallback. The
+        // `onlyIfMissing` guard preserves higher-tier fields (identified/
+        // discovered) — the fallback only fills genuine gaps.
+        const mergeFallbackField = (fieldPath, value, evidenceMeta) => {
+          if (value == null) return;
+          if (profile.get(fieldPath) != null) return; // authoritative wins
+          const prov = evidenceMeta?.provenance === 'ai_generated' ? 'ai_generated' : 'discovered';
+          const conf = evidenceMeta?.confidence ?? 0.75;
+          const sourceInfo = {
+            sourceUrl: evidenceMeta?.sourceUrl || sourceUrl || undefined,
+            provider: 'google_maps_fallback',
+            extractionMethod: evidenceMeta?.extractionMethod || 'provider',
+            metadata: {
+              fallback: true,
+              sourceType: evidenceMeta?.sourceType || 'google_maps_url',
+              evidenceSnippet: evidenceMeta?.evidenceSnippet || null,
+            },
+          };
+          try {
+            profile.set(fieldPath, value, prov, conf, sourceInfo);
+          } catch (err) {
+            console.error(`[P1.8] Fallback merge failed for ${fieldPath} (best-effort): ${err?.message || String(err)}`);
+          }
+        };
+
+        const ev = fallbackResult.evidence || {};
+        if (fallbackResult.fields.address) {
+          mergeFallbackField('location.full_address', fallbackResult.fields.address, ev.address);
+          const comp = fallbackResult.fields.addressComponents;
+          if (comp?.street) mergeFallbackField('location.street', comp.street, ev.address);
+          if (comp?.city) mergeFallbackField('location.city', comp.city, ev.address);
+          if (comp?.state) mergeFallbackField('location.state', comp.state, ev.address);
+          if (comp?.postalCode) mergeFallbackField('location.postal_code', comp.postalCode, ev.address);
+          if (comp?.country) mergeFallbackField('location.country', comp.country, ev.address);
+        }
+        if (fallbackResult.fields.phone) {
+          mergeFallbackField('contact.phone', fallbackResult.fields.phone, ev.phone);
+        }
+        if (fallbackResult.fields.email) {
+          mergeFallbackField('contact.email', fallbackResult.fields.email, ev.email);
+        }
+        if (fallbackResult.fields.website) {
+          mergeFallbackField('contact.website', fallbackResult.fields.website, ev.website);
+        }
+        if (fallbackResult.fields.coordinates) {
+          mergeFallbackField('location.coordinates', fallbackResult.fields.coordinates, ev.coordinates);
+        }
+        if (fallbackResult.fields.name && !profile.get('identity.name')) {
+          mergeFallbackField('identity.name', fallbackResult.fields.name, ev.name);
+        }
+        if (fallbackResult.fields.category && !profile.get('identity.category')) {
+          mergeFallbackField('identity.category', fallbackResult.fields.category, ev.category);
+        }
+
+        // Surface fallback provenance for observability and canonicalization.
+        if (fallbackResult.evidence && Object.keys(fallbackResult.evidence).length > 0) {
+          profile.fallbackEvidence = profile.fallbackEvidence || {};
+          Object.assign(profile.fallbackEvidence, fallbackResult.evidence);
+        }
+        providerTrace.fallback = {
+          status: fallbackResult.aiExtracted ? 'ai_extraction' : (Object.keys(fallbackResult.fields).length ? 'deterministic' : 'no_evidence'),
+          recoveredFields: Object.keys(fallbackResult.fields),
+          aiExtracted: fallbackResult.aiExtracted,
+          unresolvedFields: fallbackResult.unresolvedFields || [],
+          source: sourceUrl || null,
+        };
       }
     }
 

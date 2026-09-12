@@ -331,12 +331,17 @@ export function extractDeterministicFallback({
 
   const existing = existingCanonicalProfile || null;
   const authoritative = {
+    name: existing?.identity?.name ?? existing?.business?.name ?? null,
+    address: existing?.location?.full_address ?? existing?.identity?.address ?? existing?.location?.address ?? null,
     city: existing?.location?.city ?? existing?.location?.addressComponents?.city ?? null,
     state: existing?.location?.state ?? existing?.location?.addressComponents?.state ?? null,
-    postalCode: existing?.location?.postalCode ?? existing?.location?.addressComponents?.postalCode ?? null,
+    postalCode: existing?.location?.postal_code ?? existing?.location?.postalCode ?? existing?.location?.addressComponents?.postalCode ?? null,
     coordinates: existing?.location?.coordinates ?? existing?.identity?.coordinates ?? null,
     providerRecordId: existing?.providers?.[0]?.providerRecordId ?? null,
     phone: existing?.contact?.phone ?? existing?.identity?.phone ?? null,
+    email: existing?.contact?.email ?? existing?.business?.email ?? null,
+    website: existing?.contact?.website ?? existing?.identity?.website ?? null,
+    category: existing?.identity?.category ?? existing?.business?.category ?? null,
   };
 
   // --- Exact Google Maps source identity (URL parser) ---
@@ -364,7 +369,7 @@ export function extractDeterministicFallback({
   };
 
   // Name: exact source/provider identity only.
-  if (sourceIdentity?.placeName && existing?.identity?.name == null) {
+  if (sourceIdentity?.placeName && authoritative.name == null) {
     fields.name = sourceIdentity.placeName;
     evidence.name = { value: sourceIdentity.placeName, ...sourceEvidence, extractionMethod: 'parser' };
     confidence.name = 0.9;
@@ -390,7 +395,7 @@ export function extractDeterministicFallback({
 
     // Address (full + components)
     const providerAddress = rec.location?.full_address || rec.location?.address || null;
-    if (providerAddress && (existing?.identity?.address == null || existing?.location?.address == null)) {
+    if (providerAddress && authoritative.address == null) {
       const conflict = detectConflicts(
         {
           city: rec.location?.city,
@@ -467,7 +472,7 @@ export function extractDeterministicFallback({
 
     // Phone (exact provider record).
     const recPhone = rec.contact?.phone || null;
-    if (recPhone && existing?.contact?.phone == null && existing?.identity?.phone == null) {
+    if (recPhone && authoritative.phone == null) {
       const phoneCheck = validatePhone(recPhone, rec.location?.country);
       if (phoneCheck.status === 'valid') {
         const conflict = detectConflicts({ phone: phoneCheck.value }, authoritative);
@@ -491,7 +496,7 @@ export function extractDeterministicFallback({
 
     // Email (exact provider record).
     const recEmail = rec.contact?.email || null;
-    if (recEmail && existing?.contact?.email == null && isValidEmail(recEmail)) {
+    if (recEmail && authoritative.email == null && isValidEmail(recEmail)) {
       fields.email = recEmail.trim();
       evidence.email = {
         value: recEmail.trim(),
@@ -508,7 +513,7 @@ export function extractDeterministicFallback({
 
     // Website (exact provider record, official-website-aware).
     const recWebsite = rec.contact?.website || null;
-    if (recWebsite && existing?.contact?.website == null && existing?.identity?.website == null) {
+    if (recWebsite && authoritative.website == null) {
       const siteCheck = validateWebsite(recWebsite);
       if (siteCheck.status === 'valid') {
         fields.website = siteCheck.value;
@@ -528,7 +533,7 @@ export function extractDeterministicFallback({
 
     // Category: provider category first.
     const recCategory = rec.business?.category || null;
-    if (recCategory && existing?.business?.category == null && existing?.identity?.category == null) {
+    if (recCategory && authoritative.category == null) {
       fields.category = recCategory;
       evidence.category = {
         value: recCategory,
@@ -544,16 +549,16 @@ export function extractDeterministicFallback({
     }
   }
 
-  // Unresolved = fields missing AND no evidence supplied.
+  // Unresolved = fields missing (in authoritative + fallback) AND no evidence supplied.
   const trackUnresolved = (fieldName, has) => {
     if (!has) unresolvedFields.push(fieldName);
   };
-  trackUnresolved('name', fields.name != null);
-  trackUnresolved('address', fields.address != null);
-  trackUnresolved('phone', fields.phone != null);
-  trackUnresolved('email', fields.email != null);
-  trackUnresolved('website', fields.website != null);
-  trackUnresolved('coordinates', fields.coordinates != null);
+  trackUnresolved('name', fields.name != null || authoritative.name != null);
+  trackUnresolved('address', fields.address != null || authoritative.address != null);
+  trackUnresolved('phone', fields.phone != null || authoritative.phone != null);
+  trackUnresolved('email', fields.email != null || authoritative.email != null);
+  trackUnresolved('website', fields.website != null || authoritative.website != null);
+  trackUnresolved('coordinates', fields.coordinates != null || authoritative.coordinates != null);
 
   return {
     fields,

@@ -805,6 +805,13 @@ Rules:
         providerUnavailable: Boolean(extractedProfile?.providerUnavailable),
         gateway: config.omniroute.baseUrl,
         model: config.omniroute.models.reasoning,
+        // P1.8: retain the retrieved page text as recoverable evidence for the
+        // source-grounded fallback extractor. This is the SAME text the AI
+        // extraction prompt already consumes — carrying it forward lets the
+        // field-level fallback complete missing fields (phone/email/website)
+        // from the same evidence without a second fetch. Additive only; never
+        // parsed downstream as structured business data.
+        sourceText: (metadata?.visibleText || '').slice(0, 6000) || null,
         acquisition: {
           status: acquisition.status,
           completeness: acquisition.completeness,
