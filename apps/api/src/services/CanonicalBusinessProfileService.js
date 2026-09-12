@@ -759,6 +759,33 @@ class CanonicalBusinessProfileService {
   // --- enrichment (AI quarantine metadata survives; never upgraded) ---
   Object.assign(projection.enrichment, buildEnrichment(source));
 
+  // --- P1.8: fallback evidence survives projection (field-level provenance) ---
+  // The source-grounded fallback extractor attaches per-field evidence
+  // snapshots (extractionMethod, confidence, sourceUrl, evidenceSnippet) to
+  // the intelligence source. Preserve those verbatim under
+  // enrichment.fallbackEvidence so consumers can distinguish "recovered from
+  // Google Maps source evidence" from authoritative provider data without
+  // mutating field values or upgrading provenance.
+  const fallbackEvidence =
+    source?.source?.fallbackEvidence ??
+    source?.source?.providers?.fallback?.evidence ??
+    source?.fallbackEvidence ??
+    null;
+  if (fallbackEvidence && typeof fallbackEvidence === 'object' && Object.keys(fallbackEvidence).length > 0) {
+    projection.enrichment.fallbackEvidence = fallbackEvidence;
+  }
+  // Also surface the fallback provider trace summary (which fields were
+  // recovered, whether AI was used).
+  const fallbackTrace = source?.source?.providers?.fallback ?? null;
+  if (fallbackTrace && typeof fallbackTrace === 'object') {
+    projection.enrichment.fallback = {
+      status: fallbackTrace.status ?? null,
+      recoveredFields: Array.isArray(fallbackTrace.recoveredFields) ? [...fallbackTrace.recoveredFields] : null,
+      aiExtracted: Boolean(fallbackTrace.aiExtracted),
+      unresolvedFields: Array.isArray(fallbackTrace.unresolvedFields) ? [...fallbackTrace.unresolvedFields] : null,
+    };
+  }
+
   // Apply persisted canonical-field overrides when present (authoritative).
   if (Array.isArray(canonicalFields)) {
     this._applyCanonicalFields(projection, canonicalFields);

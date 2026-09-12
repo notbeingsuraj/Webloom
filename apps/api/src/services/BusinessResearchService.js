@@ -1585,6 +1585,13 @@ class BusinessResearchService {
         resolutionConfidence: name ? 0.9 : 0,
         mapsUrl: hints.sourceUrl || null,
         providers: providerTrace,
+        // P1.8: surface fallback field-level evidence for observability and
+        // canonical projection enrichment. The canonical projection reads
+        // from identity._provenance for field-level metadata; this block
+        // provides the raw evidence snapshots (extractionMethod, confidence,
+        // sourceUrl, evidenceSnippet) that the canonical shape may expose
+        // under enrichment.fallbackEvidence.
+        fallbackEvidence: profile.fallbackEvidence || null,
       },
       identity: {
         name: nameInfo.value,
