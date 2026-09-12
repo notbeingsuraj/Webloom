@@ -300,6 +300,10 @@ check('selectBestRecord without coordinates just picks top-ranked candidate', ()
 console.log('\n[5] Candidate City/State Mismatch Detection');
 
 check('Entity resolution: same business at same coords → same_entity', () => {
+  // Fixture fix: record2 previously used (29.913, 73.885) — ~315 m from
+  // record1, beyond the 100 m COORDINATE_NEAR_METERS threshold — which made
+  // compareLocations say 'different'. Same coords must be within the
+  // near threshold for same_entity to fire.
   const record1 = {
     business: { name: 'Manan Furnitures', category: 'Furniture store' },
     location: { full_address: 'Meera Marg, Sri Ganganagar', city: 'Sri Ganganagar', state: 'Rajasthan', country: 'India', coordinates: { lat: 29.912783, lng: 73.881746 } },
@@ -307,7 +311,7 @@ check('Entity resolution: same business at same coords → same_entity', () => {
   };
   const record2 = {
     business: { name: 'Manan Furnitures', category: 'Furniture store' },
-    location: { full_address: 'Meera Marg, Sri Ganganagar', city: 'Sri Ganganagar', state: 'Rajasthan', country: 'India', coordinates: { lat: 29.913, lng: 73.885 } },
+    location: { full_address: 'Meera Marg, Sri Ganganagar', city: 'Sri Ganganagar', state: 'Rajasthan', country: 'India', coordinates: { lat: 29.912783, lng: 73.881746 } },
     contact: { phone: '087644 54984' },
   };
   const result = calculateMatchScore(record1, record2);
@@ -447,15 +451,19 @@ check('Lead cache is per-request (in-memory Map, not global DB)', () => {
 console.log('\n[10] Entity Resolution Coordinate Distance');
 
 check('calculateMatchScore detects coordinate distance > 100m as different location', () => {
+  // Fixture fix: a bare 10-digit local number with no country context returns
+  // null from normalizePhone (ambiguous → never invents a country), so
+  // phone_exact could never fire. Use an explicit international number that
+  // normalizes deterministically.
   const record1 = {
     business: { name: 'Test Business' },
-    location: { full_address: '123 Main St', city: 'Sri Ganganagar', state: 'Rajasthan', coordinates: { lat: 29.912783, lng: 73.881746 } },
-    contact: { phone: '1234567890' },
+    location: { full_address: '123 Main St', city: 'Sri Ganganagar', state: 'Rajasthan', country: 'India', coordinates: { lat: 29.912783, lng: 73.881746 } },
+    contact: { phone: '+91 98765 43210' },
   };
   const record2 = {
     business: { name: 'Test Business' },
-    location: { full_address: '456 Other St', city: 'Tarn Taran', state: 'Punjab', coordinates: { lat: 31.515746, lng: 74.811488 } },
-    contact: { phone: '1234567890' },
+    location: { full_address: '456 Other St', city: 'Tarn Taran', state: 'Punjab', country: 'India', coordinates: { lat: 31.515746, lng: 74.811488 } },
+    contact: { phone: '+91 98765 43210' },
   };
   const result = calculateMatchScore(record1, record2);
   // Same name, same phone, but very different coordinates
