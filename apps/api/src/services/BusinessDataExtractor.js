@@ -561,11 +561,15 @@ Rules:
    * 3. Merge into BusinessProfile with provenance tracking
    * 4. Return normalized result
    */
-  async extractFromGoogleMapsUrl(googleMapsUrl) {
-    // Check cache first
-    const cached = this.getCachedExtraction(googleMapsUrl);
-    if (cached) {
-      return { ...cached, cached: true };
+  async extractFromGoogleMapsUrl(googleMapsUrl, options = {}) {
+    const { forceRefresh = false } = options;
+    
+    // Check cache first (unless forceRefresh)
+    if (!forceRefresh) {
+      const cached = this.getCachedExtraction(googleMapsUrl);
+      if (cached) {
+        return { ...cached, cached: true };
+      }
     }
 
     // Step 1: Parse URL for identifiers (IDENTIFIED provenance)
@@ -600,6 +604,18 @@ Rules:
       // Extract metadata from HTML
       metadata = this.extractMetadata(pageData.html);
       metadata.sourceUrl = pageData.url;
+
+      // If Jina AI didn't return enough business evidence, try direct HTML extraction
+      let directMetadata = null;
+      if (this.isEmptyAcquisitionPage(metadata, pageData.url)) {
+        console.log('[BusinessDataExtractor] Jina AI returned empty page, attempting direct Google Maps HTML extraction...');
+        directMetadata = await this.extractFromDirectGoogleMapsHtml(googleMapsUrl);
+        if (directMetadata && !this.isEmptyAcquisitionPage(directMetadata, googleMapsUrl)) {
+          console.log('[BusinessDataExtractor] Direct extraction succeeded, using direct metadata');
+          metadata = directMetadata;
+          acquisitionMethod = 'direct_google_maps';
+        }
+      }
 
       // A JavaScript application shell, consent wall, map-tile response, or
       // explicit upstream error is not business evidence. Do not spend an AI
