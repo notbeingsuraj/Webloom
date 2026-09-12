@@ -89,7 +89,9 @@ class WebExtractionProvider extends BusinessDataProvider {
 
     try {
       const extractor = await this._getExtractor();
-      const result = await extractor.extractFromGoogleMapsUrl(url);
+      const result = await extractor.extractFromGoogleMapsUrl(url, {
+        forceRefresh: Boolean(hints?.forceRefresh),
+      });
       const latencyMs = Date.now() - startedAt;
 
       if (!result || typeof result !== 'object') {

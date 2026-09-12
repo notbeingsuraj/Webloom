@@ -297,6 +297,17 @@ class BusinessDataExtractor {
       // Extract phone numbers, addresses, ratings from visible text and embedded data
       const extractedFields = this.extractFieldsFromDirectHtml(html, embeddedData);
       metadata.extractedFields = extractedFields;
+      // Make deterministic direct fields part of the evidence supplied to AI.
+      // The model may only use these values when they are explicitly present.
+      const evidenceLines = [];
+      if (extractedFields.phone) evidenceLines.push(`Phone: ${extractedFields.phone}`);
+      if (extractedFields.address) evidenceLines.push(`Address: ${extractedFields.address}`);
+      if (extractedFields.rating != null) evidenceLines.push(`Rating: ${extractedFields.rating}`);
+      if (extractedFields.reviewCount != null) evidenceLines.push(`Review count: ${extractedFields.reviewCount}`);
+      if (extractedFields.reviews.length) evidenceLines.push(`Reviews: ${JSON.stringify(extractedFields.reviews)}`);
+      if (evidenceLines.length) {
+        metadata.visibleText = `${metadata.visibleText || ''}\\n${evidenceLines.join('\\n')}`.trim();
+      }
 
       return metadata;
     } catch (error) {
@@ -930,8 +941,14 @@ Rules:
     if (extractedProfile.location?.coordinates) {
       profile.set('location.coordinates', extractedProfile.location.coordinates, extractedProvenance, 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
     }
-    if (extractedProfile.ratings?.rating) {
+    if (extractedProfile.ratings?.rating != null) {
       profile.set('ratings.rating', extractedProfile.ratings.rating, extractedProvenance, extractedProfile.confidence?.rating || 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
+    }
+    if (extractedProfile.ratings?.review_count != null) {
+      profile.set('ratings.review_count', extractedProfile.ratings.review_count, extractedProvenance, extractedProfile.confidence?.review_count || 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
+    }
+    if (Array.isArray(extractedProfile.reviews) && extractedProfile.reviews.length) {
+      profile.set('ratings.reviews', extractedProfile.reviews, extractedProvenance, 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
     }
     if (extractedProfile.hours && Object.keys(extractedProfile.hours).some(k => extractedProfile.hours[k])) {
       profile.set('hours', extractedProfile.hours, extractedProvenance, 0.6, { sourceUrl: pageData?.url || googleMapsUrl });

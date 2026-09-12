@@ -160,6 +160,7 @@ export interface CreateLeadData {
   leadName?: string;
   internalNotes?: string;
   customInstructions?: string;
+  forceRefresh?: boolean;
 }
 
 export const leadService = {

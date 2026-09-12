@@ -420,7 +420,7 @@ class GeoapifyProvider extends BusinessDataProvider {
     // Best-effort enrichment: pull place-details (phone/website/hours/categories)
     const placeId = best?.provider?.placeId;
     if (placeId) {
-      const details = await this._fetchPlaceDetails(placeId);
+      const details = await this._fetchPlaceDetails(placeId, best?.location?.coordinates || null);
       if (details) {
         return this._mergeDetails(best, details);
       }
