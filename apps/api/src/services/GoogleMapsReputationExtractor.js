@@ -149,10 +149,6 @@ export function extractFromStructuredProvider(providerRecord, identityAnchor = n
   const hasReviewCount = reviewCountCheck.valid;
   const hasReviews = reviews.length > 0;
 
-  if (!hasRating && !hasReviewCount && !hasReviews) {
-    return { reputation: null, provenance: 'observed', evidence: null };
-  }
-
   const reputation = {
     rating: hasRating ? ratingCheck.value : null,
     reviewCount: hasReviewCount ? reviewCountCheck.value : null,
@@ -165,6 +161,10 @@ export function extractFromStructuredProvider(providerRecord, identityAnchor = n
     confidence: hasRating ? 0.9 : 0.7,
     source: 'provider_record',
   };
+
+  if (!hasRating && !hasReviewCount && !hasReviews) {
+    return { reputation, provenance: 'observed', evidence: null };
+  }
 
   const evidence = {
     rating: hasRating ? {

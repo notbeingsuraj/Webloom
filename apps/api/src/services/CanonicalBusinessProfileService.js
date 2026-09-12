@@ -545,6 +545,11 @@ function buildProvenanceMap(record) {
           map[path] = {
             provenance: value.provenance,
             confidence: typeof value.confidence === 'number' ? value.confidence : null,
+            // P1.9: preserve the field value so toCanonicalFieldList /
+            // _applyCanonicalFields can round-trip BusinessProfile fields
+            // (ratings.rating, ratings.review_count, ...) through the
+            // canonical-field list without losing the value.
+            value: value.value ?? null,
             source: value.sourceInfo?.sourceUrl ?? value.sourceInfo?.provider ?? value.sourceId ?? null,
             updatedAt: value.updatedAt ?? null,
           };

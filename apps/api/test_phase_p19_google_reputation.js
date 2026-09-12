@@ -22,6 +22,11 @@
  */
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 let passed = 0;
 let failed = 0;
@@ -80,6 +85,7 @@ import GoogleMapsReputationExtractor, {
 import { generateReviewIntelligence } from './src/services/ReputationIntelligenceService.js';
 import CanonicalBusinessProfileService from './src/services/CanonicalBusinessProfileService.js';
 import BusinessProfile from './src/services/BusinessProfile.js';
+import { detectConflicts } from './src/services/GoogleMapsFallbackExtractor.js';
 
 // ==================================================================
 // FIXTURES
@@ -541,7 +547,6 @@ check('35. Frontend renders AI-extracted state', () => {
 // --- 36. Identity conflict rejects reputation data ---
 check('36. Identity conflict rejects reputation data', () => {
   // Tarn Taran record has city conflict with Sri Ganganagar anchor.
-  const { detectConflicts } = requireLazy('./src/services/GoogleMapsFallbackExtractor.js');
   const conflict = detectConflicts(
     {
       city: tarnTaranRecord.location.city,
@@ -568,7 +573,6 @@ check('38. Manan Furnitures review count regression expects 82', () => {
 // --- 39. Manan Furnitures rejects Tarn Taran reputation data ---
 check('39. Manan Furnitures rejects Tarn Taran reputation data', () => {
   // Reputation data from a different city must be rejected before merge.
-  const { detectConflicts } = requireLazy('./src/services/GoogleMapsFallbackExtractor.js');
   const conflict = detectConflicts(
     { city: 'Tarn Taran', providerRecordId: 'geoapify_tarn_taran' },
     { city: 'Sri Ganganagar', providerRecordId: 'ChIJ-manan-ganganagar' },
@@ -597,9 +601,10 @@ check('41. Input immutability', () => {
 check('42. No unexpected database writes', () => {
   // extractReputation pure functions perform no DB access. Statically verify
   // the module does not import any DB module.
-  const src = GoogleMapsReputationExtractor.toString();
-  const full = src + '\n' + GoogleMapsReputationExtractor.extractFromStructuredProvider.toString();
-  assert.ok(!/db\/|IdentityRepository|SourceCache/i.source, 'no db imports');
+  const src = readFileSync(join(__dirname, 'src/services/GoogleMapsReputationExtractor.js'), 'utf8');
+  assert.ok(!src.includes('IdentityRepository'), 'no IdentityRepository import');
+  assert.ok(!src.includes('SourceCache'), 'no SourceCache import');
+  assert.ok(!src.includes("from '../db/"), 'no db module import');
 });
 
 // --- 43. No AI call when structured reputation is already authoritative ---
@@ -733,14 +738,6 @@ check('55. No P2.0 work started (verification gate)', () => {
   // P1.9 stop condition: this test file exists only for P1.9 scope.
   assert.ok(true);
 });
-
-// ==================================================================
-// Helper: lazy require for ESM
-// ==================================================================
-function requireLazy(path) {
-  // eslint-disable-next-line no-eval
-  return eval('require')(path);
-}
 
 // ==================================================================
 // Run pending async checks
