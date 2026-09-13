@@ -993,7 +993,7 @@ class CanonicalBusinessProfileService {
       providerIdentities,
     });
 
-    // Persisted entity identity is authoritative — project entity columns
+    // Persisted entity identity is authoritative — projec t entity columns
     // (never synthetic; only when present).
     if (entityId) projection.identity.entityId = entityId;
     const name = entity.canonicalName ?? null;

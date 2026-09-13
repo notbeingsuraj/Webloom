@@ -180,6 +180,8 @@ export function createCandidatesFromRecord(record, provenance = 'discovered', so
 
   const add = (fieldPath, rawValue, conf) => {
     if (rawValue == null || rawValue === '') return;
+    // Support evidence at record level (for AI candidates)
+    const recordEvidence = record?.evidence?.[fieldPath] || record?.evidence?.[fieldPath.split('.').pop()];
     candidates.push(createFieldCandidate({
       fieldPath,
       rawValue,
@@ -191,6 +193,7 @@ export function createCandidatesFromRecord(record, provenance = 'discovered', so
         sourceUrl: sourceInfo?.sourceUrl || null,
         extractionMethod: sourceInfo?.extractionMethod || null,
       },
+      evidence: recordEvidence ? { snippet: recordEvidence.snippet || recordEvidence } : undefined,
     }));
   };
 
