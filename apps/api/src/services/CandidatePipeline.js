@@ -312,7 +312,7 @@ export async function runCandidatePipeline({
         // Use the original Webloom provenance string for profile.set()
         const provenance = c.provenance.webloom;
         const confidence = c.confidence ?? 0.6;
-        profile.set(fieldPath, c.normalizedValue, provenance, confidence, sourceInfo);
+        profile.set(c.fieldPath, c.normalizedValue, provenance, confidence, sourceInfo);
         applied.push({ fieldPath: c.fieldPath, value: c.normalizedValue, provenance });
       }
       return applied;
@@ -333,20 +333,34 @@ export async function mergeRecordThroughPipeline(profile, record, provenance, so
 
 /**
  * Convenience: run pipeline for fallback extraction results
+ * 
+ * fallbackResult fields map to BusinessProfile field paths:
+ *   address -> location.full_address
+ *   phone -> contact.phone
+ *   email -> contact.email
+ *   website -> contact.website
+ *   coordinates -> location.coordinates
+ *   name -> identity.name
+ *   category -> identity.category
  */
 export async function runFallbackPipeline(profile, fallbackResult, sourceUrl, options = {}) {
-  // fallbackResult has { fields, evidence }
   const records = [];
   if (fallbackResult.fields) {
-    const fieldRecords = {};
-    for (const [fieldPath, value] of Object.entries(fallbackResult.fields)) {
-      // Map dotted paths to record structure (simple - just build a flat record)
-      fieldRecords[fieldPath] = value;
-    }
-    // We need to convert flat dotted paths back to the record structure
-    // For simplicity, create a synthetic record with the fields
+    // Map fallback field names to BusinessProfile field paths
+    const fieldMap = {
+      address: 'location.full_address',
+      phone: 'contact.phone',
+      email: 'contact.email',
+      website: 'contact.website',
+      coordinates: 'location.coordinates',
+      name: 'identity.name',
+      category: 'identity.category',
+    };
+
     const syntheticRecord = {};
-    for (const [fieldPath, value] of Object.entries(fallbackResult.fields)) {
+    for (const [fallbackField, value] of Object.entries(fallbackResult.fields)) {
+      const fieldPath = fieldMap[fallbackField];
+      if (!fieldPath) continue;
       const parts = fieldPath.split('.');
       let target = syntheticRecord;
       for (let i = 0; i < parts.length - 1; i++) {
@@ -355,6 +369,7 @@ export async function runFallbackPipeline(profile, fallbackResult, sourceUrl, op
       }
       target[parts[parts.length - 1]] = value;
     }
+
     const provenance = fallbackResult.aiExtracted ? 'ai_generated' : 'discovered';
     records.push({
       record: syntheticRecord,
@@ -400,10 +415,11 @@ export async function runAIEnrichmentPipeline(profile, aiResult, sourceUrl, opti
   if (!aiResult || typeof aiResult !== 'object') {
     return { accepted: [], rejected: [], conflicts: [], diagnostics: {} };
   }
-  const record = { business: {}, contact: {}, location: {} };
-  if (aiResult.category) record.business.category = aiResult.category;
-  if (aiResult.description) record.business.description = aiResult.description;
-  if (Array.isArray(aiResult.services) && aiResult.services.length) record.identity = { services: aiResult.services };
+  // Map AI result fields to BusinessProfile field paths
+  const record = { business: {}, contact: {}, location: {}, identity: {} };
+  if (aiResult.category) record.identity.category = aiResult.category;
+  if (aiResult.description) record.identity.description = aiResult.description;
+  if (Array.isArray(aiResult.services) && aiResult.services.length) record.identity.services = aiResult.services;
 
   return runCandidatePipeline({
     records: [{ record, provenance: 'inferred', sourceInfo: { sourceUrl, provider: 'ai_enrichment' } }],
@@ -427,3 +443,5 @@ export default {
   SELECTION_PRIORITY,
   IDENTITY_SENSITIVE,
 };
+
+export { IDENTITY_SENSITIVE, SELECTION_PRIORITY };

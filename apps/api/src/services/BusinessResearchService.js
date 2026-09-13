@@ -19,6 +19,7 @@ import { IdentityRepository, NotFoundError, DuplicateError, ValidationError } fr
 import { CanonicalizationService } from './CanonicalizationService.js';
 import { analyzeEntityRelocation, TEMPORAL_VERDICT } from './TemporalRelocationAnalyzer.js';
 import { looksLikeStreetAddress } from '../utils/streetAddressDetector.js';
+import { mergeRecordThroughPipeline, runFallbackPipeline, runReputationPipeline, runAIEnrichmentPipeline } from './CandidatePipeline.js';
 
 class BusinessResearchService {
   /**
@@ -600,61 +601,10 @@ class BusinessResearchService {
           existingCanonicalProfile: profile.toObject(),
         });
 
-        // Merge recovered fields with FIELD-LEVEL provenance (P1.8 §12).
-        // Never upgrade AI-generated values: their provenance stays
-        // ai_generated even though they were recovered by the fallback. The
-        // `onlyIfMissing` guard preserves higher-tier fields (identified/
-        // discovered) — the fallback only fills genuine gaps.
-        const mergeFallbackField = (fieldPath, value, evidenceMeta) => {
-          if (value == null) return;
-          if (profile.get(fieldPath) != null) return; // authoritative wins
-          const prov = evidenceMeta?.provenance === 'ai_generated' ? 'ai_generated' : 'discovered';
-          const conf = evidenceMeta?.confidence ?? 0.75;
-          const sourceInfo = {
-            sourceUrl: evidenceMeta?.sourceUrl || sourceUrl || undefined,
-            provider: 'google_maps_fallback',
-            extractionMethod: evidenceMeta?.extractionMethod || 'provider',
-            metadata: {
-              fallback: true,
-              sourceType: evidenceMeta?.sourceType || 'google_maps_url',
-              evidenceSnippet: evidenceMeta?.evidenceSnippet || null,
-            },
-          };
-          try {
-            profile.set(fieldPath, value, prov, conf, sourceInfo);
-          } catch (err) {
-            console.error(`[P1.8] Fallback merge failed for ${fieldPath} (best-effort): ${err?.message || String(err)}`);
-          }
-        };
-
-        const ev = fallbackResult.evidence || {};
-        if (fallbackResult.fields.address) {
-          mergeFallbackField('location.full_address', fallbackResult.fields.address, ev.address);
-          const comp = fallbackResult.fields.addressComponents;
-          if (comp?.street) mergeFallbackField('location.street', comp.street, ev.address);
-          if (comp?.city) mergeFallbackField('location.city', comp.city, ev.address);
-          if (comp?.state) mergeFallbackField('location.state', comp.state, ev.address);
-          if (comp?.postalCode) mergeFallbackField('location.postal_code', comp.postalCode, ev.address);
-          if (comp?.country) mergeFallbackField('location.country', comp.country, ev.address);
-        }
-        if (fallbackResult.fields.phone) {
-          mergeFallbackField('contact.phone', fallbackResult.fields.phone, ev.phone);
-        }
-        if (fallbackResult.fields.email) {
-          mergeFallbackField('contact.email', fallbackResult.fields.email, ev.email);
-        }
-        if (fallbackResult.fields.website) {
-          mergeFallbackField('contact.website', fallbackResult.fields.website, ev.website);
-        }
-        if (fallbackResult.fields.coordinates) {
-          mergeFallbackField('location.coordinates', fallbackResult.fields.coordinates, ev.coordinates);
-        }
-        if (fallbackResult.fields.name && !profile.get('identity.name')) {
-          mergeFallbackField('identity.name', fallbackResult.fields.name, ev.name);
-        }
-        if (fallbackResult.fields.category && !profile.get('identity.category')) {
-          mergeFallbackField('identity.category', fallbackResult.fields.category, ev.category);
-        }
+        // Merge recovered fields through CandidatePipeline (preserves P1.8 semantics).
+        const result = await runFallbackPipeline(profile, fallbackResult, sourceUrl, {
+          onlyIfMissing: true,
+        });
 
         // Surface fallback provenance for observability and canonicalization.
         if (fallbackResult.evidence && Object.keys(fallbackResult.evidence).length > 0) {
@@ -662,12 +612,16 @@ class BusinessResearchService {
           Object.assign(profile.fallbackEvidence, fallbackResult.evidence);
         }
         providerTrace.fallback = {
-          status: fallbackResult.aiExtracted ? 'ai_extraction' : (Object.keys(fallbackResult.fields).length ? 'deterministic' : 'no_evidence'),
-          recoveredFields: Object.keys(fallbackResult.fields),
+          status: fallbackResult.aiExtracted ? 'ai_extraction' : (Object.keys(fallbackResult.fields || {}).length ? 'deterministic' : 'no_evidence'),
+          recoveredFields: Object.keys(fallbackResult.fields || {}),
           aiExtracted: fallbackResult.aiExtracted,
           unresolvedFields: fallbackResult.unresolvedFields || [],
           source: sourceUrl || null,
         };
+
+        if (config?.debugBusinessAnalysis && result.diagnostics) {
+          console.log(`[QualityBoundary] fallback: candidates=${result.diagnostics.totalCandidates}, accepted=${result.diagnostics.byStatus?.accepted}, rejected=${result.diagnostics.byStatus?.rejected}, conflicts=${result.diagnostics.byStatus?.conflicted}`);
+        }
       }
     }
 
@@ -709,7 +663,12 @@ class BusinessResearchService {
 
       if (repResult?.reputation) {
         const rep = repResult.reputation;
-        const merged = this._mergeReputation(profile, rep, repResult);
+        const result = await runReputationPipeline(profile, rep, repResult);
+
+        if (config?.debugBusinessAnalysis && result.diagnostics) {
+          console.log(`[QualityBoundary] reputation: candidates=${result.diagnostics.totalCandidates}, accepted=${result.diagnostics.byStatus?.accepted}, rejected=${result.diagnostics.byStatus?.rejected}, conflicts=${result.diagnostics.byStatus?.conflicted}`);
+        }
+
         providerTrace.reputation = {
           status: rep.status || 'unavailable',
           provenance: rep.provenance || null,
@@ -718,7 +677,7 @@ class BusinessResearchService {
           reviewCount: rep.reviewCount ?? null,
           reviewCountSamples: Array.isArray(rep.reviews) ? rep.reviews.length : 0,
           source: rep.source || null,
-          merged: merged,
+          merged: result.accepted.length > 0,
         };
       }
     }
@@ -1356,7 +1315,7 @@ class BusinessResearchService {
   }
 
   /**
-   * Merge a canonical provider record into the BusinessProfile.
+   * Merge a canonical provider record into the BusinessProfile using CandidatePipeline.
    * @param {BusinessProfile} profile
    * @param {Object} record - canonical flat shape
    * @param {string} provenance
@@ -1365,96 +1324,22 @@ class BusinessResearchService {
    * @param {boolean} onlyIfMissing - if true, do not overwrite existing values
    * @param {Object} resolutionInfo - (optional) Entity Resolution match result metadata
    */
-  _mergeCanonical(profile, record, provenance, providerLabel, sourceUrl, onlyIfMissing = false, resolutionInfo = null) {
+  async _mergeCanonical(profile, record, provenance, providerLabel, sourceUrl, onlyIfMissing = false, resolutionInfo = null) {
     if (!record || typeof record !== 'object') return;
 
-    const sourceInfo = { sourceUrl: sourceUrl || undefined };
-    const confidence = record.confidence || {};
+    const sourceInfo = { sourceUrl: sourceUrl || undefined, provider: providerLabel };
+    const result = await mergeRecordThroughPipeline(profile, record, provenance, sourceInfo, {
+      onlyIfMissing,
+      isConservativeMerge: false,
+      resolutionInfo,
+    });
 
-    // P1.2 AI quarantine: if the record was produced by AI extraction (flagged
-    // in the extraction metadata), downgrade its provenance to ai_generated so
-    // its identity fields can NEVER outrank deterministic URL/provider identity.
-    // AI data remains available as candidate/evidence data (fills gaps only).
-    const isAiDerived = Boolean(record?.metadata?.aiExtracted);
-    const effectiveProvenance = isAiDerived && provenance === 'discovered' ? 'ai_generated' : provenance;
-
-    const setOrSkip = (fieldPath, value, conf) => {
-      if (value == null || value === '') return;
-      if (onlyIfMissing && profile.get(fieldPath) != null) return;
-
-      // Data-quality guard: an address-looking string must never replace an
-      // existing real business name. Providers (esp. Geoapify when the search
-      // drifts to a street-level feature) can return a street address in the
-      // `name` field. A URL-derived business name (`identified`) or another
-      // provider's real name already on the profile is authoritative; the
-      // address string is a different datum (the location), not identity.
-      if (fieldPath === 'identity.name') {
-        const existingName = profile.get('identity.name');
-        if (existingName && this._looksLikeStreetAddress(value) && !this._looksLikeStreetAddress(existingName)) {
-          return;
-        }
-        // Never let a bare address become the canonical business name at all.
-        if (!existingName && this._looksLikeStreetAddress(value)) {
-          return;
-        }
-      }
-
-      profile.set(fieldPath, value, effectiveProvenance, conf, sourceInfo);
-    };
-
-    if (record.business) {
-      setOrSkip('identity.name', sanitizeFieldValue(record.business.name), confidence.name || 0.9);
-      setOrSkip('identity.category', sanitizeFieldValue(record.business.category), confidence.category || 0.8);
-      if (Array.isArray(record.business.categories) && record.business.categories.length) {
-        if (!onlyIfMissing || !profile.get('identity.categories') || profile.get('identity.categories').length === 0) {
-          profile.set('identity.categories', record.business.categories, effectiveProvenance, 0.8, sourceInfo);
-        }
-      }
-      setOrSkip('identity.description', sanitizeFieldValue(record.business.description), 0.7);
-      setOrSkip('identity.business_type', sanitizeFieldValue(record.business.business_type), 0.8);
+    // Attach pipeline diagnostics for observability
+    if (config?.debugBusinessAnalysis && result.diagnostics) {
+      console.log(`[QualityBoundary] ${providerLabel} merge: candidates=${result.diagnostics.totalCandidates}, accepted=${result.diagnostics.byStatus?.accepted}, rejected=${result.diagnostics.byStatus?.rejected}, conflicts=${result.diagnostics.byStatus?.conflicted}`);
     }
 
-    if (record.contact) {
-      setOrSkip('contact.phone', sanitizeFieldValue(record.contact.phone), confidence.phone || 0.9);
-      setOrSkip('contact.email', sanitizeFieldValue(record.contact.email), 0.8);
-      setOrSkip('contact.website', sanitizeFieldValue(record.contact.website), confidence.website || 0.85);
-    }
-
-    if (record.location) {
-      setOrSkip('location.full_address', sanitizeFieldValue(record.location.full_address), confidence.address || 0.9);
-      setOrSkip('location.street', sanitizeFieldValue(record.location.street), 0.85);
-      setOrSkip('location.city', sanitizeFieldValue(record.location.city), 0.85);
-      setOrSkip('location.state', sanitizeFieldValue(record.location.state), 0.8);
-      setOrSkip('location.country', sanitizeFieldValue(record.location.country), 0.85);
-      setOrSkip('location.postal_code', sanitizeFieldValue(record.location.postal_code), 0.85);
-      const coords = record.location.coordinates || (record.location.latitude != null && record.location.longitude != null ? { lat: record.location.latitude, lng: record.location.longitude } : null);
-      if (coords) setOrSkip('location.coordinates', coords, 0.95);
-    }
-
-    if (record.ratings) {
-      if (typeof record.ratings.rating === 'number') setOrSkip('ratings.rating', record.ratings.rating, confidence.rating || 0.85);
-      if (typeof record.ratings.review_count === 'number') setOrSkip('ratings.review_count', record.ratings.review_count, 0.85);
-    }
-
-    if (record.hours && Object.keys(record.hours).some((k) => record.hours[k])) {
-      // Merge day-by-day; prefer existing over new when onlyIfMissing
-      if (!onlyIfMissing) {
-        profile.set('hours', record.hours, effectiveProvenance, 0.8, sourceInfo);
-      } else {
-        const existingHours = profile.get('hours') || {};
-        const merged = { ...existingHours };
-        for (const [day, val] of Object.entries(record.hours)) {
-          if (val && !merged[day]) merged[day] = val;
-        }
-        profile.set('hours', merged, effectiveProvenance, 0.8, sourceInfo);
-      }
-    }
-
-    if (Array.isArray(record.services) && record.services.length) {
-      if (!onlyIfMissing || profile.get('identity.services') == null) {
-        profile.set('identity.services', record.services, effectiveProvenance, 0.7, sourceInfo);
-      }
-    }
+    return result;
   }
 
   /**
@@ -1468,33 +1353,21 @@ class BusinessResearchService {
    * @param {string|null} sourceUrl
    * @param {Object} resolutionInfo - Entity Resolution metadata
    */
-  _mergeConservativelyForDifferentEntities(profile, record, sourceUrl, resolutionInfo) {
+  async _mergeConservativelyForDifferentEntities(profile, record, sourceUrl, resolutionInfo) {
     if (!record || typeof record !== 'object') return;
 
     const sourceInfo = { sourceUrl: sourceUrl || undefined };
-    const confidence = record.confidence || {};
+    const result = await mergeRecordThroughPipeline(profile, record, 'discovered', sourceInfo, {
+      onlyIfMissing: false,
+      isConservativeMerge: true,
+      resolutionInfo,
+    });
 
-    // Only merge supplemental data that would not change business identity:
-    // - Hours (business hours can be supplementary)
-    // - Ratings/reviews (public data, non-identifying)
-    // DO NOT merge: name, address, phone, website, category, description
-
-    if (record.hours && Object.keys(record.hours).some((k) => record.hours[k])) {
-      const existingHours = profile.get('hours') || {};
-      if (Object.keys(existingHours).length === 0) {
-        // Only merge if profile has no hours yet
-        profile.set('hours', record.hours, 'discovered', 0.5, sourceInfo);
-      }
+    if (config?.debugBusinessAnalysis && result.diagnostics) {
+      console.log(`[QualityBoundary] conservative merge (different_entity): candidates=${result.diagnostics.totalCandidates}, accepted=${result.diagnostics.byStatus?.accepted}, rejected=${result.diagnostics.byStatus?.rejected}`);
     }
 
-    if (record.ratings) {
-      if (typeof record.ratings.rating === 'number' && profile.get('ratings.rating') == null) {
-        profile.set('ratings.rating', record.ratings.rating, 'discovered', 0.6, sourceInfo);
-      }
-      if (typeof record.ratings.review_count === 'number' && profile.get('ratings.review_count') == null) {
-        profile.set('ratings.review_count', record.ratings.review_count, 'discovered', 0.6, sourceInfo);
-      }
-    }
+    return result;
   }
 
   /**
@@ -1635,14 +1508,11 @@ class BusinessResearchService {
       });
 
       if (result && typeof result === 'object') {
-        if (result.category && profile.get('identity.category') == null) {
-          profile.set('identity.category', sanitizeFieldValue(result.category), 'inferred', 0.6, { sourceUrl });
-        }
-        if (result.description && profile.get('identity.description') == null) {
-          profile.set('identity.description', sanitizeFieldValue(result.description), 'inferred', 0.6, { sourceUrl });
-        }
-        if (Array.isArray(result.services) && result.services.length && profile.get('identity.services') == null) {
-          profile.set('identity.services', result.services.map(sanitizeFieldValue), 'inferred', 0.6, { sourceUrl });
+        const aiResult = { ...result };
+        const pipelineResult = await runAIEnrichmentPipeline(profile, aiResult, sourceUrl);
+
+        if (config?.debugBusinessAnalysis && pipelineResult.diagnostics) {
+          console.log(`[QualityBoundary] ai_enrichment: candidates=${pipelineResult.diagnostics.totalCandidates}, accepted=${pipelineResult.diagnostics.byStatus?.accepted}, rejected=${pipelineResult.diagnostics.byStatus?.rejected}`);
         }
       }
     } catch (error) {

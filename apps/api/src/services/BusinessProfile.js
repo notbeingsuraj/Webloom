@@ -472,6 +472,176 @@ class BusinessProfile {
     return filled / fields.length;
   }
 
+  /**
+   * Quality-aware completeness analysis.
+   *
+   * Distinguishes:
+   *   - Required fields found with evidence
+   *   - Required fields missing
+   *   - Evidence-backed fields (any provenance with evidence)
+   *   - AI-only fields (ai_generated provenance)
+   *   - Fields with conflicts
+   *   - Rejected/unsupported fields
+   *   - Incomplete nested objects
+   *
+   * Returns a structured report, not just a ratio.
+   * Legacy getCompleteness() is preserved for backward compatibility.
+   */
+  getQualityCompleteness() {
+    const requiredFields = [
+      'identity.name',
+      'identity.category',
+      'contact.phone',
+      'contact.website',
+      'location.full_address',
+    ];
+
+    const optionalFields = [
+      'identity.description',
+      'contact.email',
+      'location.city',
+      'location.country',
+      'location.coordinates',
+      'ratings.rating',
+      'ratings.review_count',
+      'hours',
+    ];
+
+    const report = {
+      required: {
+        found: [],
+        missing: [],
+        evidenceBacked: [],
+        aiOnly: [],
+        conflicted: [],
+        rejected: [],
+      },
+      optional: {
+        found: [],
+        missing: [],
+        evidenceBacked: [],
+        aiOnly: [],
+        conflicted: [],
+        rejected: [],
+      },
+      nested: {
+        incomplete: [],
+      },
+      summary: {
+        requiredTotal: requiredFields.length,
+        requiredFound: 0,
+        requiredEvidenceBacked: 0,
+        requiredAiOnly: 0,
+        requiredConflicted: 0,
+        requiredMissing: 0,
+        optionalTotal: optionalFields.length,
+        optionalFound: 0,
+        overallEvidenceCoverage: 0,
+        hasConflicts: false,
+      },
+    };
+
+    // Check required fields
+    for (const field of requiredFields) {
+      const value = this.get(field);
+      const fieldObj = this.getField(field);
+      const conflicts = this.getConflicts ? this.getConflicts(field) : [];
+
+      if (value != null && value !== '') {
+        report.required.found.push(field);
+        report.summary.requiredFound++;
+
+        // Evidence check
+        const hasEvidence = fieldObj?.evidenceId || fieldObj?.sourceId ||
+          (fieldObj?.sourceInfo?.sourceUrl && fieldObj?.sourceInfo?.provider);
+        if (hasEvidence) {
+          report.required.evidenceBacked.push(field);
+          report.summary.requiredEvidenceBacked++;
+        }
+
+        // AI-only check
+        if (fieldObj?.provenance === 'ai_generated') {
+          report.required.aiOnly.push(field);
+          report.summary.requiredAiOnly++;
+        }
+
+        // Conflict check
+        if (conflicts.length > 0) {
+          report.required.conflicted.push(field);
+          report.summary.requiredConflicted++;
+          report.summary.hasConflicts = true;
+        }
+      } else {
+        report.required.missing.push(field);
+        report.summary.requiredMissing++;
+      }
+    }
+
+    // Check optional fields
+    for (const field of optionalFields) {
+      const value = this.get(field);
+      const fieldObj = this.getField(field);
+      const conflicts = this.getConflicts ? this.getConflicts(field) : [];
+
+      if (value != null && value !== '') {
+        report.optional.found.push(field);
+        report.summary.optionalFound++;
+
+        const hasEvidence = fieldObj?.evidenceId || fieldObj?.sourceId ||
+          (fieldObj?.sourceInfo?.sourceUrl && fieldObj?.sourceInfo?.provider);
+        if (hasEvidence) {
+          report.optional.evidenceBacked.push(field);
+        }
+
+        if (fieldObj?.provenance === 'ai_generated') {
+          report.optional.aiOnly.push(field);
+        }
+
+        if (conflicts.length > 0) {
+          report.optional.conflicted.push(field);
+          report.summary.hasConflicts = true;
+        }
+      } else {
+        report.optional.missing.push(field);
+      }
+    }
+
+    // Check nested objects for completeness
+    const nestedObjects = {
+      'identity': ['name', 'category', 'description', 'business_type', 'categories'],
+      'contact': ['phone', 'email', 'website'],
+      'location': ['full_address', 'street', 'city', 'state', 'country', 'postal_code', 'coordinates'],
+      'ratings': ['rating', 'review_count', 'reviews', 'review_summary', 'sentiment', 'themes'],
+      'hours': ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+    };
+
+    for (const [group, subFields] of Object.entries(nestedObjects)) {
+      const groupObj = this.getField(group);
+      if (groupObj && groupObj.value && typeof groupObj.value === 'object') {
+        const nestedValue = groupObj.value;
+        let hasAny = false;
+        let allPresent = true;
+        for (const sub of subFields) {
+          if (nestedValue[sub] != null && nestedValue[sub] !== '') {
+            hasAny = true;
+          } else {
+            allPresent = false;
+          }
+        }
+        if (hasAny && !allPresent) {
+          report.nested.incomplete.push(group);
+        }
+      }
+    }
+
+    // Overall evidence coverage
+    const totalWithEvidence = report.required.evidenceBacked.length + report.optional.evidenceBacked.length;
+    const totalFound = report.required.found.length + report.optional.found.length;
+    report.summary.overallEvidenceCoverage = totalFound > 0 ? totalWithEvidence / totalFound : 0;
+
+    return report;
+  }
+
   getProvenanceBreakdown() {
     const breakdown = { verified: 0, discovered: 0, identified: 0, user_provided: 0, inferred: 0, ai_generated: 0 };
     

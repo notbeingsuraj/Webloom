@@ -34,6 +34,7 @@ import {
   ACQUISITION_STATUS,
   normalizeErrorCode
 } from './AcquisitionResult.js';
+import { runCandidatePipeline } from './CandidatePipeline.js';
 import { normalizeField, stripObjectToString } from './FieldNormalizer.js';
 import { getSourceCache } from '../db/SourceCache.js';
 import { validateFetchUrl } from '../utils/ssrfValidator.js';
@@ -944,7 +945,7 @@ Rules:
       resolutionStatus = identified.placeId ? 'partial' : 'unresolved';
     }
 
-    // Step 3: Build BusinessProfile with provenance tracking
+    // Step 3: Build BusinessProfile with provenance tracking (via quality boundary)
     const profile = new BusinessProfile();
     
     // Add IDENTIFIED data from URL parsing
@@ -959,50 +960,36 @@ Rules:
       profile.set('location.coordinates', identified.coordinates, 'identified', 0.8, { sourceUrl: googleMapsUrl });
     }
 
-    // Add DISCOVERED/ai_generated data from Google Maps page extraction.
+    // Add DISCOVERED/ai_generated data from Google Maps page extraction through CandidatePipeline
     // P1.2 AI quarantine: when the profile was produced by the AI model, the
     // identity fields are labeled ai_generated so they can never outrank
     // deterministic URL/provider identity. Values remain available as
     // evidence/candidate data but cannot overwrite authoritative fields.
     const extractedProvenance = aiExtracted ? 'ai_generated' : 'discovered';
-    if (extractedProfile.business?.name) {
-      profile.set('identity.name', extractedProfile.business.name, extractedProvenance, extractedProfile.confidence?.name || 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (extractedProfile.business?.category) {
-      profile.set('identity.category', extractedProfile.business.category, extractedProvenance, extractedProfile.confidence?.category || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (extractedProfile.business?.categories?.length) {
-      profile.set('identity.categories', extractedProfile.business.categories, extractedProvenance, 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (extractedProfile.business?.description) {
-      profile.set('identity.description', extractedProfile.business.description, extractedProvenance, 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (extractedProfile.contact?.phone) {
-      profile.set('contact.phone', extractedProfile.contact.phone, extractedProvenance, extractedProfile.confidence?.phone || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (extractedProfile.contact?.website) {
-      profile.set('contact.website', extractedProfile.contact.website, extractedProvenance, extractedProfile.confidence?.website || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (extractedProfile.location?.full_address) {
-      profile.set('location.full_address', extractedProfile.location.full_address, extractedProvenance, extractedProfile.confidence?.address || 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (extractedProfile.location?.coordinates) {
-      profile.set('location.coordinates', extractedProfile.location.coordinates, extractedProvenance, 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (extractedProfile.ratings?.rating != null) {
-      profile.set('ratings.rating', extractedProfile.ratings.rating, extractedProvenance, extractedProfile.confidence?.rating || 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (extractedProfile.ratings?.review_count != null) {
-      profile.set('ratings.review_count', extractedProfile.ratings.review_count, extractedProvenance, extractedProfile.confidence?.review_count || 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (Array.isArray(extractedProfile.reviews) && extractedProfile.reviews.length) {
-      profile.set('ratings.reviews', extractedProfile.reviews, extractedProvenance, 0.7, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (extractedProfile.hours && Object.keys(extractedProfile.hours).some(k => extractedProfile.hours[k])) {
-      profile.set('hours', extractedProfile.hours, extractedProvenance, 0.6, { sourceUrl: pageData?.url || googleMapsUrl });
-    }
-    if (extractedProfile.social_links?.length) {
-      profile.set('social_links', extractedProfile.social_links, extractedProvenance, 0.5, { sourceUrl: pageData?.url || googleMapsUrl });
+    
+    // Route extracted fields through CandidatePipeline for validation/selection
+    if (extractedProfile && (extractedProfile.business || extractedProfile.contact || 
+        extractedProfile.location || extractedProfile.ratings || extractedProfile.hours ||
+        extractedProfile.reviews || extractedProfile.social_links || extractedProfile.services)) {
+      const pipelineResult = await runCandidatePipeline({
+        records: [{
+          record: extractedProfile,
+          provenance: extractedProvenance,
+          sourceInfo: {
+            sourceUrl: pageData?.url || googleMapsUrl,
+            provider: 'web_extraction',
+            extractionMethod: aiExtracted ? 'ai' : 'dom',
+          },
+        }],
+        profileContext: profile.toObject ? profile.toObject() : profile,
+        options: { onlyIfMissing: false },
+      });
+      
+      pipelineResult.applyToProfile(profile, { sourceUrl: googleMapsUrl, provider: 'web_extraction' });
+
+      if (config?.debugBusinessAnalysis && pipelineResult.diagnostics) {
+        console.log(`[QualityBoundary] web_extraction: candidates=${pipelineResult.diagnostics.totalCandidates}, accepted=${pipelineResult.diagnostics.byStatus?.accepted}, rejected=${pipelineResult.diagnostics.byStatus?.rejected}, conflicts=${pipelineResult.diagnostics.byStatus?.conflicted}`);
+      }
     }
 
     // Step 4: Build an AcquisitionResult from the extraction (before merging
@@ -1057,11 +1044,28 @@ Rules:
         }
         const websiteData = await this.websiteProvider.extract(websiteUrl);
         
-        // Merge with VERIFIED provenance (official website is authoritative)
-        profile.merge(websiteData, 'verified', 0.9);
+        // Merge with VERIFIED provenance through CandidatePipeline
+        const websitePipelineResult = await runCandidatePipeline({
+          records: [{
+            record: websiteData,
+            provenance: 'verified',
+            sourceInfo: {
+              sourceUrl: websiteUrl,
+              provider: 'official_website',
+              extractionMethod: 'dom',
+            },
+          }],
+          profileContext: profile.toObject ? profile.toObject() : profile,
+          options: { onlyIfMissing: false },
+        });
+        
+        websitePipelineResult.applyToProfile(profile, { sourceUrl: websiteUrl, provider: 'official_website' });
         
         if (config.debugBusinessAnalysis) {
           console.log('[BusinessDataExtractor] Official website data merged');
+          if (websitePipelineResult.diagnostics) {
+            console.log(`[QualityBoundary] official_website: candidates=${websitePipelineResult.diagnostics.totalCandidates}, accepted=${websitePipelineResult.diagnostics.byStatus?.accepted}, rejected=${websitePipelineResult.diagnostics.byStatus?.rejected}`);
+          }
         }
       } catch (error) {
         if (config.debugBusinessAnalysis) {
