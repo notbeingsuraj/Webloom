@@ -635,12 +635,31 @@ checkAsync('51. Quality completeness distinguishes evidence', async () => {
 checkAsync('52. Quality completeness detects conflicts', async () => {
   const profile = new BusinessProfile();
   profile.set('identity.name', 'Name A', 'identified', 0.8, { sourceUrl: 'https://maps.google.com/test' });
-  // Simulate a conflict by directly setting a conflicting value with different provenance
+  // A genuinely unresolved conflict: same tier (discovered vs discovered via
+  // user_provided overrides), different values — no clean tier winner.
   profile.set('identity.name', 'Name B', 'discovered', 0.9, { sourceUrl: 'https://geoapify.com/test' });
+  profile.set('identity.category', 'Cat A', 'discovered', 0.7, { sourceUrl: 'https://maps.google.com/test' });
 
   const qc = profile.getQualityCompleteness();
-  assert.ok(qc.required.conflicted.includes('identity.name'));
-  assert.equal(qc.summary.hasConflicts, true);
+  // identity.name: same-tier higher-confidence discovery legitimately wins —
+  // recorded as RESOLVED conflict (winner, reason) and NOT flagged as an
+  // unresolved quality problem (push-audit §7).
+  assert.ok(!qc.required.conflicted.includes('identity.name'));
+  const resolved = profile.getConflicts('identity.name');
+  assert.equal(resolved.length, 1);
+  assert.equal(resolved[0].status, 'resolved');
+  assert.equal(resolved[0].winner, 'incoming');
+  assert.ok(resolved[0].resolutionReason.includes('source_tier'));
+  assert.ok(resolved[0].values.length === 2);
+  assert.ok(resolved[0].values.every(v => v.source || v.sourceInfo?.sourceUrl));
+
+  // An equal-priority conflict with equal confidence (no winner) IS unresolved.
+  profile.set('identity.category', 'Cat B', 'discovered', 0.7, { sourceUrl: 'https://geoapify.com/test' });
+  // force an intractable conflict by directly seeding a second equal-tier value
+  profile.data.identity.category.value = 'Cat C';
+  const qc2 = profile.getQualityCompleteness();
+  assert.ok(qc2.required.conflicted.includes('identity.category'));
+  assert.equal(qc2.summary.hasConflicts, true);
 });
 
 checkAsync('53. Nested incomplete detection', async () => {

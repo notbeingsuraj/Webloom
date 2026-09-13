@@ -145,8 +145,20 @@ class BusinessProfile {
       evidenceId = evidence.id;
     }
 
-    // Check for conflict before updating
+    // Check for conflict before updating. A conflict is only *genuinely
+    // unresolved* when the incoming value differs from the existing one AND the
+    // incoming provenance cannot cleanly win on the source-tier rule. A
+    // clean tier win (higher provenance, or equal provenance with higher
+    // confidence) is recorded as a resolved conflict with the winner + reason —
+    // never as an unresolved conflict — so downstream quality metrics do not
+    // treat a legitimate source-tier win as a problem (push-audit §7).
+    // Equal tier + equal/lower confidence with different values = a real tie:
+    // recorded unresolved (no winner).
     if (isNewValue && hasExistingValue && current?.value !== value) {
+      const newWins = sourceInfo.canonical === true || newPriority > currentPriority ||
+        (newPriority === currentPriority && confidence > (current?.confidence || 0));
+      const existingWins = !newWins && newPriority < currentPriority;
+      const hasCleanWinner = newWins || existingWins;
       this._detectAndStoreConflict(path, {
         oldValue: current.value,
         newValue: value,
@@ -158,7 +170,13 @@ class BusinessProfile {
         newSourceInfo: sourceInfo,
         oldEvidenceId: current.evidenceId,
         newEvidenceId: evidenceId,
-        sourceId
+        sourceId,
+        winner: hasCleanWinner ? (newWins ? 'new' : 'existing') : null,
+        resolutionReason: hasCleanWinner
+          ? (newWins
+              ? `source_tier: ${current.provenance || 'none'} (${currentPriority}) < ${provenance} (${newPriority})`
+              : `source_tier: ${current.provenance || 'none'} (${currentPriority}) > ${provenance} (${newPriority})`)
+          : `tie: ${current.provenance || 'none'} (${currentPriority}) == ${provenance} (${newPriority})`,
       });
     }
     
@@ -202,14 +220,18 @@ class BusinessProfile {
    * Detect and store a conflict when a new value differs from existing
    */
   _detectAndStoreConflict(path, conflictData) {
-    const { oldValue, newValue, oldProvenance, newProvenance, oldConfidence, newConfidence, oldSourceInfo, newSourceInfo, oldEvidenceId, newEvidenceId, sourceId } = conflictData;
+    const { oldValue, newValue, oldProvenance, newProvenance, oldConfidence, newConfidence, oldSourceInfo, newSourceInfo, oldEvidenceId, newEvidenceId, sourceId, winner = null, resolutionReason = null } = conflictData;
     
     // Create claims for both values if they don't exist
     const oldClaimId = this._findClaimByValue(path, oldValue);
     const newClaimId = this._findClaimByValue(path, newValue);
     
-    // Create conflict object
+    // Create conflict object. Includes BOTH candidates with value, source/
+    // provider, confidence, timestamps, and — when the source-tier rule picks
+    // a winner — the selected winner and the reason (push-audit §7).
+    const now = new Date().toISOString();
     const conflict = {
+      id: `conf_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       fieldPath: path,
       values: [
         {
@@ -217,27 +239,33 @@ class BusinessProfile {
           provenance: oldProvenance,
           confidence: oldConfidence,
           sourceInfo: oldSourceInfo,
+          source: oldSourceInfo?.provider || oldSourceInfo?.sourceUrl || null,
+          provider: oldSourceInfo?.provider || null,
           evidenceId: oldEvidenceId,
-          retrievedAt: new Date().toISOString()
+          retrievedAt: now
         },
         {
           value: newValue,
           provenance: newProvenance,
           confidence: newConfidence,
           sourceInfo: newSourceInfo,
+          source: newSourceInfo?.provider || newSourceInfo?.sourceUrl || null,
+          provider: newSourceInfo?.provider || null,
           evidenceId: newEvidenceId,
-          retrievedAt: new Date().toISOString()
+          retrievedAt: now
         }
       ],
-      status: 'conflicted',
-      detectedAt: new Date().toISOString()
+      status: winner ? 'resolved' : 'conflicted',
+      winner: winner ? (winner === 'new' ? 'incoming' : 'existing') : null,
+      resolutionReason,
+      detectedAt: now
     };
-    
-    const conflictId = `conf_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+    const conflictId = conflict.id;
     this.conflictStore.set(conflictId, conflict);
     
     // Log conflict for observability
-    console.warn(`[BusinessProfile] Conflict detected on ${path}: "${oldValue}" vs "${newValue}"`);
+    console.warn(`[BusinessProfile] Conflict detected on ${path}: "${oldValue}" vs "${newValue}"${winner ? ` → ${winner} wins (${resolutionReason})` : ''}`);
   }
 
   /**
@@ -545,7 +573,7 @@ class BusinessProfile {
     for (const field of requiredFields) {
       const value = this.get(field);
       const fieldObj = this.getField(field);
-      const conflicts = this.getConflicts ? this.getConflicts(field) : [];
+      const conflicts = this.getConflicts ? this.getConflicts(field, { onlyUnresolved: true }) : [];
 
       if (value != null && value !== '') {
         report.required.found.push(field);
@@ -581,7 +609,7 @@ class BusinessProfile {
     for (const field of optionalFields) {
       const value = this.get(field);
       const fieldObj = this.getField(field);
-      const conflicts = this.getConflicts ? this.getConflicts(field) : [];
+      const conflicts = this.getConflicts ? this.getConflicts(field, { onlyUnresolved: true }) : [];
 
       if (value != null && value !== '') {
         report.optional.found.push(field);
@@ -666,12 +694,17 @@ class BusinessProfile {
   /**
    * Get all conflicts for a specific field path
    * @param {string} path - Field path (e.g., 'contact.phone')
+   * @param {Object} [opts] - { onlyUnresolved = false } filter to genuinely
+   *   unresolved conflicts (a higher-tier source win is recorded as
+   *   `status: 'resolved'` and is NOT a quality problem).
    * @returns {Array} Array of conflict objects
    */
-  getConflicts(path = null) {
+  getConflicts(path = null, opts = {}) {
+    const { onlyUnresolved = false } = opts;
     const conflicts = [];
     for (const conflict of this.conflictStore.values()) {
       if (!path || conflict.fieldPath === path) {
+        if (onlyUnresolved && conflict.status === 'resolved') continue;
         conflicts.push(conflict);
       }
     }
@@ -977,7 +1010,7 @@ class BusinessProfile {
     }
     
     // Penalize if there are unresolved conflicts
-    const conflicts = this.getConflicts(this._getPathForClaim(this._findClaimByNormalizedValue(null, this._normalizeValueForClaim(null, this.get(path)))));
+    const conflicts = this.getConflicts(this._getPathForClaim(this._findClaimByNormalizedValue(null, this._normalizeValueForClaim(null, this.get(path)))), { onlyUnresolved: true });
     if (conflicts.length > 0) {
       adjustedConfidence = Math.max(0, adjustedConfidence - 0.15);
     }
