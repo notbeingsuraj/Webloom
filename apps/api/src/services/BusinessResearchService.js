@@ -711,11 +711,24 @@ class BusinessResearchService {
 
     const intelligence = this._profileToIntelligence(profile, hints, providerTrace);
 
+    // providerTrace is exposed in the API response for observability.
+    // In production (debugBusinessAnalysis: false) we only surface the
+    // high-level status per provider — no diagnostics, no internal evidence,
+    // no AI prompts, no source-text snippets. This satisfies the
+    // push-audit §A.9 requirement: quality info only when debug is enabled.
+    const exposedProviderTrace = config?.debugBusinessAnalysis
+      ? providerTrace
+      : {
+          geoapify: providerTrace.geoapify,
+          webExtraction: providerTrace.webExtraction,
+          aiEnrichment: providerTrace.aiEnrichment,
+        };
+
     return {
       success: true,
       profile,
       intelligence,
-      provider: providerTrace,
+      provider: exposedProviderTrace,
       validation,
       hints,
       persistence,
