@@ -432,7 +432,9 @@ class BusinessResearchService {
       const geoResult = await GeoapifyProvider.search(hints);
       providerTrace.geoapify = geoResult.status;
       providerTrace.geoapifyError = geoResult.error || null;
-      providerTrace.geoapifyDiagnostics = geoResult.diagnostics || null;
+      if (config?.debugBusinessAnalysis) {
+        providerTrace.geoapifyDiagnostics = geoResult.diagnostics || null;
+      }
 
       const best = GeoapifyProvider.selectBestRecord(geoResult, hints);
       if (best) {
@@ -547,7 +549,9 @@ class BusinessResearchService {
         providerTrace.webExtraction =
           webResult.status === 'success' ? 'no_evidence' : webResult.status;
         providerTrace.webExtractionError = webResult.error || null;
-        providerTrace.webExtractionDiagnostics = webResult.diagnostics || null;
+        if (config?.debugBusinessAnalysis) {
+          providerTrace.webExtractionDiagnostics = webResult.diagnostics || null;
+        }
       }
     }
 
