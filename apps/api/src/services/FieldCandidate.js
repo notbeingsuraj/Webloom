@@ -178,6 +178,14 @@ export function createCandidatesFromRecord(record, provenance = 'discovered', so
   const candidates = [];
   const confidence = record?.confidence || {};
 
+  // Shape-agnostic business carrier: the canonical flat provider shape puts
+  // name/category/description under `business`, while AI enrichment and some
+  // legacy shapes carry them under `identity`. Read both, preferring
+  // `business` (matches CanonicalBusinessProfileService.NAME_SOURCES).
+  const biz = record?.business && typeof record?.business === 'object' && Object.keys(record.business).length
+    ? record.business
+    : (record?.identity && typeof record?.identity === 'object' ? record.identity : {});
+
   const add = (fieldPath, rawValue, conf) => {
     if (rawValue == null || rawValue === '') return;
     // Support evidence at record level (for AI candidates)
@@ -197,18 +205,16 @@ export function createCandidatesFromRecord(record, provenance = 'discovered', so
     }));
   };
 
-  if (record?.business) {
-    add('identity.name', record.business.name, confidence.name);
-    add('identity.category', record.business.category, confidence.category);
-    add('identity.description', record.business.description);
-    add('identity.business_type', record.business.business_type);
-    if (Array.isArray(record.business.categories) && record.business.categories.length) {
-      add('identity.categories', record.business.categories);
-    }
+  add('identity.name', biz.name, confidence.name);
+  add('identity.category', biz.category, confidence.category);
+  add('identity.description', biz.description, confidence.description);
+  add('identity.business_type', biz.business_type ?? biz.businessType, confidence.business_type);
+  if (Array.isArray(biz.categories) && biz.categories.length) {
+    add('identity.categories', biz.categories, confidence.categories);
   }
   if (record?.contact) {
     add('contact.phone', record.contact.phone, confidence.phone);
-    add('contact.email', record.contact.email);
+    add('contact.email', record.contact.email, confidence.email);
     add('contact.website', record.contact.website, confidence.website);
   }
   if (record?.location) {
@@ -226,13 +232,18 @@ export function createCandidatesFromRecord(record, provenance = 'discovered', so
   }
   if (record?.ratings) {
     if (typeof record.ratings.rating === 'number') add('ratings.rating', record.ratings.rating, confidence.rating);
-    if (typeof record.ratings.review_count === 'number') add('ratings.review_count', record.ratings.review_count);
+    if (typeof record.ratings.review_count === 'number') add('ratings.review_count', record.ratings.review_count, confidence.review_count);
   }
   if (record?.hours && typeof record.hours === 'object') {
     add('hours', record.hours);
   }
-  if (Array.isArray(record?.services) && record.services.length) {
-    add('identity.services', record.services);
+  const services = record?.services ?? biz.services;
+  if (Array.isArray(services) && services.length) {
+    add('identity.services', services);
+  }
+  const socialLinks = record?.social_links ?? record?.socialLinks;
+  if (Array.isArray(socialLinks) && socialLinks.length) {
+    add('social_links', socialLinks);
   }
 
   return candidates;
