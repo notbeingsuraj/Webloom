@@ -142,7 +142,11 @@ export default function Contact() {
               </span>
               <span>
                 Registered address<br />
-                <span className="font-medium text-webloom-warning">{siteConfig.contact.address.line1 || siteConfig.contact.address}</span>
+                <span className="font-medium text-webloom-warning">
+                  {typeof siteConfig.contact.address === 'string'
+                    ? siteConfig.contact.address
+                    : siteConfig.contact.address.line1 || 'TODO: provide registered address'}
+                </span>
               </span>
             </p>
           </div>

@@ -9,13 +9,13 @@ interface PageHeaderProps {
 
 export default function PageHeader({ eyebrow, title, description, action }: PageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 border-b border-[#E5E5EA] pb-6 md:flex-row md:items-end md:justify-between">
+    <div className="flex flex-col gap-4 border-b border-webloom-border pb-6 md:flex-row md:items-end md:justify-between">
       <div className="space-y-2">
         {eyebrow ? (
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#6E6E73]">{eyebrow}</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-webloom-muted">{eyebrow}</p>
         ) : null}
-        <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[#111111] md:text-[2.6rem]">{title}</h1>
-        {description ? <p className="max-w-2xl text-sm leading-6 text-[#6E6E73] md:text-base">{description}</p> : null}
+        <h1 className="text-3xl font-semibold tracking-[-0.04em] text-webloom-text md:text-[2.6rem]">{title}</h1>
+        {description ? <p className="max-w-2xl text-sm leading-6 text-webloom-muted md:text-base">{description}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>

@@ -1,22 +1,34 @@
 /**
  * Analytics — environment-configured, consent-gated event tracking.
  *
- * Rules enforced here:
+ * Rules enforced here (pure logic in analyticsCore.ts for testability):
  * - No hardcoded secrets/IDs; config comes from VITE_PUBLIC_ANALYTICS_* env.
  * - Analytics is disabled in development unless explicitly enabled.
  * - If VITE_PUBLIC_ANALYTICS_CONSENT_REQUIRED === 'true' (or consent is not
  *   yet granted) events are queued/stashed and only flushed after consent.
  * - NEVER send sensitive data: prompts, extracted content, personal data, API
- *   credentials. Only event names + page paths are tracked.
+ *   credentials. Only event names + primitive props are forwarded.
  */
 import { siteConfig } from '../config/site';
+import {
+  consentGate,
+  sanitizeEvent,
+  type ConsentState,
+  type TrackEvent,
+  type AnalyticsConfig,
+} from './analyticsCore';
 
 const CONSENT_KEY = 'webloom:analytics-consent';
-export type ConsentState = 'granted' | 'denied' | 'pending';
+export type { ConsentState };
 
-interface TrackEvent {
-  name: string;
-  props?: Record<string, string | number | boolean>;
+function buildConfig(): AnalyticsConfig {
+  return {
+    domain: siteConfig.analytics.domain,
+    src: siteConfig.analytics.src,
+    consentRequired: siteConfig.analytics.consentRequired,
+    enabled: siteConfig.analytics.enabled(),
+    isDev: import.meta.env.DEV === true,
+  };
 }
 
 function loadScript(): boolean {
@@ -46,9 +58,9 @@ export function setConsent(state: ConsentState) {
   if (state === 'granted') {
     // Load analytics only after explicit consent when required, or whenever
     // consent is granted (config controls the requirement).
-    if (siteConfig.analytics.enabled()) {
+    const config = buildConfig();
+    if (config.enabled && !config.isDev) {
       loadScript();
-      // Flush any queued events.
       flushQueue();
     }
   } else {
@@ -57,17 +69,11 @@ export function setConsent(state: ConsentState) {
 }
 
 const QUEUE_KEY = 'webloom:analytics-queue';
-function queueEnabled(): boolean {
-  if (!import.meta.env.DEV && siteConfig.analytics.enabled() === false) return false;
-  // In development: never track.
-  if (import.meta.env.DEV) return false;
-  return true;
-}
 
 function enqueue(event: TrackEvent) {
   try {
     const existing = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
-    existing.push({ ...event, at: new Date().toISOString() });
+    existing.push({ ...sanitizeEvent(event), at: new Date().toISOString() });
     localStorage.setItem(QUEUE_KEY, JSON.stringify(existing.slice(-50)));
   } catch {
     /* storage unavailable — best-effort */
@@ -99,26 +105,18 @@ function send(event: TrackEvent) {
  * Track an event. Safe no-op when analytics is disabled or consent denied.
  */
 export function trackEvent(event: TrackEvent) {
-  if (!queueEnabled()) return;
+  const config = buildConfig();
+  const gate = consentGate(config, getConsentState());
 
-  const consent = getConsentState();
-  const requiresConsent = siteConfig.analytics.consentRequired;
-
-  if (requiresConsent) {
-    if (consent !== 'granted') {
-      // Consent-gated mode: queue the event, fire only after consent.
-      enqueue(event);
-      return;
-    }
-  } else if (consent === 'denied') {
-    // Denied persistence blocks tracking even when consent isn't required.
+  if (gate === 'block') return;
+  if (gate === 'queue') {
+    enqueue(event);
     return;
   }
 
-  if (siteConfig.analytics.enabled()) {
-    loadScript();
-    send(event);
-  }
+  const safe = sanitizeEvent(event);
+  loadScript();
+  send(safe);
 }
 
 /** Convenience wrappers for the specified event set. */

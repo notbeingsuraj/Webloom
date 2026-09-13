@@ -10,7 +10,6 @@ import { leadService } from '../services/leadService';
 const surface = 'rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)] md:p-8';
 const eyebrow = 'text-[11px] uppercase tracking-[0.18em] text-webloom-dim';
 const input = 'w-full rounded-[18px] border border-webloom-border bg-webloom-raised px-4 py-3 text-[15px] text-webloom-text outline-none transition focus:border-primary-500 focus:bg-webloom-hover';
-const inputError = 'w-full rounded-[18px] border border-webloom-danger bg-webloom-raised px-4 py-3 text-[15px] text-webloom-text outline-none transition focus:border-webloom-danger';
 
 const progressSteps = [
   { label: 'Reading business location', duration: 3000 },

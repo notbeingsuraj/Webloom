@@ -69,17 +69,17 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
       : null;
 
   return (
-    <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
+    <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Reviews & reputation</h2>
+        <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Reviews & reputation</h2>
         {status && (
           <span
             className={[
               'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide',
-              isUnavailable ? 'bg-[#F5F5F7] text-[#6E6E73] border border-[#E5E5EA]'
-                : isConflicting ? 'bg-[#FDECEC] text-[#B42318] border border-[#F0C5C2]'
-                : status === 'ai_extracted_from_evidence' ? 'bg-[#F5F3FF] text-[#6D28D9] border border-[#DDD6FE]'
-                : 'bg-[#EBF3FF] text-[#0A84FF] border border-[#D8E9FF]',
+              isUnavailable ? 'bg-webloom-surface text-webloom-muted border border-webloom-border'
+                : isConflicting ? 'bg-red-900/30 text-red-400 border border-red-800/50'
+                : status === 'ai_extracted_from_evidence' ? 'bg-purple-900/30 text-purple-300 border border-purple-800/50'
+                : 'bg-primary-900/30 text-primary-400 border border-primary-800/50',
             ].join(' ')}
           >
             {isConflicting ? <AlertTriangle className="h-3 w-3" /> : <Info className="h-3 w-3" />}
@@ -90,43 +90,43 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
 
       {/* Rating + review count */}
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Rating</p>
+        <div className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Rating</p>
           <div className="mt-3 flex items-center gap-1.5">
             {rating != null ? (
               <>
                 <Star className="h-4 w-4 text-[#F59E0B] fill-[#F59E0B]" />
-                <span className="text-2xl font-semibold tracking-[-0.05em] text-[#111111]">
+                <span className="text-2xl font-semibold tracking-[-0.05em] text-webloom-text">
                   {typeof rating === 'number' ? rating.toFixed(1) : rating}
                 </span>
-                <span className="text-sm text-[#6E6E73]">/ 5</span>
+                <span className="text-sm text-webloom-muted">/ 5</span>
               </>
             ) : (
-              <span className="text-lg font-medium leading-7 text-[#6E6E73]">Unavailable</span>
+              <span className="text-lg font-medium leading-7 text-webloom-muted">Unavailable</span>
             )}
           </div>
         </div>
 
-        <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Reviews</p>
-          <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">
+        <div className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Reviews</p>
+          <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-webloom-text">
             {reviewCount != null ? (
               <>
-                {reviewCount.toLocaleString()}<span className="ml-1 text-sm font-normal text-[#6E6E73]">reviews</span>
+                {reviewCount.toLocaleString()}<span className="ml-1 text-sm font-normal text-webloom-muted">reviews</span>
               </>
             ) : (
-              <span className="text-lg font-medium leading-7 text-[#6E6E73]">
+              <span className="text-lg font-medium leading-7 text-webloom-muted">
                 {sampleCount > 0 ? 'Total count unavailable' : 'Unavailable'}
               </span>
             )}
           </p>
         </div>
 
-        <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Review source</p>
-          <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">
+        <div className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Review source</p>
+          <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-webloom-text">
             <span className="flex items-center gap-1.5 text-lg font-medium leading-7">
-              <MessageSquare className="h-4 w-4 text-[#0A84FF]" />
+              <MessageSquare className="h-4 w-4 text-primary-400" />
               {sourceLabel(rep?.source)}
             </span>
           </p>
@@ -135,51 +135,51 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
 
       {/* Unavailable / conflicting states */}
       {isUnavailable && !partialNote && (
-        <p className="mt-4 rounded-[18px] border border-[#E5E5EA] bg-[#F7F7F8] px-4 py-3 text-sm text-[#6E6E73]">
+        <p className="mt-4 rounded-[18px] border border-webloom-border bg-webloom-raised px-4 py-3 text-sm text-webloom-muted">
           {statusText || 'Rating unavailable from supplied sources'}
         </p>
       )}
       {isConflicting && (
-        <p className="mt-4 rounded-[18px] border border-[#F0C5C2] bg-[#FDECEC] px-4 py-3 text-sm text-[#B42318]">
+        <p className="mt-4 rounded-[18px] border border-red-800/50 bg-red-900/30 px-4 py-3 text-sm text-red-400">
           Reputation data could not be verified for this business.
         </p>
       )}
 
       {/* Partial note: sample count vs total */}
       {partialNote && (
-        <p className="mt-4 rounded-[18px] border border-[#E5E5EA] bg-[#F7F7F8] px-4 py-3 text-sm text-[#6E6E73]">
+        <p className="mt-4 rounded-[18px] border border-webloom-border bg-webloom-raised px-4 py-3 text-sm text-webloom-muted">
           {partialNote}
         </p>
       )}
 
       {/* Review summary */}
       {reviewSummary && (
-        <div className="mt-4 rounded-[18px] border border-[#E5E5EA] bg-[#F7F7F8] px-4 py-3">
-          <p className="text-[11px] uppercase tracking-[0.14em] text-[#6E6E73]">Review summary</p>
-          <p className="mt-1 text-sm leading-6 text-[#111111]">{reviewSummary}</p>
+        <div className="mt-4 rounded-[18px] border border-webloom-border bg-webloom-raised px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-webloom-muted">Review summary</p>
+          <p className="mt-1 text-sm leading-6 text-webloom-text">{reviewSummary}</p>
         </div>
       )}
 
       {/* Review samples */}
       {sampleCount > 0 && (
         <div className="mt-5">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Review samples ({sampleCount})</p>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Review samples ({sampleCount})</p>
           <ul className="mt-3 space-y-2">
             {reviews.slice(0, 10).map((r, idx) => (
-              <li key={idx} className="rounded-[18px] border border-[#E5E5EA] bg-white p-4">
+              <li key={idx} className="rounded-[18px] border border-webloom-border bg-webloom-surface p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   {r.rating != null && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#FFF7ED] px-2 py-0.5 text-xs font-medium text-[#C2410C]">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-900/30 px-2 py-0.5 text-xs font-medium text-amber-300">
                       <Star className="h-3 w-3 fill-[#F59E0B] text-[#F59E0B]" />
                       {r.rating}
                     </span>
                   )}
-                  {r.author && <span className="text-xs font-medium text-[#111111]">{r.author}</span>}
-                  {r.publishedAt && <span className="text-xs text-[#6E6E73]">{r.publishedAt}</span>}
+                  {r.author && <span className="text-xs font-medium text-webloom-text">{r.author}</span>}
+                  {r.publishedAt && <span className="text-xs text-webloom-muted">{r.publishedAt}</span>}
                 </div>
-                {r.text && <p className="mt-2 text-sm leading-6 text-[#111111]">{r.text}</p>}
+                {r.text && <p className="mt-2 text-sm leading-6 text-webloom-text">{r.text}</p>}
                 {r.provenance === 'ai_generated' && (
-                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-[#6D28D9]">
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-purple-300">
                     Extracted from source evidence
                   </p>
                 )}

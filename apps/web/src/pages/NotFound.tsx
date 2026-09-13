@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, LayoutDashboard } from 'lucide-react';
 import usePageMetadata from '../hooks/usePageMetadata';
 import { routes } from '../config/site';
-import Button from './ui/Button';
+import Button from '../components/ui/Button';
 
 export default function NotFound() {
   usePageMetadata(routes.NOT_FOUND);

@@ -6,28 +6,28 @@ import type { IntentItem, TriggerItem, ObjectiveItem, VisualDirectionData } from
 // ---------------------------------------------------------------------------
 
 const urgencyTone: Record<string, string> = {
-  low: 'bg-[#F5F5F7] text-[#6E6E73] border border-[#E5E5EA]',
-  medium: 'bg-[#FFF7ED] text-[#C2410C] border border-[#FBD4A8]',
-  high: 'bg-[#FDECEC] text-[#B42318] border border-[#F0C5C2]',
-  urgent: 'bg-[#FDECEC] text-[#B42318] border border-[#F0C5C2]',
+  low: 'bg-webloom-surface text-webloom-muted border border-webloom-border',
+  medium: 'bg-amber-900/30 text-amber-300 border border-amber-800/50',
+  high: 'bg-red-900/30 text-red-400 border border-red-800/50',
+  urgent: 'bg-red-900/30 text-red-400 border border-red-800/50',
 };
 
 const frequencyTone: Record<string, string> = {
-  'one-time': 'bg-[#F5F5F7] text-[#6E6E73] border border-[#E5E5EA]',
-  recurring: 'bg-[#EBF3FF] text-[#0A84FF] border border-[#D8E9FF]',
-  seasonal: 'bg-[#F5F3FF] text-[#6D28D9] border border-[#DDD6FE]',
+  'one-time': 'bg-webloom-surface text-webloom-muted border border-webloom-border',
+  recurring: 'bg-primary-900/30 text-primary-400 border border-primary-800/50',
+  seasonal: 'bg-purple-900/30 text-purple-300 border border-purple-800/50',
 };
 
 const strengthTone: Record<string, string> = {
-  weak: 'bg-[#F5F5F7] text-[#6E6E73] border border-[#E5E5EA]',
-  moderate: 'bg-[#FFF7ED] text-[#C2410C] border border-[#FBD4A8]',
-  strong: 'bg-[#ECFDF5] text-[#067647] border border-[#BAF0C4]',
+  weak: 'bg-webloom-surface text-webloom-muted border border-webloom-border',
+  moderate: 'bg-amber-900/30 text-amber-300 border border-amber-800/50',
+  strong: 'bg-emerald-900/40 text-emerald-400 border border-emerald-800/60',
 };
 
 const priorityTone: Record<string, string> = {
-  primary: 'bg-[#EBF3FF] text-[#0A84FF] border border-[#D8E9FF]',
-  secondary: 'bg-[#F5F5F7] text-[#6E6E73] border border-[#E5E5EA]',
-  tertiary: 'bg-[#F5F5F7] text-[#6E6E73] border border-[#E5E5EA]',
+  primary: 'bg-primary-900/30 text-primary-400 border border-primary-800/50',
+  secondary: 'bg-webloom-surface text-webloom-muted border border-webloom-border',
+  tertiary: 'bg-webloom-surface text-webloom-muted border border-webloom-border',
 };
 
 function Badge({ label, tone }: { label?: string | null; tone: string }) {
@@ -41,7 +41,7 @@ function Badge({ label, tone }: { label?: string | null; tone: string }) {
 
 function EmptyNote() {
   return (
-    <p className="rounded-xl border border-[#E5E5EA] bg-[#F7F7F8] px-3 py-2.5 text-xs text-[#6E6E73]">
+    <p className="rounded-xl border border-webloom-border bg-webloom-raised px-3 py-2.5 text-xs text-webloom-muted">
       Not available from the analysed sources.
     </p>
   );
@@ -56,10 +56,10 @@ export function IntentList({ items }: { items: IntentItem[] | null }) {
   return (
     <ul className="space-y-2">
       {items.map((item, idx) => (
-        <li key={idx} className="rounded-xl border border-[#E5E5EA] bg-white px-3 py-2.5">
+        <li key={idx} className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-2">
-            <Target className="h-3.5 w-3.5 shrink-0 text-[#0A84FF]" />
-            <span className="text-sm font-medium text-[#111111]">{item.intent}</span>
+            <Target className="h-3.5 w-3.5 shrink-0 text-primary-400" />
+            <span className="text-sm font-medium text-webloom-text">{item.intent}</span>
             <span className="ml-auto flex items-center gap-1.5">
               {item.urgency && <Badge label={item.urgency} tone={urgencyTone[item.urgency] || urgencyTone.medium} />}
               {item.frequency && <Badge label={item.frequency} tone={frequencyTone[item.frequency] || frequencyTone['one-time']} />}
@@ -80,12 +80,12 @@ export function TriggerList({ items }: { items: TriggerItem[] | null }) {
   return (
     <ul className="space-y-2">
       {items.map((item, idx) => (
-        <li key={idx} className="rounded-xl border border-[#E5E5EA] bg-white px-3 py-2.5">
+        <li key={idx} className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-2">
-            <TrendingUp className="h-3.5 w-3.5 shrink-0 text-[#C2410C]" />
-            <span className="text-sm font-medium text-[#111111]">{item.trigger}</span>
+            <TrendingUp className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+            <span className="text-sm font-medium text-webloom-text">{item.trigger}</span>
             <span className="ml-auto flex items-center gap-1.5">
-              {item.type && <Badge label={item.type} tone="bg-[#F5F3FF] text-[#6D28D9] border border-[#DDD6FE]" />}
+              {item.type && <Badge label={item.type} tone="bg-purple-900/30 text-purple-300 border border-purple-800/50" />}
               {item.strength && <Badge label={item.strength} tone={strengthTone[item.strength] || strengthTone.moderate} />}
             </span>
           </div>
@@ -104,16 +104,16 @@ export function ObjectiveList({ items }: { items: ObjectiveItem[] | null }) {
   return (
     <ul className="space-y-2">
       {items.map((item, idx) => (
-        <li key={idx} className="rounded-xl border border-[#E5E5EA] bg-white px-3 py-2.5">
+        <li key={idx} className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2.5">
           <div className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#067647]" />
+            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-[#111111]">{item.objective}</span>
+                <span className="text-sm font-medium text-webloom-text">{item.objective}</span>
                 {item.priority && <Badge label={item.priority} tone={priorityTone[item.priority] || priorityTone.secondary} />}
               </div>
               {item.metrics?.length > 0 && (
-                <p className="mt-1 text-xs leading-5 text-[#6E6E73]">Success metrics: {item.metrics.join(', ')}</p>
+                <p className="mt-1 text-xs leading-5 text-webloom-muted">Success metrics: {item.metrics.join(', ')}</p>
               )}
             </div>
           </div>
@@ -130,9 +130,9 @@ export function ObjectiveList({ items }: { items: ObjectiveItem[] | null }) {
 function LabeledRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;
   return (
-    <div className="rounded-xl border border-[#E5E5EA] bg-white px-3 py-2">
-      <p className="text-[10px] uppercase tracking-[0.14em] text-[#6E6E73]">{label}</p>
-      <p className="mt-0.5 text-sm text-[#111111]">{value}</p>
+    <div className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2">
+      <p className="text-[10px] uppercase tracking-[0.14em] text-webloom-muted">{label}</p>
+      <p className="mt-0.5 text-sm text-webloom-text">{value}</p>
     </div>
   );
 }
@@ -140,11 +140,11 @@ function LabeledRow({ label, value }: { label: string; value?: string | null }) 
 function ChipList({ label, values }: { label: string; values: string[] }) {
   if (!values?.length) return null;
   return (
-    <div className="rounded-xl border border-[#E5E5EA] bg-white px-3 py-2">
-      <p className="text-[10px] uppercase tracking-[0.14em] text-[#6E6E73]">{label}</p>
+    <div className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2">
+      <p className="text-[10px] uppercase tracking-[0.14em] text-webloom-muted">{label}</p>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {values.map((v) => (
-          <span key={v} className="inline-flex items-center rounded-full border border-[#E5E5EA] bg-[#F7F7F8] px-2 py-0.5 text-xs text-[#111111]">{v}</span>
+          <span key={v} className="inline-flex items-center rounded-full border border-webloom-border bg-webloom-raised px-2 py-0.5 text-xs text-webloom-text">{v}</span>
         ))}
       </div>
     </div>

@@ -8,6 +8,7 @@ import AuditRow from '../components/ui/AuditRow';
 import WebsitePreview from '../components/WebsitePreview';
 import ReputationPanel from '../components/ReputationPanel';
 import { IntentList, TriggerList, ObjectiveList, VisualDirectionPanel } from '../components/IntelligenceCards';
+import usePageMetadata from '../hooks/usePageMetadata';
 import { toIntentItems, toTriggerItems, toObjectiveItems, toVisualDirectionData } from '../utils/intelligenceRenderers';
 import { resolveLeadScore } from '../utils/opportunityScore';
 import { leadService } from '../services/leadService';
@@ -15,6 +16,11 @@ import { leadService } from '../services/leadService';
 const tabs = ['Overview', 'Analysis', 'Website', 'Outreach'];
 
 export default function LeadDetail() {
+  usePageMetadata({
+    title: 'Webloom | Lead Workspace',
+    description: 'Review a business analysis workspace.',
+    noindex: true, // authenticated product surface
+  });
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -107,17 +113,17 @@ export default function LeadDetail() {
   }, [lead?.businessData?.services]);
 
   if (isLoading) {
-    return <div className="rounded-[28px] border border-[#E5E5EA] bg-white p-10 text-center text-sm text-[#6E6E73]">Loading lead workspace...</div>;
+    return <div className="rounded-[28px] border border-webloom-border bg-webloom-surface p-10 text-center text-sm text-webloom-muted">Loading lead workspace...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <header className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)] md:p-8">
+      <header className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)] md:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Lead detail</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-[#111111] md:text-[2.7rem]">{lead?.businessName || 'Local business'}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-[#6E6E73]">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Lead detail</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-webloom-text md:text-[2.7rem]">{lead?.businessName || 'Local business'}</h1>
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-webloom-muted">
               <span>{lead?.businessCategory || 'Local business'}</span>
               {lead?.location?.city && <><span className="h-1 w-1 rounded-full bg-[#D2D2D7]" /><span>{lead.location.city}</span></>}
               {lead?.contact?.website && <><span className="h-1 w-1 rounded-full bg-[#D2D2D7]" /><span className="flex items-center gap-1"><Globe className="h-3 w-3" /> Website</span></>}
@@ -128,7 +134,7 @@ export default function LeadDetail() {
             <select
               value={lead?.status || 'new'}
               onChange={(e) => updateStatusMutation.mutate(e.target.value)}
-              className="rounded-full border border-[#D2D2D7] bg-[#F7F7F8] px-3 py-2 text-sm font-medium text-[#111111] outline-none focus:border-[#0A84FF]"
+              className="rounded-full border border-webloom-border bg-webloom-raised px-3 py-2 text-sm font-medium text-webloom-text outline-none focus:border-primary-500"
               aria-label="Lead status"
             >
               <option value="new">New</option>
@@ -139,7 +145,7 @@ export default function LeadDetail() {
             </select>
             <button
               onClick={() => deleteMutation.mutate()}
-              className="inline-flex items-center gap-2 rounded-full border border-[#F0C5C2] bg-[#FDECEC] px-3 py-2 text-sm font-medium text-[#B42318] transition hover:bg-[#FBE2E2]"
+              className="inline-flex items-center gap-2 rounded-full border border-red-800/50 bg-red-900/30 px-3 py-2 text-sm font-medium text-red-400 transition hover:bg-red-900/50"
             >
               <Trash2 className="h-4 w-4" />
               Delete
@@ -147,7 +153,7 @@ export default function LeadDetail() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2 border-t border-[#E5E5EA] pt-6">
+        <div className="mt-6 flex flex-wrap gap-2 border-t border-webloom-border pt-6">
           {tabs.map((tab) => (
             <button
               key={tab}
@@ -155,7 +161,7 @@ export default function LeadDetail() {
               onClick={() => setActiveTab(tab)}
               className={[
                 'rounded-full px-3 py-2 text-sm font-medium transition',
-                activeTab === tab ? 'bg-[#111111] text-white' : 'bg-[#F7F7F8] text-[#6E6E73] hover:text-[#111111]',
+                activeTab === tab ? 'bg-webloom-raised text-white' : 'bg-webloom-raised text-webloom-muted hover:text-webloom-text',
               ].join(' ')}
             >
               {tab}
@@ -167,72 +173,72 @@ export default function LeadDetail() {
       {activeTab === 'Overview' && (
         <div className="grid gap-6 xl:grid-cols-[1.03fr_0.97fr]">
           <div className="space-y-6">
-            <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
+            <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
               <div className="mb-5 flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Business profile</h2>
+                <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Business profile</h2>
                 <StatusBadge status={lead?.status || 'new'} />
               </div>
 
               <dl className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                  <dt className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Location</dt>
-                  <dd className="mt-3 flex items-center gap-2 text-sm text-[#111111]">
-                    <MapPin className="h-4 w-4 shrink-0 text-[#6E6E73]" />
+                <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                  <dt className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Location</dt>
+                  <dd className="mt-3 flex items-center gap-2 text-sm text-webloom-text">
+                    <MapPin className="h-4 w-4 shrink-0 text-webloom-muted" />
                     <span>{lead?.location?.address || 'Location not available'}</span>
                   </dd>
                 </div>
-                <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                  <dt className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Phone</dt>
-                  <dd className="mt-3 flex items-center gap-2 text-sm text-[#111111]">
-                    <Phone className="h-4 w-4 shrink-0 text-[#6E6E73]" />
+                <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                  <dt className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Phone</dt>
+                  <dd className="mt-3 flex items-center gap-2 text-sm text-webloom-text">
+                    <Phone className="h-4 w-4 shrink-0 text-webloom-muted" />
                     {lead?.contact?.phone ? (
-                      <a href={`tel:${lead.contact.phone}`} className="text-[#0A84FF] hover:text-[#0077ED]">{lead.contact.phone}</a>
-                    ) : <span className="text-[#6E6E73]">Not available</span>}
+                      <a href={`tel:${lead.contact.phone}`} className="text-primary-400 hover:text-primary-300">{lead.contact.phone}</a>
+                    ) : <span className="text-webloom-muted">Not available</span>}
                   </dd>
                 </div>
-                <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                  <dt className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Email</dt>
-                  <dd className="mt-3 flex items-center gap-2 text-sm text-[#111111]">
-                    <Mail className="h-4 w-4 shrink-0 text-[#6E6E73]" />
+                <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                  <dt className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Email</dt>
+                  <dd className="mt-3 flex items-center gap-2 text-sm text-webloom-text">
+                    <Mail className="h-4 w-4 shrink-0 text-webloom-muted" />
                     {lead?.contact?.email ? (
-                      <a href={`mailto:${lead.contact.email}`} className="text-[#0A84FF] hover:text-[#0077ED]">{lead.contact.email}</a>
-                    ) : <span className="text-[#6E6E73]">Not available</span>}
+                      <a href={`mailto:${lead.contact.email}`} className="text-primary-400 hover:text-primary-300">{lead.contact.email}</a>
+                    ) : <span className="text-webloom-muted">Not available</span>}
                   </dd>
                 </div>
-                <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                  <dt className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Website</dt>
-                  <dd className="mt-3 flex items-center gap-2 text-sm text-[#111111]">
-                    <Globe className="h-4 w-4 shrink-0 text-[#6E6E73]" />
+                <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                  <dt className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Website</dt>
+                  <dd className="mt-3 flex items-center gap-2 text-sm text-webloom-text">
+                    <Globe className="h-4 w-4 shrink-0 text-webloom-muted" />
                     {lead?.contact?.website ? (
-                      <a href={lead.contact.website} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[#0A84FF] hover:text-[#0077ED]">
+                      <a href={lead.contact.website} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-primary-400 hover:text-primary-300">
                         Visit site <ExternalLink className="h-3 w-3" />
                       </a>
-                    ) : <span className="text-[#6E6E73]">No website detected</span>}
+                    ) : <span className="text-webloom-muted">No website detected</span>}
                   </dd>
                 </div>
               </dl>
             </div>
 
-            <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
+            <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Business DNA</h2>
+                <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Business DNA</h2>
                 <StatusBadge status={analysisState} />
               </div>
               {analysisState === 'failed' && (
-                <div className="mb-4 rounded-[20px] border border-[#F0C5C2] bg-[#FDECEC] p-4">
-                  <p className="flex items-center gap-2 text-sm font-medium text-[#B42318]">
+                <div className="mb-4 rounded-[20px] border border-red-800/50 bg-red-900/30 p-4">
+                  <p className="flex items-center gap-2 text-sm font-medium text-red-400">
                     <AlertCircle className="h-4 w-4" />
                     Brand DNA generation failed
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-[#B42318]/80">The business profile is still valid, but the AI analysis did not complete. Retry to regenerate.</p>
+                  <p className="mt-1 text-xs leading-5 text-red-400/80">The business profile is still valid, but the AI analysis did not complete. Retry to regenerate.</p>
                 </div>
               )}
               <div className="mt-5 space-y-4">
-                <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Target audience</p>
-                  <p className="mt-2 text-sm leading-6 text-[#111111]">{showDna ? (lead?.analysis?.brandDNA?.audience?.primary?.segment || lead?.analysis?.brandDNA?.audience || dnaEmptyText) : dnaEmptyText}</p>
+                <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Target audience</p>
+                  <p className="mt-2 text-sm leading-6 text-webloom-text">{showDna ? (lead?.analysis?.brandDNA?.audience?.primary?.segment || lead?.analysis?.brandDNA?.audience || dnaEmptyText) : dnaEmptyText}</p>
                   {showDna && lead?.analysis?.brandDNA?.audience?.primary?.demographics && (
-                    <p className="mt-2 text-xs leading-5 text-[#6E6E73]">
+                    <p className="mt-2 text-xs leading-5 text-webloom-muted">
                       {[
                         lead.analysis.brandDNA.audience.primary.demographics.ageRange,
                         lead.analysis.brandDNA.audience.primary.demographics.income,
@@ -241,39 +247,39 @@ export default function LeadDetail() {
                     </p>
                   )}
                 </div>
-                <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Positioning statement</p>
-                  <p className="mt-2 text-sm leading-6 text-[#111111]">{showDna ? (lead?.analysis?.brandDNA?.positioning?.statement || dnaEmptyText) : dnaEmptyText}</p>
+                <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Positioning statement</p>
+                  <p className="mt-2 text-sm leading-6 text-webloom-text">{showDna ? (lead?.analysis?.brandDNA?.positioning?.statement || dnaEmptyText) : dnaEmptyText}</p>
                   {showDna && lead?.analysis?.brandDNA?.positioning?.differentiation && (
-                    <p className="mt-2 text-xs leading-5 text-[#6E6E73]">{lead.analysis.brandDNA.positioning.differentiation}</p>
+                    <p className="mt-2 text-xs leading-5 text-webloom-muted">{lead.analysis.brandDNA.positioning.differentiation}</p>
                   )}
                 </div>
-                <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Brand personality</p>
+                <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Brand personality</p>
                   {showDna && lead?.analysis?.brandDNA?.brandPersonality?.primary?.length ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {lead.analysis.brandDNA.brandPersonality.primary.map((trait: string) => (
-                        <span key={trait} className="inline-flex items-center rounded-full border border-[#E5E5EA] bg-white px-2.5 py-1 text-xs text-[#111111]">{trait}</span>
+                        <span key={trait} className="inline-flex items-center rounded-full border border-webloom-border bg-webloom-surface px-2.5 py-1 text-xs text-webloom-text">{trait}</span>
                       ))}
                       {lead.analysis.brandDNA.brandPersonality.archetype && (
-                        <span className="inline-flex items-center rounded-full bg-[#EBF3FF] px-2.5 py-1 text-xs text-[#0A84FF]">Archetype: {lead.analysis.brandDNA.brandPersonality.archetype}</span>
+                        <span className="inline-flex items-center rounded-full bg-primary-900/30 px-2.5 py-1 text-xs text-primary-400">Archetype: {lead.analysis.brandDNA.brandPersonality.archetype}</span>
                       )}
                     </div>
-                  ) : <p className="mt-2 text-sm leading-6 text-[#111111]">{dnaEmptyText}</p>}
+                  ) : <p className="mt-2 text-sm leading-6 text-webloom-text">{dnaEmptyText}</p>}
                 </div>
                 {showDna && lead?.analysis?.brandDNA?.toneOfVoice && (
-                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Tone of voice</p>
-                    <p className="mt-2 text-sm leading-6 text-[#111111]">{lead.analysis.brandDNA.toneOfVoice.characteristics?.join(', ') || '—'}</p>
+                  <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Tone of voice</p>
+                    <p className="mt-2 text-sm leading-6 text-webloom-text">{lead.analysis.brandDNA.toneOfVoice.characteristics?.join(', ') || '—'}</p>
                   </div>
                 )}
                 {showDna && lead?.analysis?.brandDNA?.strategicRecommendations?.length ? (
-                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Strategic recommendations</p>
+                  <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Strategic recommendations</p>
                     <ul className="mt-2 space-y-2">
                       {lead.analysis.brandDNA.strategicRecommendations.slice(0, 4).map((rec: { recommendation?: string }, i: number) => (
-                        <li key={i} className="flex items-start gap-2 text-sm leading-5 text-[#111111]">
-                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#067647]" />
+                        <li key={i} className="flex items-start gap-2 text-sm leading-5 text-webloom-text">
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
                           {rec.recommendation}
                         </li>
                       ))}
@@ -285,42 +291,42 @@ export default function LeadDetail() {
 
           {/* Provenance / Source Information */}
             {(lead?.analysis?.metrics?.trustSignals || services.length > 0) && (
-              <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
-                <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Business details</h2>
+              <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
+                <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Business details</h2>
                 <div className="mt-5 space-y-3">
                   {services.length > 0 && (
-                    <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Services</p>
+                    <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Services</p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {services.map((s: string) => (
-                          <span key={s} className="inline-flex items-center gap-1 rounded-full border border-[#E5E5EA] bg-white px-2.5 py-1 text-xs text-[#111111]">
-                            <Tag className="h-3 w-3 text-[#6E6E73]" /> {s}
+                          <span key={s} className="inline-flex items-center gap-1 rounded-full border border-webloom-border bg-webloom-surface px-2.5 py-1 text-xs text-webloom-text">
+                            <Tag className="h-3 w-3 text-webloom-muted" /> {s}
                           </span>
                         ))}
                       </div>
                     </div>
                   )}
                   {lead?.businessData?.openingHours && (
-                    <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Hours</p>
-                      <div className="mt-2 flex items-center gap-2 text-sm text-[#111111]">
-                        <Clock className="h-4 w-4 text-[#6E6E73]" />
+                    <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Hours</p>
+                      <div className="mt-2 flex items-center gap-2 text-sm text-webloom-text">
+                        <Clock className="h-4 w-4 text-webloom-muted" />
                         <span>Hours data available</span>
                       </div>
                     </div>
                   )}
                   {lead?.analysis?.metrics?.trustSignals && (
-                    <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Source confidence</p>
+                    <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Source confidence</p>
                       <div className="mt-2 flex items-center gap-2">
                         {Array.isArray(lead.analysis.metrics.trustSignals) ? (
                           lead.analysis.metrics.trustSignals.slice(0, 3).map((signal: string, i: number) => (
-                            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[#ECFDF5] px-2 py-1 text-xs text-[#067647]">
+                            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-emerald-900/40 px-2 py-1 text-xs text-emerald-400">
                               <CheckCircle2 className="h-3 w-3" /> {signal}
                             </span>
                           ))
                         ) : (
-                          <span className="text-sm text-[#111111]">Sources consulted</span>
+                          <span className="text-sm text-webloom-text">Sources consulted</span>
                         )}
                       </div>
                     </div>
@@ -337,9 +343,9 @@ export default function LeadDetail() {
               description={scoreDescription}
             />
 
-            <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
-              <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Digital audit</h2>
-              <p className="mt-1 text-xs text-[#6E6E73]">
+            <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
+              <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Digital audit</h2>
+              <p className="mt-1 text-xs text-webloom-muted">
                 {lead?.analysis?.audit?.status === 'degraded'
                   ? `Audit incomplete — ${lead.analysis.audit.websiteExists ? 'website detected but not scored' : 'no website detected'}`
                   : lead?.analysis?.audit?.websiteExists
@@ -365,13 +371,13 @@ export default function LeadDetail() {
               </div>
             </div>
 
-            <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
+            <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Recommended action</h2>
+                <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Recommended action</h2>
                 <button
                   type="button"
                   onClick={() => generateDNAMutation.mutate()}
-                  className="rounded-full bg-[#111111] px-3 py-2 text-xs font-medium text-white transition hover:bg-[#2A2A2A]"
+                  className="rounded-full bg-webloom-raised px-3 py-2 text-xs font-medium text-white transition hover:bg-[#2A2A2A]"
                   disabled={generateDNAMutation.isPending}
                 >
                   {generateDNAMutation.isPending ? 'Generating...' : 'Refresh analysis'}
@@ -379,17 +385,17 @@ export default function LeadDetail() {
               </div>
 
               {generateDNAMutation.isError ? (
-                <div className="mt-5 rounded-[20px] border border-[#F0C5C2] bg-[#FDECEC] p-4 text-sm leading-6">
-                  <p className="flex items-center gap-2 font-medium text-[#B42318]">
+                <div className="mt-5 rounded-[20px] border border-red-800/50 bg-red-900/30 p-4 text-sm leading-6">
+                  <p className="flex items-center gap-2 font-medium text-red-400">
                     <AlertCircle className="h-4 w-4" />
                     Refresh failed
                   </p>
-                  <p className="mt-1 text-xs text-[#B42318]/80">The analysis could not be regenerated. Check the API and try again.</p>
+                  <p className="mt-1 text-xs text-red-400/80">The analysis could not be regenerated. Check the API and try again.</p>
                 </div>
               ) : (
-                <div className="mt-5 rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4 text-sm leading-6 text-[#111111]">
+                <div className="mt-5 rounded-[20px] border border-webloom-border bg-webloom-raised p-4 text-sm leading-6 text-webloom-text">
                   <p className="flex items-center gap-2 font-medium">
-                    <Sparkles className="h-4 w-4 text-[#0A84FF]" />
+                    <Sparkles className="h-4 w-4 text-primary-400" />
                     {recommendedAction}
                   </p>
                 </div>
@@ -401,20 +407,20 @@ export default function LeadDetail() {
 
       {activeTab === 'Analysis' && (
         <div className="space-y-6">
-          <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
+          <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
             <div className="mb-6 flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Opportunity breakdown</h2>
+              <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Opportunity breakdown</h2>
               <StatusBadge status={lead?.opportunityScore?.priority || 'high'} />
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Website</p>
-                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead?.contact?.website ? 'Present' : 'Missing'}</p>
+              <div className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Website</p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-webloom-text">{lead?.contact?.website ? 'Present' : 'Missing'}</p>
               </div>
-              <div className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Score</p>
-                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">{lead?.opportunityScore?.total ?? '—'}</p>
+              <div className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Score</p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-webloom-text">{lead?.opportunityScore?.total ?? '—'}</p>
               </div>
             </div>
           </div>
@@ -424,35 +430,35 @@ export default function LeadDetail() {
 
           {/* Brand DNA deep dive */}
           {lead?.analysis?.brandDNA && (
-            <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
+            <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
               <div className="mb-5 flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Brand DNA deep dive</h2>
+                <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Brand DNA deep dive</h2>
                 <StatusBadge status={lead?.analysis?.brandStrategyStatus || 'new'} />
               </div>
               <div className="grid gap-4 lg:grid-cols-2">
                 {lead.analysis.brandDNA.customerIntent && (
-                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Customer intent</p>
+                  <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Customer intent</p>
                     <div className="mt-2">
                       <IntentList items={toIntentItems(lead.analysis.brandDNA.customerIntent)} />
                     </div>
                   </div>
                 )}
                 {lead.analysis.brandDNA.purchaseTriggers && (
-                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Purchase triggers</p>
+                  <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Purchase triggers</p>
                     <div className="mt-2">
                       <TriggerList items={toTriggerItems(lead.analysis.brandDNA.purchaseTriggers)} />
                     </div>
                   </div>
                 )}
                 {lead.analysis.brandDNA.painPoints?.length ? (
-                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Pain points</p>
+                  <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Pain points</p>
                     <ul className="mt-2 space-y-1.5">
                       {lead.analysis.brandDNA.painPoints.slice(0, 5).map((pp: { pain?: string } | string, i: number) => (
-                        <li key={i} className="flex items-start gap-2 text-sm leading-5 text-[#111111]">
-                          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#B42318]" />
+                        <li key={i} className="flex items-start gap-2 text-sm leading-5 text-webloom-text">
+                          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
                           {typeof pp === 'string' ? pp : pp.pain || ''}
                         </li>
                       ))}
@@ -460,12 +466,12 @@ export default function LeadDetail() {
                   </div>
                 ) : null}
                 {lead.analysis.brandDNA.competitiveAdvantages?.length ? (
-                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Competitive advantages</p>
+                  <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Competitive advantages</p>
                     <ul className="mt-2 space-y-1.5">
                       {lead.analysis.brandDNA.competitiveAdvantages.slice(0, 5).map((adv: { advantage?: string } | string, i: number) => (
-                        <li key={i} className="flex items-start gap-2 text-sm leading-5 text-[#111111]">
-                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#067647]" />
+                        <li key={i} className="flex items-start gap-2 text-sm leading-5 text-webloom-text">
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
                           {typeof adv === 'string' ? adv : adv.advantage || ''}
                         </li>
                       ))}
@@ -473,25 +479,25 @@ export default function LeadDetail() {
                   </div>
                 ) : null}
                 {lead.analysis.brandDNA.conversionStrategy?.primaryCTA && (
-                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Primary CTA</p>
-                    <p className="mt-2 text-sm font-medium text-[#111111]">{lead.analysis.brandDNA.conversionStrategy.primaryCTA.text || lead.analysis.brandDNA.conversionStrategy.primaryCTA.action}</p>
+                  <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Primary CTA</p>
+                    <p className="mt-2 text-sm font-medium text-webloom-text">{lead.analysis.brandDNA.conversionStrategy.primaryCTA.text || lead.analysis.brandDNA.conversionStrategy.primaryCTA.action}</p>
                     {lead.analysis.brandDNA.conversionStrategy.primaryCTA.reasoning && (
-                      <p className="mt-1 text-xs leading-5 text-[#6E6E73]">{lead.analysis.brandDNA.conversionStrategy.primaryCTA.reasoning}</p>
+                      <p className="mt-1 text-xs leading-5 text-webloom-muted">{lead.analysis.brandDNA.conversionStrategy.primaryCTA.reasoning}</p>
                     )}
                   </div>
                 )}
                 {lead.analysis.brandDNA.visualDirection && (
-                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Visual direction</p>
+                  <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Visual direction</p>
                     <div className="mt-2">
                       <VisualDirectionPanel data={toVisualDirectionData(lead.analysis.brandDNA.visualDirection)} />
                     </div>
                   </div>
                 )}
                 {lead.analysis.brandDNA.websiteObjectives && (
-                  <div className="rounded-[20px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Website objectives</p>
+                  <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Website objectives</p>
                     <div className="mt-2">
                       <ObjectiveList items={toObjectiveItems(lead.analysis.brandDNA.websiteObjectives)} />
                     </div>
@@ -503,12 +509,12 @@ export default function LeadDetail() {
 
           {/* Research / Analysis Details */}
           {lead?.analysis?.metrics?.facts && lead.analysis.metrics.facts.length > 0 && (
-            <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
-              <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Key findings</h2>
+            <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
+              <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Key findings</h2>
               <div className="mt-4 space-y-2">
                 {lead.analysis.metrics.facts.slice(0, 8).map((fact: any, i: number) => (
-                  <div key={i} className="flex items-start gap-2.5 rounded-xl border border-[#E5E5EA] bg-[#F7F7F8] px-4 py-3 text-sm text-[#111111]">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-[#067647] mt-0.5" />
+                  <div key={i} className="flex items-start gap-2.5 rounded-xl border border-webloom-border bg-webloom-raised px-4 py-3 text-sm text-webloom-text">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
                     <span className="leading-6">{typeof fact === 'string' ? fact : fact.claim}</span>
                   </div>
                 ))}
@@ -517,11 +523,11 @@ export default function LeadDetail() {
           )}
 
           {lead?.analysis?.metrics?.unknowns && lead.analysis.metrics.unknowns.length > 0 && (
-            <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
-              <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Information gaps</h2>
+            <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
+              <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Information gaps</h2>
               <div className="mt-4 space-y-2">
                 {lead.analysis.metrics.unknowns.slice(0, 5).map((unknown: string, i: number) => (
-                  <div key={i} className="flex items-start gap-2.5 rounded-xl border border-[#E5E5EA] bg-[#FFF7ED] px-4 py-3 text-sm text-[#C2410C]">
+                  <div key={i} className="flex items-start gap-2.5 rounded-xl border border-webloom-border bg-amber-900/30 px-4 py-3 text-sm text-amber-300">
                     <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     <span className="leading-6">{unknown}</span>
                   </div>
@@ -542,16 +548,16 @@ export default function LeadDetail() {
       )}
 
       {activeTab === 'Outreach' && (
-        <div className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
-          <h2 className="text-xl font-semibold tracking-[-0.04em] text-[#111111]">Outreach drafts</h2>
+        <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
+          <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Outreach drafts</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {['WhatsApp', 'Email', 'Instagram', 'Call Script'].map((channel) => (
-              <div key={channel} className="rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">{channel}</p>
-                <p className="mt-3 text-sm leading-6 text-[#111111]">{channel === 'WhatsApp' ? 'Hi, I noticed your current digital presence...' : 'We can help improve...'}</p>
+              <div key={channel} className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">{channel}</p>
+                <p className="mt-3 text-sm leading-6 text-webloom-text">{channel === 'WhatsApp' ? 'Hi, I noticed your current digital presence...' : 'We can help improve...'}</p>
                 <div className="mt-4 flex gap-2">
-                  <button type="button" className="rounded-full bg-[#111111] px-3 py-2 text-xs font-medium text-white">Copy</button>
-                  <button type="button" className="rounded-full border border-[#D2D2D7] bg-white px-3 py-2 text-xs font-medium text-[#111111]">Regenerate</button>
+                  <button type="button" className="rounded-full bg-webloom-raised px-3 py-2 text-xs font-medium text-white">Copy</button>
+                  <button type="button" className="rounded-full border border-webloom-border bg-webloom-surface px-3 py-2 text-xs font-medium text-webloom-text">Regenerate</button>
                 </div>
               </div>
             ))}

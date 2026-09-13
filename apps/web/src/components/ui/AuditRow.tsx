@@ -5,15 +5,15 @@ interface AuditRowProps {
 }
 
 const toneStyles = {
-  good: 'text-[#0A84FF] bg-[#EBF3FF] border-[#D8E9FF]',
-  neutral: 'text-[#111111] bg-[#F5F5F7] border-[#E5E5EA]',
-  bad: 'text-[#B42318] bg-[#FDECEC] border-[#F0C5C2]',
+  good: 'text-primary-400 bg-primary-900/30 border-primary-800/50',
+  neutral: 'text-webloom-text bg-webloom-surface border-webloom-border',
+  bad: 'text-red-400 bg-red-900/30 border-red-800/50',
 };
 
 export default function AuditRow({ label, value, tone = 'neutral' }: AuditRowProps) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#E5E5EA] bg-white px-4 py-3">
-      <span className="text-sm text-[#111111]">{label}</span>
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-webloom-border bg-webloom-surface px-4 py-3">
+      <span className="text-sm text-webloom-text">{label}</span>
       <span className={['inline-flex rounded-full border px-2.5 py-1 text-xs font-medium', toneStyles[tone]].join(' ')}>{value}</span>
     </div>
   );

@@ -32,7 +32,7 @@ export default function PrivacyPolicy() {
             Contact: <a className={accent} href={`mailto:${siteConfig.contact.email}`}>{siteConfig.contact.email}</a>
           </p>
           <p className="mt-2">
-            Address: <span className="text-webloom-warning font-medium">{siteConfig.contact.address.line1 || siteConfig.contact.address}</span>
+            Address: <span className="text-webloom-warning font-medium">{typeof siteConfig.contact.address === 'string' ? siteConfig.contact.address : siteConfig.contact.address.line1 || 'TODO: provide registered address'}</span>
           </p>
         </Section>
 

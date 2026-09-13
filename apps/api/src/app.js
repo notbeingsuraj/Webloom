@@ -14,6 +14,7 @@ import landingPageRoutes from './routes/landingPage.js';
 import digitalAuditRoutes from './routes/digitalAudit.js';
 import websiteRoutes from './routes/website.js';
 import reviewsRoutes from './routes/reviews.js';
+import contactRoutes from './routes/contact.js';
 
 const app = express();
 
@@ -55,6 +56,7 @@ app.use('/api/landing-page', landingPageRoutes);
 app.use('/api/digital-audit', digitalAuditRoutes);
 app.use('/api/website', websiteRoutes);
 app.use('/api/reviews', reviewsRoutes);
+app.use('/api/contact', contactRoutes);
 
 // API info endpoint
 app.get('/api', (req, res) => {
@@ -70,6 +72,7 @@ app.get('/api', (req, res) => {
       landingPage: '/api/landing-page',
       digitalAudit: '/api/digital-audit',
       reviews: '/api/reviews',
+      contact: '/api/contact',
     },
   });
 });
