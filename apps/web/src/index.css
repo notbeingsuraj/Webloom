@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  color: #111111;
-  background: #f5f5f7;
+  color: #FAFAFA;
+  background: #09090B;
   font-family: Inter, 'SF Pro Display', 'Segoe UI', sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -12,10 +12,11 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
 }
 
 html {
-  background: #f5f5f7;
+  background: #09090B;
   scroll-behavior: smooth;
 }
 
@@ -23,8 +24,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f5f5f7;
-  color: #111111;
+  background: #09090B;
+  color: #FAFAFA;
 }
 
 * { box-sizing: border-box; }
@@ -38,7 +39,15 @@ button, input, textarea, select {
 }
 
 ::selection {
-  background: rgba(10, 132, 255, 0.18);
+  background: rgba(99, 102, 241, 0.30);
+}
+
+@layer base {
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #555; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -3,7 +3,14 @@ import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Loader, MapPin, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
 import Button from '../components/ui/Button';
+import usePageMetadata from '../hooks/usePageMetadata';
+import analytics from '../services/analytics';
 import { leadService } from '../services/leadService';
+
+const surface = 'rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)] md:p-8';
+const eyebrow = 'text-[11px] uppercase tracking-[0.18em] text-webloom-dim';
+const input = 'w-full rounded-[18px] border border-webloom-border bg-webloom-raised px-4 py-3 text-[15px] text-webloom-text outline-none transition focus:border-primary-500 focus:bg-webloom-hover';
+const inputError = 'w-full rounded-[18px] border border-webloom-danger bg-webloom-raised px-4 py-3 text-[15px] text-webloom-text outline-none transition focus:border-webloom-danger';
 
 const progressSteps = [
   { label: 'Reading business location', duration: 3000 },
@@ -40,6 +47,11 @@ function validateGoogleMapsUrl(url: string): string | null {
 
 export default function NewLead() {
   const navigate = useNavigate();
+  usePageMetadata({
+    title: 'Webloom | Business Intelligence Analysis',
+    description: 'Paste a Google Maps URL to extract verified business intelligence, digital audit, and opportunity score.',
+    noindex: true,
+  });
   const [urlInput, setUrlInput] = useState('');
   const [formData, setFormData] = useState({
     leadName: '',
@@ -57,7 +69,11 @@ export default function NewLead() {
   const createLeadMutation = useMutation({
     mutationFn: leadService.createLead,
     onSuccess: (data) => {
+      analytics.analysisCompleted();
       navigate(`/leads/${data.data._id}`);
+    },
+    onError: () => {
+      analytics.analysisFailed();
     },
   });
 
@@ -129,6 +145,7 @@ export default function NewLead() {
       setUrlError(error);
       return;
     }
+    analytics.startAnalysis();
     setCurrentStep(0);
     setStartTime(Date.now());
     setElapsedTime(0);
@@ -158,35 +175,38 @@ export default function NewLead() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-8 rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)] md:p-8">
+      <div className={`mb-8 ${surface}`}>
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Analysis</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-[#111111] md:text-[2.7rem]">
+            <p className={eyebrow}>Analysis</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-webloom-text md:text-[2.7rem]">
               Turn local businesses into opportunities.
             </h1>
-            <p className="mt-3 max-w-2xl text-base text-[#6E6E73]">
+            <p className="mt-3 max-w-2xl text-base text-webloom-muted">
               Paste a Google Maps URL to uncover business value, identify digital gaps, and generate a premium outreach plan.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#E5E5EA] bg-[#F7F7F8] px-3 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-[#6E6E73]">
-            <Sparkles className="h-3.5 w-3.5 text-[#0A84FF]" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-webloom-border bg-webloom-raised px-3 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-webloom-muted">
+            <Sparkles className="h-3.5 w-3.5 text-primary-400" />
             Lead workflow
           </div>
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <form onSubmit={handleSubmit} className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)] md:p-8">
+        <form onSubmit={handleSubmit} className={surface} noValidate>
           <div className="space-y-6">
             <div>
-              <label className="mb-2 block text-sm font-medium text-[#111111]">Google Maps URL</label>
+              <label htmlFor="maps-url" className="mb-2 block text-sm font-medium text-webloom-text">Google Maps URL</label>
               <div className="relative">
-                <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#6E6E73]" />
+                <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-webloom-dim" />
                 <input
+                  id="maps-url"
                   type="url"
                   required
-                  className={`w-full rounded-[20px] border ${urlError ? 'border-[#B42318] bg-[#FEF6F5]' : 'border-[#D2D2D7] bg-[#F7F7F8]'} py-4 pl-12 pr-4 text-base text-[#111111] outline-none transition focus:border-[#0A84FF] focus:bg-white ${isProcessing ? 'opacity-60' : ''}`}
+                  aria-invalid={!!urlError}
+                  aria-describedby={urlError ? 'maps-url-error' : 'maps-url-hint'}
+                  className={`w-full rounded-[20px] border ${urlError ? 'border-webloom-danger bg-webloom-raised' : 'border-webloom-border bg-webloom-raised focus:border-primary-500'} py-4 pl-12 pr-4 text-base text-webloom-text outline-none transition focus:bg-webloom-hover ${isProcessing ? 'opacity-60' : ''}`}
                   placeholder="https://maps.google.com/place/..."
                   value={urlInput}
                   onChange={(e) => handleUrlChange(e.target.value)}
@@ -196,38 +216,38 @@ export default function NewLead() {
                 />
               </div>
               {urlError ? (
-                <p className="mt-2 flex items-center gap-1.5 text-sm text-[#B42318]">
+                <p id="maps-url-error" className="mt-2 flex items-center gap-1.5 text-sm text-webloom-danger" role="alert">
                   <AlertCircle className="h-3.5 w-3.5" />
                   {urlError}
                 </p>
               ) : (
-                <p className="mt-2 text-sm text-[#6E6E73]">Paste a Google Maps link for any business — e.g. maps.google.com/place/... or maps.google.com/?cid=...</p>
+                <p id="maps-url-hint" className="mt-2 text-sm text-webloom-muted">Paste a Google Maps link for any business — e.g. maps.google.com/place/... or maps.google.com/?cid=...</p>
               )}
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-[#111111]">Lead name</span>
+                <span className="mb-2 block text-sm font-medium text-webloom-text">Lead name</span>
                 <input
                   type="text"
-                  className="w-full rounded-[18px] border border-[#D2D2D7] bg-[#F7F7F8] px-4 py-3 text-[#111111] outline-none transition focus:border-[#0A84FF] focus:bg-white"
+                  className={input}
                   placeholder="Business name or account"
                   value={formData.leadName}
                   onChange={(e) => setFormData({ ...formData, leadName: e.target.value })}
                 />
               </label>
 
-              <div className="rounded-[18px] border border-dashed border-[#D2D2D7] bg-[#F7F7F8] px-4 py-3 text-sm text-[#6E6E73]">
-                <p className="font-medium text-[#111111]">Workflow</p>
+              <div className="rounded-[18px] border border-dashed border-webloom-border bg-webloom-raised px-4 py-3 text-sm text-webloom-muted">
+                <p className="font-medium text-webloom-text">Workflow</p>
                 <p className="mt-1">Business analysis → DNA → score → website → outreach</p>
               </div>
             </div>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#111111]">Internal notes</span>
+              <span className="mb-2 block text-sm font-medium text-webloom-text">Internal notes</span>
               <textarea
                 rows={3}
-                className="w-full rounded-[18px] border border-[#D2D2D7] bg-[#F7F7F8] px-4 py-3 text-[#111111] outline-none transition focus:border-[#0A84FF] focus:bg-white"
+                className={input}
                 placeholder="Customer notes, source details, or sales context"
                 value={formData.internalNotes}
                 onChange={(e) => setFormData({ ...formData, internalNotes: e.target.value })}
@@ -235,10 +255,10 @@ export default function NewLead() {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#111111]">Custom instructions</span>
+              <span className="mb-2 block text-sm font-medium text-webloom-text">Custom instructions</span>
               <textarea
                 rows={3}
-                className="w-full rounded-[18px] border border-[#D2D2D7] bg-[#F7F7F8] px-4 py-3 text-[#111111] outline-none transition focus:border-[#0A84FF] focus:bg-white"
+                className={input}
                 placeholder="Desired positioning, brand tone, or special requirements"
                 value={formData.customInstructions}
                 onChange={(e) => setFormData({ ...formData, customInstructions: e.target.value })}
@@ -246,12 +266,12 @@ export default function NewLead() {
             </label>
 
             {isTimeout ? (
-              <div className="rounded-[18px] border border-[#F0C5C2] bg-[#FDECEC] px-4 py-3 text-sm text-[#B42318]">
+              <div className="rounded-[18px] border border-red-800/50 bg-red-900/30 px-4 py-3 text-sm text-red-300" role="alert">
                 <div className="font-medium">Request timed out</div>
                 <div className="mt-1">The analysis is taking longer than expected. You can try again with a simpler Google Maps URL.</div>
               </div>
             ) : errorMessage ? (
-              <div className="rounded-[18px] border border-[#F0C5C2] bg-[#FDECEC] px-4 py-3 text-sm text-[#B42318]">
+              <div className="rounded-[18px] border border-red-800/50 bg-red-900/30 px-4 py-3 text-sm text-red-300" role="alert">
                 <div className="font-medium">Something went wrong</div>
                 <div className="mt-1">{errorMessage}</div>
               </div>
@@ -275,9 +295,9 @@ export default function NewLead() {
           </div>
         </form>
 
-        <aside className="rounded-[30px] border border-[#E5E5EA] bg-[#F7F7F8] p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Status</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">
+        <aside className={`${surface} bg-webloom-raised`}>
+          <p className={eyebrow}>Status</p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-webloom-text">
             {createLeadMutation.isPending ? 'Processing lead' : 'Ready to review'}
           </h2>
 
@@ -291,19 +311,19 @@ export default function NewLead() {
                   <div className={[
                     'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold transition-colors duration-300',
                     isComplete
-                      ? 'bg-[#ECFDF5] text-[#067647] border border-[#BAF0C4]'
+                      ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-800/60'
                       : isActive
-                      ? 'bg-[#0A84FF] text-white'
-                      : 'bg-white text-[#6E6E73] border border-[#D2D2D7]',
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-webloom-surface text-webloom-dim border border-webloom-border',
                   ].join(' ')}>
                     {isComplete ? <CheckCircle2 className="h-3.5 w-3.5" /> : isActive ? <Loader className="h-3 w-3 animate-spin" /> : index + 1}
                   </div>
                   <div className="min-w-0">
-                    <span className={['text-sm block truncate', isComplete ? 'text-[#067647]' : isActive ? 'text-[#111111] font-medium' : 'text-[#6E6E73]'].join(' ')}>
+                    <span className={['text-sm block truncate', isComplete ? 'text-emerald-400' : isActive ? 'text-webloom-text font-medium' : 'text-webloom-muted'].join(' ')}>
                       {step.label}
                     </span>
                     {isActive && (
-                      <span className="text-[11px] text-[#6E6E73]">{formatTime(elapsedTime)} elapsed</span>
+                      <span className="text-[11px] text-webloom-dim">{formatTime(elapsedTime)} elapsed</span>
                     )}
                   </div>
                 </div>
@@ -311,9 +331,9 @@ export default function NewLead() {
             })}
           </div>
 
-          <div className="mt-8 rounded-[22px] border border-[#E5E5EA] bg-white p-4">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">What Webloom does</p>
-            <ul className="mt-4 space-y-3 text-sm leading-6 text-[#111111]">
+          <div className="mt-8 rounded-[22px] border border-webloom-border bg-webloom-surface p-4">
+            <p className={eyebrow}>What Webloom does</p>
+            <ul className="mt-4 space-y-3 text-sm leading-6 text-webloom-muted">
               <li>• Resolves business identity from your Maps URL</li>
               <li>• Gathers verified business information from multiple sources</li>
               <li>• Produces a canonical business profile with provenance</li>

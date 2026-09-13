@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /leads/
+Disallow: /websites/
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /authed
+
+Sitemap: https://webloom.app/sitemap.xml

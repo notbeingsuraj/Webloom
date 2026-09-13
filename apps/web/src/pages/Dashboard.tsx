@@ -3,9 +3,21 @@ import { Link } from 'react-router-dom';
 import { ArrowUpRight, Briefcase, Building2, CheckCircle2, Users } from 'lucide-react';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
+import usePageMetadata from '../hooks/usePageMetadata';
+import analytics from '../services/analytics';
 import { leadService } from '../services/leadService';
 
+const card = 'rounded-[24px] border border-webloom-border bg-webloom-surface p-4';
+const surface = 'rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]';
+const eyebrow = 'text-[11px] font-medium uppercase tracking-[0.18em] text-webloom-dim';
+
 export default function Dashboard() {
+  usePageMetadata({
+    title: 'Webloom | AI-Powered Web Intelligence',
+    description: 'Resolve verified business identities and generate conversion-ready websites with Webloom.',
+    noindex: true, // dashboard is authenticated product surface
+  });
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: () => leadService.getDashboardStats(),
@@ -25,11 +37,11 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="h-24 animate-pulse rounded-[28px] border border-[#E5E5EA] bg-white/80" />
+      <div className="space-y-6" aria-busy="true" aria-label="Loading dashboard">
+        <div className="h-24 animate-pulse rounded-[28px] border border-webloom-border bg-webloom-surface" />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-28 animate-pulse rounded-[24px] border border-[#E5E5EA] bg-white/80" />
+            <div key={index} className="h-28 animate-pulse rounded-[24px] border border-webloom-border bg-webloom-surface" />
           ))}
         </div>
       </div>
@@ -38,55 +50,60 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <header className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)] md:p-8">
+      <header className={`${surface} md:p-8`}>
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#6E6E73]">Overview</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-[#111111] md:text-[2.7rem]">Good afternoon, Suraj.</h1>
+            <p className={eyebrow}>Overview</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-webloom-text md:text-[2.7rem]">
+              Web intelligence pipeline
+            </h1>
+            <p className="mt-2 text-sm text-webloom-muted">
+              Structure business data from a single Google Maps URL.
+            </p>
           </div>
 
-          <Link to="/leads/new">
+          <Link to="/leads/new" onClick={() => analytics.primaryCta('dashboard_analyse')}>
             <Button variant="primary" size="md" leadingIcon={<ArrowUpRight className="h-4 w-4" />}>
               Analyse Business
             </Button>
           </Link>
         </div>
 
-        <div className="mt-8 border-t border-[#E5E5EA] pt-6">
-          <p className="text-sm text-[#6E6E73]">Your pipeline</p>
+        <div className="mt-8 border-t border-webloom-border pt-6">
+          <p className="text-sm text-webloom-muted">Your pipeline</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {metrics.map(({ name, value, detail, icon: Icon }) => (
-              <div key={name} className="rounded-[24px] border border-[#E5E5EA] bg-[#F7F7F8] p-4">
+              <div key={name} className={card}>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-[#6E6E73]">{name}</span>
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#111111]">
+                  <span className="text-sm text-webloom-muted">{name}</span>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-webloom-raised text-primary-400">
                     <Icon className="h-4 w-4" />
                   </span>
                 </div>
                 <div className="mt-5 flex items-end justify-between gap-3">
-                  <span className="text-3xl font-semibold tracking-[-0.05em] text-[#111111]">{value}</span>
-                  <span className="text-[11px] uppercase tracking-[0.12em] text-[#6E6E73]">Live</span>
+                  <span className="text-3xl font-semibold tracking-[-0.05em] text-webloom-text">{value}</span>
+                  <span className="text-[11px] uppercase tracking-[0.12em] text-webloom-dim">Live</span>
                 </div>
-                <p className="mt-3 text-sm text-[#6E6E73]">{detail}</p>
+                <p className="mt-3 text-sm text-webloom-muted">{detail}</p>
               </div>
             ))}
           </div>
         </div>
       </header>
 
-      <section className="rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_15px_40px_rgba(17,17,17,0.02)] md:p-7">
-        <div className="mb-6 flex items-center justify-between gap-3">
+      <section className={`${surface} md:p-7`}>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]">Priority</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-[#111111]">Priority Leads</h2>
+            <p className={eyebrow}>Priority</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-webloom-text">Priority Leads</h2>
           </div>
-          <Link to="/leads/new" className="text-sm font-medium text-[#0A84FF] hover:text-[#0077ED]">
+          <Link to="/leads/new" onClick={() => analytics.primaryCta('pipeline_review')} className="text-sm font-medium text-primary-400 hover:text-primary-300">
             Review pipeline
           </Link>
         </div>
 
-        <div className="overflow-hidden rounded-[24px] border border-[#E5E5EA]">
-          <div className="hidden grid-cols-[1.5fr_1fr_1fr_0.8fr_0.8fr_0.9fr] gap-3 bg-[#F7F7F8] px-4 py-3 text-[11px] font-medium uppercase tracking-[0.12em] text-[#6E6E73] md:grid">
+        <div className="overflow-x-auto rounded-[24px] border border-webloom-border">
+          <div className="hidden min-w-[720px] grid-cols-[1.5fr_1fr_1fr_0.8fr_0.8fr_0.9fr] gap-3 bg-webloom-raised px-4 py-3 text-[11px] font-medium uppercase tracking-[0.12em] text-webloom-dim md:grid">
             <span>Business</span>
             <span>Category</span>
             <span>Location</span>
@@ -95,20 +112,23 @@ export default function Dashboard() {
             <span className="text-right">Action</span>
           </div>
 
-          <div className="divide-y divide-[#E5E5EA] bg-white">
+          <div className="divide-y divide-webloom-border bg-webloom-surface">
             {leadsData?.data?.length ? (
               leadsData.data.map((lead: any) => (
-                <div key={lead._id} className="grid gap-3 px-4 py-4 md:grid-cols-[1.5fr_1fr_1fr_0.8fr_0.8fr_0.9fr] md:items-center">
+                <div key={lead._id} className="grid min-w-[720px] gap-3 px-4 py-4 md:grid-cols-[1.5fr_1fr_1fr_0.8fr_0.8fr_0.9fr] md:items-center">
                   <div>
-                    <p className="text-sm font-medium text-[#111111]">{lead.businessName}</p>
-                    <p className="mt-1 text-xs text-[#6E6E73]">{lead.location?.city || 'Local business'}</p>
+                    <p className="text-sm font-medium text-webloom-text">{lead.businessName || 'Local business'}</p>
+                    <p className="mt-1 text-xs text-webloom-muted">{lead.location?.city || 'Local business'}</p>
                   </div>
-                  <div className="text-sm text-[#6E6E73]">{lead.businessCategory || 'N/A'}</div>
-                  <div className="text-sm text-[#6E6E73]">{lead.location?.city || 'N/A'}</div>
-                  <div className="text-sm font-medium text-[#111111]">{lead.opportunityScore?.total ?? '—'}</div>
+                  <div className="text-sm text-webloom-muted">{lead.businessCategory || 'N/A'}</div>
+                  <div className="text-sm text-webloom-muted">{lead.location?.city || 'N/A'}</div>
+                  <div className="text-sm font-medium text-webloom-text">{lead.opportunityScore?.total ?? '—'}</div>
                   <div><StatusBadge status={lead.status || 'new'} /></div>
                   <div className="md:text-right">
-                    <Link to={`/leads/${lead._id}`} className="inline-flex items-center justify-center rounded-full bg-[#111111] px-3 py-2 text-xs font-medium text-white transition hover:bg-[#2A2A2A]">
+                    <Link
+                      to={`/leads/${lead._id}`}
+                      className="inline-flex items-center justify-center rounded-full bg-primary-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-primary-500"
+                    >
                       View
                     </Link>
                   </div>
@@ -116,10 +136,10 @@ export default function Dashboard() {
               ))
             ) : (
               <div className="px-6 py-12 text-center">
-                <p className="text-lg font-medium text-[#111111]">No leads yet.</p>
-                <p className="mt-2 text-sm text-[#6E6E73]">Analyse your first business to start building your pipeline.</p>
+                <p className="text-lg font-medium text-webloom-text">No leads yet.</p>
+                <p className="mt-2 text-sm text-webloom-muted">Analyse your first business to start building your pipeline.</p>
                 <div className="mt-5">
-                  <Link to="/leads/new">
+                  <Link to="/leads/new" onClick={() => analytics.primaryCta('empty_analyse')}>
                     <Button variant="primary" size="sm">Analyse Business</Button>
                   </Link>
                 </div>

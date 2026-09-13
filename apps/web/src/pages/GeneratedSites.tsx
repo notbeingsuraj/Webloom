@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
+import usePageMetadata from '../hooks/usePageMetadata';
 import websiteService, { type GeneratedSite, type GeneratePayload } from '../services/websiteService';
 import api from '../services/api';
 
@@ -19,15 +20,20 @@ interface AnalyzedBusiness {
 }
 
 const styles = {
-  card: 'rounded-[30px] border border-[#E5E5EA] bg-white p-6 shadow-[0_18px_50px_rgba(17,17,17,0.03)]',
-  eyebrow: 'text-[11px] uppercase tracking-[0.18em] text-[#6E6E73]',
-  field: 'rounded-[20px] border border-[#D2D2D7] bg-[#F7F7F8] px-4 py-3 text-base text-[#111111] outline-none transition focus:border-[#0A84FF] focus:bg-white',
-  label: 'mb-2 block text-sm font-medium text-[#111111]',
-  stat: 'rounded-[22px] border border-[#E5E5EA] bg-[#F7F7F8] p-4',
-  chip: 'inline-flex items-center gap-1.5 rounded-full border border-[#E5E5EA] bg-white px-3 py-1.5 text-xs font-medium text-[#6E6E73]',
+  card: 'rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]',
+  eyebrow: 'text-[11px] uppercase tracking-[0.18em] text-webloom-dim',
+  field: 'w-full rounded-[20px] border border-webloom-border bg-webloom-raised px-4 py-3 text-base text-webloom-text outline-none transition focus:border-primary-500 focus:bg-webloom-hover',
+  label: 'mb-2 block text-sm font-medium text-webloom-text',
+  stat: 'rounded-[22px] border border-webloom-border bg-webloom-surfaced p-4',
+  chip: 'inline-flex items-center gap-1.5 rounded-full border border-webloom-border bg-webloom-raised px-3 py-1.5 text-xs font-medium text-webloom-muted',
 };
 
 export default function GeneratedSites() {
+  usePageMetadata({
+    title: 'Webloom | Generated Websites',
+    description: 'Manage generated websites from business analyses.',
+    noindex: true, // authenticated product surface
+  });
   const queryClient = useQueryClient();
   const [mapsUrl, setMapsUrl] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
