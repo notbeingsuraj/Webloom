@@ -8,6 +8,9 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "test": "node test_providers.js",
+    "test:quality": "node test_quality_boundary.js",
+    "test:phases": "node test_phase_p12_identity.js && node test_phase_p13_canonical_profile.js && node test_phase_p14_api_boundary.js && node test_phase_p15_consumer_migration.js && node test_phase_p18_source_grounded_fallback.js && node test_phase_p19_google_reputation.js",
+    "benchmark": "node benchmarks/benchmark.test.js",
     "review": "node review-cli.js",
     "build": "echo 'No build step for API'"
   },
