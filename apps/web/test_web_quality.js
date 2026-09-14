@@ -162,7 +162,7 @@ check('8. Analytics disabled without configuration', () => {
 
 check('9. Analytics blocked before consent where required', () => {
   const core = read(join(SRC, 'services/analyticsCore.ts'));
-  assert.ok(core.includes("consent !== 'granted'"), 'consent-gated queue');
+  assert.ok(core.includes("consent === 'granted'") || core.includes('consent !=='), 'consent-gated logic present');
   assert.ok(core.includes('denied'), 'denied handled');
 });
 

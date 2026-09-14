@@ -36,6 +36,7 @@ export function shouldTrack(config: AnalyticsConfig): boolean {
 
 /**
  * In consent-required mode, an event may only fire when consent is granted.
+ * Denied consent blocks tracking. Pending consent queues the event.
  * In non-consent-required mode, denied consent also blocks tracking.
  *
  * Returns 'fire' | 'queue' | 'block'.
@@ -44,7 +45,9 @@ export function consentGate(config: AnalyticsConfig, consent: ConsentState): 'fi
   if (!shouldTrack(config)) return 'block';
 
   if (config.consentRequired) {
-    if (consent !== 'granted') return 'queue';
+    if (consent === 'granted') return 'fire';
+    if (consent === 'denied') return 'block';
+    return 'queue'; // pending
   } else if (consent === 'denied') {
     return 'block';
   }
@@ -57,9 +60,37 @@ export function consentGate(config: AnalyticsConfig, consent: ConsentState): 'fi
  * name + allow-listed primitive props.
  */
 export function sanitizeEvent(event: TrackEvent): TrackEvent {
+  const SENSITIVE_KEYS = new Set([
+    'prompt',
+    'prompts',
+    'extractedContent',
+    'extracted_data',
+    'extractedData',
+    'businessData',
+    'business_data',
+    'personalData',
+    'personal_data',
+    'pii',
+    'credentials',
+    'credential',
+    'apiKey',
+    'api_key',
+    'apikey',
+    'secret',
+    'secrets',
+    'token',
+    'tokens',
+    'password',
+    'passphrase',
+    'authorization',
+    'auth',
+  ]);
+
   const props: Record<string, string | number | boolean> = {};
   if (event.props && typeof event.props === 'object') {
     for (const [key, value] of Object.entries(event.props)) {
+      // Filter by sensitive key name
+      if (SENSITIVE_KEYS.has(key.toLowerCase())) continue;
       const t = typeof value;
       if (t === 'string' || t === 'number' || t === 'boolean') {
         props[key] = value;
