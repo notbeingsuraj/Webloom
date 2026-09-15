@@ -1600,6 +1600,26 @@ export class IdentityRepository {
   }
 
   /**
+   * Load Source rows referenced by canonical fields (bulk, one query) so the
+   * profile reload can restore sourceUrl/provider attribution.
+   * @private
+   */
+  _loadSourcesById(entityId, canonicalFields) {
+    const byId = new Map();
+    const sourceIds = [
+      ...new Set(canonicalFields.map((c) => c.sourceId).filter(Boolean)),
+    ];
+    if (sourceIds.length === 0) return byId;
+    const rows = this.db
+      .select()
+      .from(Source)
+      .where(inArray(Source.id, sourceIds))
+      .all();
+    for (const row of rows) byId.set(row.id, this._mapSourceRow(row));
+    return byId;
+  }
+
+  /**
    * Load canonical fields from persistent storage into a BusinessProfile
    * @param {string} entityId - Entity ID to load canonical fields for
    * @param {BusinessProfile} profile - BusinessProfile instance to populate
@@ -1609,6 +1629,7 @@ export class IdentityRepository {
     if (!entityId || !profile) return;
     
     const canonicalFields = this.getCanonicalFields(entityId);
+    const sourcesById = this._loadSourcesById(entityId, canonicalFields);
     for (const field of canonicalFields) {
       // Data-quality guard (defense-in-depth): a persisted street-address
       // string must never be re-loaded as the canonical business name —
@@ -1624,10 +1645,15 @@ export class IdentityRepository {
       // (e.g. identity.services stays an array, location.coordinates stays an
       // object). Plain strings/numbers pass through untouched.
       const value = parseCanonicalFieldValue(field.value);
+      const source = field.sourceId ? sourcesById.get(field.sourceId) : null;
       // Canonical storage is authoritative over fresh provider values.
+      // Source attribution is restored from the persisted Source row so
+      // evidence (sourceUrl/provider) survives the restart round-trip.
       profile.set(field.fieldPath, value, field.provenance, field.confidence, {
         sourceId: field.sourceId,
         claimId: field.claimId,
+        sourceUrl: source?.url || undefined,
+        provider: source?.provider || undefined,
         canonical: true,
       });
     }
