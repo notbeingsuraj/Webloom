@@ -33,7 +33,7 @@ function acquisition({ status, records = [], error = null, diagnostics = {}, met
   };
 }
 
-/** Install deterministic mocks on the global singletons. */
+/** Install deterministic mocks on the global singletons. Returns a restore fn. */
 export function installProviderMocks(fixture) {
   const geo = fixture.providerMocks?.geoapify || { status: 'not_configured', records: [] };
   const web = fixture.providerMocks?.webExtraction || { status: 'not_configured', records: [] };
@@ -63,7 +63,7 @@ export function installProviderMocks(fixture) {
     });
   };
 
-  return previous;
+  return () => restoreProviderMocks(previous);
 }
 
 /** Restore original provider methods. */
