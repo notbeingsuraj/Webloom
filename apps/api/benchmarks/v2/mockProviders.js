@@ -22,15 +22,15 @@ import WebExtractionProvider from '../../src/services/providers/WebExtractionPro
 
 /** Create an AcquisitionResult-shaped object. */
 function acquisition({ status, records = [], error = null, diagnostics = {}, metadata = null }) {
-  // Attach metadata to each record (service reads record.metadata.sourceText)
-  const recordsWithMeta = records.map(r => ({ ...r, metadata }));
+  // Records already carry their own metadata (sourceText, aiExtracted, etc.).
+  // Do NOT overwrite with acquisition-level metadata.
   return {
     provider: 'mock',
     status,
-    records: recordsWithMeta,
+    records,
     error,
     diagnostics,
-    metadata,
+    metadata, // acquisition-level metadata (e.g. http timing)
     source: { url: null, retrieval: new Date().toISOString() },
   };
 }
