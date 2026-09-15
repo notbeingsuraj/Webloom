@@ -22,10 +22,12 @@ import WebExtractionProvider from '../../src/services/providers/WebExtractionPro
 
 /** Create an AcquisitionResult-shaped object. */
 function acquisition({ status, records = [], error = null, diagnostics = {}, metadata = null }) {
+  // Attach metadata to each record (service reads record.metadata.sourceText)
+  const recordsWithMeta = records.map(r => ({ ...r, metadata }));
   return {
     provider: 'mock',
     status,
-    records,
+    records: recordsWithMeta,
     error,
     diagnostics,
     metadata,
