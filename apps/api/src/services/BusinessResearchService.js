@@ -596,6 +596,12 @@ class BusinessResearchService {
       }
 
       if (sourceUrl || parsedSource || providerRecordForFallback || sourceText) {
+        // DEBUG
+        console.log('[FALLBACK DEBUG] Running fallback block');
+        console.log('[FALLBACK DEBUG] sourceText:', !!sourceText);
+        console.log('[FALLBACK DEBUG] providerRecordForFallback:', !!providerRecordForFallback);
+        console.log('[FALLBACK DEBUG] parsedSource:', !!parsedSource);
+        
         const fallbackResult = await extractFallbackFields({
           sourceUrl,
           sourceType: 'google_maps_url',
@@ -604,11 +610,13 @@ class BusinessResearchService {
           providerRecord: providerRecordForFallback,
           existingCanonicalProfile: profile.toObject(),
         });
+        console.log('[FALLBACK DEBUG] extractFallbackFields returned, aiExtracted:', fallbackResult.aiExtracted);
 
         // Merge recovered fields through CandidatePipeline (preserves P1.8 semantics).
         const result = await runFallbackPipeline(profile, fallbackResult, sourceUrl, {
           onlyIfMissing: true,
         });
+        console.log('[FALLBACK DEBUG] runFallbackPipeline returned, accepted:', result.accepted.map(c => c.fieldPath));
 
         // Surface fallback provenance for observability and canonicalization.
         if (fallbackResult.evidence && Object.keys(fallbackResult.evidence).length > 0) {
