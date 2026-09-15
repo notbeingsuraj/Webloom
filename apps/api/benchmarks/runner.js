@@ -7,11 +7,8 @@
 
 import { BENCHMARK_FIXTURES, FIXTURE_CATEGORIES } from './fixtures.js';
 import { runCandidatePipeline } from '../src/services/CandidatePipeline.js';
-import { createFieldCandidate, CANDIDATE_STATUS, PROVENANCE_KIND } from '../src/services/FieldCandidate.js';
-import { validateCandidate } from '../src/services/FieldValidation.js';
 import BusinessProfile from '../src/services/BusinessProfile.js';
 import { extractFallbackFields } from '../src/services/GoogleMapsFallbackExtractor.js';
-import BusinessResearchService from '../src/services/BusinessResearchService.js';
 
 // Mock AI Service for benchmarking
 class MockAIService {
@@ -27,25 +24,6 @@ class MockAIService {
     return {
       [fieldName]: mock
     };
-  }
-}
-
-// Mock BusinessResearchService that uses mocked providers
-class MockBusinessResearchService {
-  constructor(fixture) {
-    this.fixture = fixture;
-    this.geoapifyRecord = fixture.providerMocks.geoapify?.records?.[0] || null;
-    this.webRecord = fixture.providerMocks.webExtraction?.records?.[0] || null;
-    this.webSourceText = fixture.providerMocks.webExtraction?.metadata?.sourceText || null;
-    this.mockAI = new MockAIService(fixture.aiMock);
-  }
-
-  // Use the actual fallback extraction but with mocked AI
-  async extractFallbackFields(opts) {
-    return await extractFallbackFields({
-      ...opts,
-      ai: this.mockAI
-    });
   }
 }
 
@@ -175,42 +153,6 @@ class BenchmarkResults {
   }
 }
 
-// Mock AI Service for benchmarking
-class MockAIService {
-  constructor(aiMock) {
-    this.aiMock = aiMock || {};
-  }
-
-  async generate({ prompt, schema }) {
-    const fieldName = Object.keys(schema.properties)[0];
-    const mock = this.aiMock[fieldName];
-    if (!mock) return null;
-    
-    return {
-      [fieldName]: mock
-    };
-  }
-}
-
-// Mock BusinessResearchService that uses mocked providers
-class MockBusinessResearchService {
-  constructor(fixture) {
-    this.fixture = fixture;
-    this.geoapifyRecord = fixture.providerMocks.geoapify?.records?.[0] || null;
-    this.webRecord = fixture.providerMocks.webExtraction?.records?.[0] || null;
-    this.webSourceText = fixture.providerMocks.webExtraction?.metadata?.sourceText || null;
-    this.mockAI = new MockAIService(fixture.aiMock);
-  }
-
-  // Use the actual fallback extraction but with mocked AI
-  async extractFallbackFields(opts) {
-    return await extractFallbackFields({
-      ...opts,
-      ai: this.mockAI
-    });
-  }
-}
-
 // Main benchmark runner
 export async function runBenchmark() {
   const results = new BenchmarkResults();
@@ -225,9 +167,6 @@ export async function runBenchmark() {
     const fixtureStart = Date.now();
     
     try {
-      // Create mock services
-      const mockService = new MockBusinessResearchService(fixture);
-      
       // Expected fields to test
       const expectedFields = [
         'identity.name',
@@ -252,7 +191,7 @@ export async function runBenchmark() {
         
         const latencyStart = Date.now();
         
-        // Run the ACTUAL extraction pipeline with mocked providers
+        // Build records from mocked providers
         const records = [];
         
         // Add geoapify record if it has this field
@@ -296,7 +235,6 @@ export async function runBenchmark() {
 
         // Also test fallback for missing fields
         let fallbackResult = null;
-        const mockAI = new MockAIService(fixture.aiMock);
         if (expectedValue != null && (records.length === 0 || pipelineResult.accepted.length === 0)) {
           fallbackResult = await extractFallbackFields({
             sourceUrl: fixture.googleMapsUrl,
@@ -305,7 +243,7 @@ export async function runBenchmark() {
             parsedSource: null,
             providerRecord: fixture.providerMocks.geoapify?.records?.[0] || null,
             existingCanonicalProfile: profile.toObject(),
-            ai: mockAI
+            ai: new MockAIService(fixture.aiMock)
           });
         }
 
