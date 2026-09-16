@@ -29,10 +29,10 @@ export default function Dashboard() {
   });
 
   const metrics = [
-    { name: 'Total Leads', value: stats?.data?.totalLeads || 0, detail: 'Across every review', icon: Users },
-    { name: 'High Opportunity', value: stats?.data?.highPriority || 0, detail: 'Strong fit & urgency', icon: Briefcase },
-    { name: 'Websites Generated', value: stats?.data?.websitesGenerated || 0, detail: 'Offer packages ready', icon: Building2 },
-    { name: 'Active Follow-ups', value: stats?.data?.contacted || 0, detail: 'Require outreach', icon: CheckCircle2 },
+    { name: 'Total Leads', value: stats?.totalLeads || 0, detail: 'Across every review', icon: Users },
+    { name: 'High Opportunity', value: stats?.highPriority || 0, detail: 'Strong fit & urgency', icon: Briefcase },
+    { name: 'Websites Generated', value: stats?.websitesGenerated || 0, detail: 'Offer packages ready', icon: Building2 },
+    { name: 'Active Follow-ups', value: stats?.contacted || 0, detail: 'Require outreach', icon: CheckCircle2 },
   ];
 
   if (isLoading) {
@@ -113,8 +113,8 @@ export default function Dashboard() {
           </div>
 
           <div className="divide-y divide-webloom-border bg-webloom-surface">
-            {leadsData?.data?.length ? (
-              leadsData.data.map((lead: any) => (
+            {leadsData?.length ? (
+              leadsData.map((lead: any) => (
                 <div key={lead._id} className="grid min-w-[720px] gap-3 px-4 py-4 md:grid-cols-[1.5fr_1fr_1fr_0.8fr_0.8fr_0.9fr] md:items-center">
                   <div>
                     <p className="text-sm font-medium text-webloom-text">{lead.businessName || 'Local business'}</p>

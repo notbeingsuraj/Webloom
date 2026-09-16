@@ -15,6 +15,39 @@ import { leadService } from '../services/leadService';
 
 const tabs = ['Overview', 'Analysis', 'Website', 'Outreach'];
 
+/**
+ * Format a single trust signal entry for display.
+ *
+ * trustSignals historically arrive in two shapes:
+ *   - legacy strings:  "Google Maps rating present"
+ *   - structured objects: { type: 'rating', value: 4.2, source: ..., verified, ... }
+ * Rendering either shape raw as a React child crashes the tree — objects are
+ * not valid React children. Normalize to a readable label instead.
+ */
+function trustSignalLabel(signal: unknown): string {
+  if (signal == null) return 'Signal recorded';
+  if (typeof signal === 'string') return signal;
+  if (typeof signal === 'number' || typeof signal === 'boolean') return String(signal);
+  if (typeof signal === 'object') {
+    const s = signal as { type?: unknown; value?: unknown; source?: unknown };
+    const type = typeof s.type === 'string' ? s.type : null;
+    const value = s.value;
+    if (type === 'rating' || type === 'review_count' || type === 'reviews_available') {
+      if (value != null) return `${type.replace(/_/g, ' ')}: ${value}`;
+      return type.replace(/_/g, ' ');
+    }
+    if (type) {
+      const label = type.replace(/_/g, ' ');
+      return value != null ? `${label}: ${value}` : label;
+    }
+    // Fall back to any readable field we can find.
+    const source = typeof s.source === 'string' ? s.source : null;
+    if (source) return `Source: ${source}`;
+    return JSON.stringify(signal);
+  }
+  return String(signal);
+}
+
 export default function LeadDetail() {
   usePageMetadata({
     title: 'Webloom | Lead Workspace',
@@ -26,9 +59,21 @@ export default function LeadDetail() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('Overview');
 
-  const { data, isLoading } = useQuery({
+  const { data: lead, isLoading, isError, error } = useQuery({
     queryKey: ['lead', id],
-    queryFn: () => leadService.getLead(id!),
+    queryFn: async () => {
+      console.debug('[LeadDetail] fetching lead', { id, url: `/leads/${id}` });
+      const lead = await leadService.getLead(id!);
+      console.debug('[LeadDetail] normalized lead payload:', {
+        id,
+        keys: lead ? Object.keys(lead) : null,
+        businessName: lead?.businessName,
+        opportunityScore: lead?.opportunityScore,
+        trustSignals: lead?.analysis?.metrics?.trustSignals,
+        status: lead?.status,
+      });
+      return lead;
+    },
   });
 
   const deleteMutation = useMutation({
@@ -53,8 +98,6 @@ export default function LeadDetail() {
     mutationFn: () => leadService.generateWebsiteSpec(id!),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['lead', id] }),
   });
-
-  const lead = data?.data;
 
   // ----- Opportunity score: ONE normalized source for both tabs -----
   const score = useMemo(
@@ -116,13 +159,45 @@ export default function LeadDetail() {
     return <div className="rounded-[28px] border border-webloom-border bg-webloom-surface p-10 text-center text-sm text-webloom-muted">Loading lead workspace...</div>;
   }
 
+  if (isError) {
+    const message =
+      (error as any)?.response?.data?.error ||
+      (error as any)?.message ||
+      'The lead could not be loaded.';
+    return (
+      <div className="rounded-[30px] border border-red-800/50 bg-red-900/30 p-10 text-center">
+        <p className="flex items-center justify-center gap-2 text-sm font-medium text-red-400">
+          <AlertCircle className="h-4 w-4" />
+          Unable to load lead
+        </p>
+        <p className="mt-2 text-sm text-red-400/80">{message}</p>
+        <button
+          type="button"
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['lead', id] })}
+          className="mt-5 rounded-full bg-webloom-raised px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2A2A2A]"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!lead || !lead._id) {
+    return (
+      <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-10 text-center">
+        <p className="text-sm font-medium text-webloom-text">No lead found</p>
+        <p className="mt-2 text-sm text-webloom-muted">This lead does not exist or has been deleted.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <header className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)] md:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Lead detail</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-webloom-text md:text-[2.7rem]">{lead?.businessName || 'Local business'}</h1>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-webloom-text md:text-[2.7rem]">{lead?.businessName || lead?.leadName || 'Local business'}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-webloom-muted">
               <span>{lead?.businessCategory || 'Local business'}</span>
               {lead?.location?.city && <><span className="h-1 w-1 rounded-full bg-[#D2D2D7]" /><span>{lead.location.city}</span></>}
@@ -318,15 +393,15 @@ export default function LeadDetail() {
                   {lead?.analysis?.metrics?.trustSignals && (
                     <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Source confidence</p>
-                      <div className="mt-2 flex items-center gap-2">
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
                         {Array.isArray(lead.analysis.metrics.trustSignals) ? (
-                          lead.analysis.metrics.trustSignals.slice(0, 3).map((signal: string, i: number) => (
+                          lead.analysis.metrics.trustSignals.slice(0, 3).map((signal, i: number) => (
                             <span key={i} className="inline-flex items-center gap-1 rounded-full bg-emerald-900/40 px-2 py-1 text-xs text-emerald-400">
-                              <CheckCircle2 className="h-3 w-3" /> {signal}
+                              <CheckCircle2 className="h-3 w-3" /> {trustSignalLabel(signal)}
                             </span>
                           ))
                         ) : (
-                          <span className="text-sm text-webloom-text">Sources consulted</span>
+                          <span className="text-sm text-webloom-text">{trustSignalLabel(lead.analysis.metrics.trustSignals)}</span>
                         )}
                       </div>
                     </div>

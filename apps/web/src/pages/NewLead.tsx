@@ -69,7 +69,7 @@ export default function NewLead() {
     mutationFn: leadService.createLead,
     onSuccess: (data) => {
       analytics.analysisCompleted();
-      navigate(`/leads/${data.data._id}`);
+      navigate(`/leads/${data._id}`);
     },
     onError: () => {
       analytics.analysisFailed();

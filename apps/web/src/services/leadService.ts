@@ -164,34 +164,53 @@ export interface CreateLeadData {
 }
 
 export const leadService = {
+  /**
+ * The API wraps every response in an envelope: `{ success: true, data: ... }`.
+ * Unwrap `data` here — in ONE place — so every consumer receives the payload
+ * directly. Previously each caller unwrapped ad-hoc (or not at all), which made
+ * envelope shape bugs easy to introduce and diagnose.
+ */
+type LeadEnvelope<T> = { success: boolean; data: T };
+
+function unwrap<T>(response: { data: LeadEnvelope<T> | T }): T {
+  const body = response.data;
+  // Envelope detection: a body with a `data` field AND no lead fields is the
+  // wrapper. A lead object itself never has a top-level `data` key.
+  if (body && typeof body === 'object' && 'data' in body && !('_id' in body)) {
+    return (body as LeadEnvelope<T>).data;
+  }
+  return body as T;
+}
+
+export const leadService = {
   async createLead(data: CreateLeadData) {
     const response = await api.post('/leads', data);
-    return response.data;
+    return unwrap<Lead>(response);
   },
 
   async getLeads(params?: any) {
     const response = await api.get('/leads', { params });
-    return response.data;
+    return unwrap<Lead[]>(response);
   },
 
   async getLead(id: string) {
     const response = await api.get(`/leads/${id}`);
-    return response.data;
+    return unwrap<Lead>(response);
   },
 
   async updateLead(id: string, data: Partial<Lead>) {
     const response = await api.put(`/leads/${id}`, data);
-    return response.data;
+    return unwrap<Lead>(response);
   },
 
   async deleteLead(id: string) {
     const response = await api.delete(`/leads/${id}`);
-    return response.data;
+    return unwrap<{ message?: string; deleted?: boolean }>(response);
   },
 
   async getDashboardStats() {
     const response = await api.get('/leads/stats/dashboard');
-    return response.data;
+    return unwrap<{ totalLeads: number; highPriority: number; websitesGenerated: number; contacted: number }>(response);
   },
 
   async generateBrandDNA(id: string) {
