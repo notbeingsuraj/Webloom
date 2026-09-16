@@ -10,6 +10,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
 import NotFound from './pages/NotFound';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 import CookieConsent from './components/CookieConsent';
 import StickyMobileCta from './components/StickyMobileCta';
 
@@ -18,16 +19,32 @@ function App() {
     <>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="leads/new" element={<NewLead />} />
-          <Route path="leads/:id" element={<LeadDetail />} />
-          <Route path="websites" element={<GeneratedSites />} />
-          <Route path="pricing" element={<Pricing />} />
-          <Route path="contact" element={<Contact />} />
-          <Route path="contact/thanks" element={<ThankYou />} />
+          <Route index element={
+            <ErrorBoundary label="Dashboard"><Dashboard /></ErrorBoundary>
+          } />
+          <Route path="leads/new" element={
+            <ErrorBoundary label="Lead analysis"><NewLead /></ErrorBoundary>
+          } />
+          <Route path="leads/:id" element={
+            <ErrorBoundary label="Lead workspace"><LeadDetail /></ErrorBoundary>
+          } />
+          <Route path="websites" element={
+            <ErrorBoundary label="Generated websites"><GeneratedSites /></ErrorBoundary>
+          } />
+          <Route path="pricing" element={
+            <ErrorBoundary label="Pricing"><Pricing /></ErrorBoundary>
+          } />
+          <Route path="contact" element={
+            <ErrorBoundary label="Contact"><Contact /></ErrorBoundary>
+          } />
+          <Route path="contact/thanks" element={
+            <ErrorBoundary label="Thank you"><ThankYou /></ErrorBoundary>
+          } />
           <Route path="privacy" element={<PrivacyPolicy />} />
           <Route path="terms" element={<Terms />} />
-          <Route path="*" element={<NotFound />} />
+          <Route path="*" element={
+            <ErrorBoundary label="Not found"><NotFound /></ErrorBoundary>
+          } />
         </Route>
       </Routes>
       {/* Site-wide overlays */}

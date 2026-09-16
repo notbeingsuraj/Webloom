@@ -7,9 +7,9 @@ import usePageMetadata from '../hooks/usePageMetadata';
 import analytics from '../services/analytics';
 import { leadService } from '../services/leadService';
 
-const surface = 'rounded-2xl border border-border bg-card p-6 shadow-sm md:p-8';
-const eyebrow = 'text-[11px] uppercase tracking-[0.18em] text-muted-foreground';
-const input = 'w-full rounded-xl border border-input bg-background px-4 py-3 text-[15px] text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring';
+const surface = 'wl-card relative p-6 md:p-8';
+const eyebrow = 'wl-eyebrow';
+const input = 'wl-input';
 
 /**
  * Analysis phase markers. The UI advances these as the pipeline progresses —
@@ -17,15 +17,17 @@ const input = 'w-full rounded-xl border border-input bg-background px-4 py-3 tex
  * final "Preparing analysis" marker only resolves when the backend response
  * actually arrives (see onSuccess). The durations below are only a cadence
  * hint for the spinner position; they are not a completion contract.
+ * Each stage carries a semantic color — blue (reading), violet (identity),
+ * pink (gathering), orange (reconciling), green (DNA), amber (scoring).
  */
 const progressSteps = [
-  { label: 'Reading business location', duration: 3000 },
-  { label: 'Resolving business identity', duration: 8000 },
-  { label: 'Gathering business information', duration: 15000 },
-  { label: 'Reconciling sources', duration: 20000 },
-  { label: 'Building Business DNA', duration: 25000 },
-  { label: 'Calculating opportunity score', duration: 30000 },
-  { label: 'Preparing analysis', duration: 35000 },
+  { label: 'Reading business location', duration: 3000, color: '#3B82F6' },
+  { label: 'Resolving business identity', duration: 8000, color: '#8B5CF6' },
+  { label: 'Gathering business information', duration: 15000, color: '#EC4899' },
+  { label: 'Reconciling sources', duration: 20000, color: '#F97316' },
+  { label: 'Building Business DNA', duration: 25000, color: '#10B981' },
+  { label: 'Calculating opportunity score', duration: 30000, color: '#F59E0B' },
+  { label: 'Preparing analysis', duration: 35000, color: '#3B82F6' },
 ];
 
 /**
@@ -431,21 +433,36 @@ export default function NewLead() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className={`mb-8 ${surface}`}>
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+      <div className={`mb-8 ${surface} wl-mesh relative overflow-hidden`}>
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className={eyebrow}>Analysis</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-foreground md:text-[2.7rem]">
-              Turn local businesses into opportunities.
+            <h1 className="mt-2 font-display text-3xl font-bold tracking-[-0.06em] text-foreground md:text-[2.7rem]">
+              Turn local businesses into <span className="text-gradient-brand">opportunities</span>.
             </h1>
             <p className="mt-3 max-w-2xl text-base text-muted-foreground">
               Paste a Google Maps URL to uncover business value, identify digital gaps, and generate a premium outreach plan.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-            Lead workflow
+          <div className="inline-flex w-fit items-center gap-2 rounded-full border border-ai/25 bg-ai/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ai">
+            <Sparkles className="h-3.5 w-3.5" />
+            Intelligence workflow
           </div>
+        </div>
+        {/* Pipeline visualization strip */}
+        <div className="relative mt-8 flex flex-col gap-2 border-t border-border/70 pt-5 md:flex-row md:items-center md:gap-6">
+          {[
+            { label: 'Discover sources', color: 'var(--primary)' },
+            { label: 'Extract intelligence', color: 'hsl(var(--ai))' },
+            { label: 'Validate evidence', color: 'hsl(var(--verified))' },
+            { label: 'Generate insights', color: 'hsl(var(--opportunity))' },
+          ].map((stage, i, arr) => (
+            <div key={stage.label} className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full" style={{ background: stage.color }} aria-hidden="true" />
+              <span className="text-xs font-medium text-muted-foreground">{stage.label}</span>
+              {i < arr.length - 1 && <ArrowRight className="hidden h-3.5 w-3.5 text-border md:inline-flex" />}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -453,16 +470,16 @@ export default function NewLead() {
         <form onSubmit={handleSubmit} className={surface} noValidate>
           <div className="space-y-6">
             <div>
-              <label htmlFor="maps-url" className="mb-2 block text-sm font-medium text-foreground">Google Maps URL</label>
+              <label htmlFor="maps-url" className="mb-2 block text-sm font-semibold text-foreground">Google Maps URL</label>
               <div className="relative">
-                <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-primary" />
                 <input
                   id="maps-url"
                   type="url"
                   required
                   aria-invalid={!!urlError}
                   aria-describedby={urlError ? 'maps-url-error' : 'maps-url-hint'}
-                  className={`w-full rounded-xl border ${urlError ? 'border-destructive bg-background' : 'border-input bg-background focus:border-primary focus:ring-2 focus:ring-ring'} py-4 pl-12 pr-4 text-base text-foreground outline-none transition ${isProcessing ? 'opacity-60' : ''}`}
+                  className={`${input} py-4 pl-12 pr-4 text-base ${isProcessing ? 'opacity-60' : ''}`}
                   placeholder="https://maps.google.com/place/..."
                   value={urlInput}
                   onChange={(e) => handleUrlChange(e.target.value)}
@@ -493,8 +510,8 @@ export default function NewLead() {
                 />
               </label>
 
-              <div className="rounded-xl border border-dashed border-border bg-secondary px-4 py-3 text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">Workflow</p>
+              <div className="rounded-xl border border-dashed border-primary/30 bg-gradient-to-br from-secondary via-card to-ai/5 px-4 py-3 text-sm text-muted-foreground">
+                <p className="font-semibold text-foreground">Workflow</p>
                 <p className="mt-1">Business analysis → DNA → score → website → outreach</p>
               </div>
             </div>
@@ -576,13 +593,23 @@ export default function NewLead() {
           </div>
         </form>
 
-        <aside className={`${surface} bg-secondary`}>
-          <p className={eyebrow}>Status</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-foreground">
+        <aside className={`${surface} bg-gradient-to-br from-secondary via-card to-ai/5`}>
+          <p className={eyebrow}>Analysis status</p>
+          <h2 className="mt-2 font-display text-2xl font-bold tracking-[-0.05em] text-foreground">
             {headerTitle}
           </h2>
+          {isProcessing && (
+            <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="wl-dot wl-glow-pulse bg-primary" aria-hidden="true" />
+              {isBeyondExpected ? 'Still active — slower than usual' : 'Running the intelligence pipeline'}
+            </p>
+          )}
 
-          <div className="mt-6 space-y-4">
+          <div className="relative mt-7 space-y-5">
+            {/* vertical connector line */}
+            {isProcessing && (
+              <div aria-hidden="true" className="absolute bottom-4 left-[15px] top-4 w-px bg-gradient-to-b from-primary via-ai/40 to-transparent" />
+            )}
             {progressSteps.map((step, index) => {
               // During processing: steps before the current one are complete
               // (timer cadence hint only — the final "Preparing analysis" step
@@ -597,23 +624,35 @@ export default function NewLead() {
               const isActive = isProcessing && index === currentStep;
 
               return (
-                <div key={step.label} className="flex items-center gap-3">
-                  <div className={[
-                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold transition-colors duration-300',
-                    isComplete
-                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                      : isActive
-                      ? 'bg-primary text-white'
-                      : 'bg-card text-muted-foreground border border-border',
-                  ].join(' ')}>
+                <div key={step.label} className="relative flex items-start gap-3">
+                  <div
+                    className={[
+                      'relative z-10 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-all duration-300',
+                      isComplete
+                        ? 'border border-verified/30 text-white shadow-glow-green'
+                        : isActive
+                        ? 'text-white'
+                        : 'border border-border bg-card text-muted-foreground',
+                    ].join(' ')}
+                    style={{ background: isActive || isComplete ? step.color : undefined }}
+                  >
                     {isComplete ? <CheckCircle2 className="h-3.5 w-3.5" /> : isActive ? <Loader className="h-3 w-3 animate-spin" /> : index + 1}
                   </div>
-                  <div className="min-w-0">
-                    <span className={['text-sm block truncate', isComplete ? 'text-emerald-600' : isActive ? 'text-foreground font-medium' : 'text-muted-foreground'].join(' ')}>
+                  <div className="min-w-0 pt-0.5">
+                    <span
+                      className={['block truncate text-sm', isComplete ? 'font-medium text-foreground line-through decoration-verified/50 decoration-1' : isActive ? 'font-semibold text-foreground' : 'text-muted-foreground'].join(' ')}
+                    >
                       {step.label}
                     </span>
                     {isActive && (
-                      <span className="text-[11px] text-muted-foreground">{formatTime(elapsedTime)} elapsed</span>
+                      <span className="mt-0.5 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                        <span className="h-1 w-1 rounded-full" style={{ background: step.color }} aria-hidden="true" />
+                        {formatTime(elapsedTime)} elapsed
+                        {isBeyondExpected && ' · longer than expected'}
+                      </span>
+                    )}
+                    {isComplete && (
+                      <span className="mt-0.5 block text-[11px] text-verified">Complete</span>
                     )}
                   </div>
                 </div>
@@ -621,14 +660,21 @@ export default function NewLead() {
             })}
           </div>
 
-          <div className="mt-8 rounded-xl border border-border bg-card p-4">
+          <div className="mt-8 rounded-xl border border-border bg-gradient-to-br from-card to-secondary/70 p-4">
             <p className={eyebrow}>What Webloom does</p>
             <ul className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
-              <li>• Resolves business identity from your Maps URL</li>
-              <li>• Gathers verified business information from multiple sources</li>
-              <li>• Produces a canonical business profile with provenance</li>
-              <li>• Generates a digital presence analysis</li>
-              <li>• Builds a strategic Business DNA profile</li>
+              {[
+                'Resolves business identity from your Maps URL',
+                'Gathers verified business information from multiple sources',
+                'Produces a canonical business profile with provenance',
+                'Generates a digital presence analysis',
+                'Builds a strategic Business DNA profile',
+              ].map((item) => (
+                <li key={item} className="flex items-start gap-2.5">
+                  <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-gradient-to-r from-primary to-ai" aria-hidden="true" />
+                  {item}
+                </li>
+              ))}
             </ul>
           </div>
         </aside>

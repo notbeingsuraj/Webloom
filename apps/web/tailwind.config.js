@@ -66,6 +66,45 @@ export default {
           danger:   '#EF4444',
           warning:  '#F59E0B',
         },
+        /* Semantic intelligence palette (light + dark aware) */
+        ai: {
+          DEFAULT: "hsl(var(--ai))",
+          foreground: "hsl(var(--ai-foreground))",
+        },
+        opportunity: {
+          DEFAULT: "hsl(var(--opportunity))",
+          foreground: "hsl(var(--opportunity-foreground))",
+        },
+        verified: {
+          DEFAULT: "hsl(var(--verified))",
+          foreground: "hsl(var(--verified-foreground))",
+        },
+        creative: {
+          DEFAULT: "hsl(var(--creative))",
+          foreground: "hsl(var(--creative-foreground))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+      },
+      boxShadow: {
+        card: 'var(--shadow-card)',
+        'card-hover': 'var(--shadow-card-hover)',
+        pop: 'var(--shadow-pop)',
+        'glow-blue': 'var(--shadow-glow-blue)',
+        'glow-violet': 'var(--shadow-glow-violet)',
+        'glow-orange': 'var(--shadow-glow-orange)',
+        'glow-green': 'var(--shadow-glow-green)',
+        'glow-pink': 'var(--shadow-glow-pink)',
+      },
+      fontFamily: {
+        sans: ['Inter', "'SF Pro Display'", '-apple-system', 'BlinkMacSystemFont', "'Segoe UI'", 'sans-serif'],
+        display: ['Sora', 'Inter', "'SF Pro Display'", '-apple-system', 'BlinkMacSystemFont', "'Segoe UI'", 'sans-serif'],
       },
       borderRadius: {
         lg: "var(--radius)",

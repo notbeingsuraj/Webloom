@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Globe, Mail, MapPin, Phone, Sparkles, Trash2, Clock, Tag, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Globe, Mail, MapPin, Phone, Sparkles, Trash2, Clock, Tag, ExternalLink, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import StatusBadge from '../components/ui/StatusBadge';
 import ScoreIndicator from '../components/ui/ScoreIndicator';
 import AuditRow from '../components/ui/AuditRow';
@@ -156,7 +156,23 @@ export default function LeadDetail() {
   }, [lead?.businessData?.services]);
 
   if (isLoading) {
-    return <div className="rounded-2xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">Loading lead workspace...</div>;
+    return (
+      <div className="space-y-6" aria-busy="true" aria-label="Loading lead workspace">
+        <div className="wl-card h-40 p-6">
+          <div className="wl-shimmer h-full w-full rounded-2xl" />
+        </div>
+        <div className="grid gap-6 xl:grid-cols-[1.03fr_0.97fr]">
+          <div className="space-y-6">
+            <div className="wl-card h-64 p-6"><div className="wl-shimmer h-full w-full rounded-2xl" /></div>
+            <div className="wl-card h-72 p-6"><div className="wl-shimmer h-full w-full rounded-2xl" /></div>
+          </div>
+          <div className="space-y-6">
+            <div className="wl-card h-52 p-6"><div className="wl-shimmer h-full w-full rounded-2xl" /></div>
+            <div className="wl-card h-56 p-6"><div className="wl-shimmer h-full w-full rounded-2xl" /></div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (isError) {
@@ -165,51 +181,101 @@ export default function LeadDetail() {
       (error as any)?.message ||
       'The lead could not be loaded.';
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-10 text-center">
-        <p className="flex items-center justify-center gap-2 text-sm font-medium text-red-700">
-          <AlertCircle className="h-4 w-4" />
-          Unable to load lead
-        </p>
-        <p className="mt-2 text-sm text-red-600/80">{message}</p>
+      <div className="wl-card mx-auto max-w-xl p-10 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+          <AlertCircle className="h-7 w-7" />
+        </div>
+        <p className="mt-5 font-display text-xl font-bold text-foreground">Unable to load lead</p>
+        <p className="mt-2 text-sm text-muted-foreground">{message}</p>
         <button
           type="button"
           onClick={() => queryClient.invalidateQueries({ queryKey: ['lead', id] })}
-          className="mt-5 rounded-full bg-secondary px-4 py-2 text-sm font-medium text-foreground transition hover:bg-secondary/80"
+          className="mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-card transition-colors hover:bg-primary/90"
         >
           Retry
         </button>
+        <p className="mt-4 text-xs text-muted-foreground">The lead data is safe — this was a fetch or display issue.</p>
       </div>
     );
   }
 
   if (!lead || !lead._id) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-10 text-center">
-        <p className="text-sm font-medium text-foreground">No lead found</p>
+      <div className="wl-card mx-auto max-w-xl p-10 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-muted-foreground">
+          <AlertCircle className="h-7 w-7" />
+        </div>
+        <p className="mt-5 font-display text-xl font-bold text-foreground">No lead found</p>
         <p className="mt-2 text-sm text-muted-foreground">This lead does not exist or has been deleted.</p>
+        <Link to="/" className="mt-6 inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">Back to dashboard</Link>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <header className="rounded-2xl border border-border bg-card p-6 shadow-sm md:p-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Lead detail</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-foreground md:text-[2.7rem]">{lead?.businessName || lead?.leadName || 'Local business'}</h1>
+      <header className="wl-card wl-mesh relative overflow-hidden p-6 md:p-8">
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="wl-eyebrow">Lead workspace</p>
+              <StatusBadge status={lead?.status || 'new'} />
+              {score.state === 'preliminary' && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2.5 py-0.5 text-[11px] font-semibold text-warning-foreground">
+                  Preliminary score
+                </span>
+              )}
+            </div>
+            <h1 className="mt-2 font-display text-3xl font-bold tracking-[-0.06em] text-foreground md:text-[2.7rem]">
+              {lead?.businessName || lead?.leadName || 'Local business'}
+            </h1>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <span>{lead?.businessCategory || 'Local business'}</span>
-              {lead?.location?.city && <><span className="h-1 w-1 rounded-full bg-[#D2D2D7]" /><span>{lead.location.city}</span></>}
-              {lead?.contact?.website && <><span className="h-1 w-1 rounded-full bg-[#D2D2D7]" /><span className="flex items-center gap-1"><Globe className="h-3 w-3" /> Website</span></>}
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-ai" aria-hidden="true" />
+                {lead?.businessCategory || 'Local business'}
+              </span>
+              {lead?.location?.city && (
+                <>
+                  <span className="h-1 w-1 rounded-full bg-border" aria-hidden="true" />
+                  <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {lead.location.city}</span>
+                </>
+              )}
+              {lead?.contact?.website && (
+                <>
+                  <span className="h-1 w-1 rounded-full bg-border" aria-hidden="true" />
+                  <a
+                    href={lead.contact.website}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-primary transition hover:text-primary/80"
+                  >
+                    <Globe className="h-3.5 w-3.5" /> Website <ExternalLink className="h-3 w-3" />
+                  </a>
+                </>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Compact score chip */}
+            <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-2.5 shadow-sm">
+              <div>
+                <p className="wl-eyebrow">Opportunity</p>
+                <p className="font-display text-xl font-bold leading-tight tabular-nums text-foreground">
+                  {score.value != null ? score.value : <span className="text-muted-foreground">—</span>}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-full border-4 border-muted bg-card" style={{ background: `conic-gradient(hsl(var(--primary)) ${(score.value ?? 0) * 3.6}deg, hsl(var(--muted)) 0deg)` }}>
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-card text-[9px] font-bold text-foreground tabular-nums">
+                  {score.value != null ? Math.round(score.value) : '—'}
+                </div>
+              </div>
+            </div>
+
             <select
               value={lead?.status || 'new'}
               onChange={(e) => updateStatusMutation.mutate(e.target.value)}
-              className="rounded-full border border-input bg-background px-3 py-2 text-sm font-medium text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
+              className="h-11 rounded-full border border-input bg-card px-4 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring"
               aria-label="Lead status"
             >
               <option value="new">New</option>
@@ -220,7 +286,7 @@ export default function LeadDetail() {
             </select>
             <button
               onClick={() => deleteMutation.mutate()}
-              className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100"
+              className="inline-flex h-11 items-center gap-2 rounded-full border border-destructive/25 bg-destructive/10 px-4 text-sm font-medium text-destructive transition hover:bg-destructive/20"
             >
               <Trash2 className="h-4 w-4" />
               Delete
@@ -228,15 +294,18 @@ export default function LeadDetail() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-6">
-          {tabs.map((tab) => (
+        <div className="relative mt-6 flex flex-wrap gap-2 border-t border-border/70 pt-5">
+          {tabs.map((tab, i) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
+              aria-current={activeTab === tab ? 'page' : undefined}
               className={[
-                'rounded-full px-3 py-2 text-sm font-medium transition',
-                activeTab === tab ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary text-muted-foreground hover:text-foreground',
+                'rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200',
+                activeTab === tab
+                  ? 'bg-gradient-to-r from-primary to-ai text-white shadow-glow-blue'
+                  : 'bg-secondary text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
               ].join(' ')}
             >
               {tab}
@@ -248,42 +317,43 @@ export default function LeadDetail() {
       {activeTab === 'Overview' && (
         <div className="grid gap-6 xl:grid-cols-[1.03fr_0.97fr]">
           <div className="space-y-6">
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            {/* Business profile — color-coded evidence fields */}
+            <div className="wl-card p-6">
               <div className="mb-5 flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold tracking-[-0.04em] text-foreground">Business profile</h2>
+                <h2 className="font-display text-xl font-bold tracking-[-0.04em] text-foreground">Business profile</h2>
                 <StatusBadge status={lead?.status || 'new'} />
               </div>
 
               <dl className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-xl border border-border bg-secondary p-4">
-                  <dt className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Location</dt>
+                <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-primary/5 p-4 transition-colors hover:border-primary/30">
+                  <dt className="wl-eyebrow">Location</dt>
                   <dd className="mt-3 flex items-center gap-2 text-sm text-foreground">
-                    <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span>{lead?.location?.address || 'Location not available'}</span>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary"><MapPin className="h-4 w-4" /></span>
+                    <span>{lead?.location?.address || <span className="text-muted-foreground">Not available</span>}</span>
                   </dd>
                 </div>
-                <div className="rounded-xl border border-border bg-secondary p-4">
-                  <dt className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Phone</dt>
+                <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-verified/5 p-4 transition-colors hover:border-verified/40">
+                  <dt className="wl-eyebrow">Phone</dt>
                   <dd className="mt-3 flex items-center gap-2 text-sm text-foreground">
-                    <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-verified/12 text-verified"><Phone className="h-4 w-4" /></span>
                     {lead?.contact?.phone ? (
                       <a href={`tel:${lead.contact.phone}`} className="text-primary hover:text-primary/80">{lead.contact.phone}</a>
                     ) : <span className="text-muted-foreground">Not available</span>}
                   </dd>
                 </div>
-                <div className="rounded-xl border border-border bg-secondary p-4">
-                  <dt className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Email</dt>
+                <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-ai/5 p-4 transition-colors hover:border-ai/40">
+                  <dt className="wl-eyebrow">Email</dt>
                   <dd className="mt-3 flex items-center gap-2 text-sm text-foreground">
-                    <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ai/12 text-ai"><Mail className="h-4 w-4" /></span>
                     {lead?.contact?.email ? (
                       <a href={`mailto:${lead.contact.email}`} className="text-primary hover:text-primary/80">{lead.contact.email}</a>
                     ) : <span className="text-muted-foreground">Not available</span>}
                   </dd>
                 </div>
-                <div className="rounded-xl border border-border bg-secondary p-4">
-                  <dt className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Website</dt>
+                <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-creative/5 p-4 transition-colors hover:border-creative/40">
+                  <dt className="wl-eyebrow">Website</dt>
                   <dd className="mt-3 flex items-center gap-2 text-sm text-foreground">
-                    <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-creative/12 text-creative"><Globe className="h-4 w-4" /></span>
                     {lead?.contact?.website ? (
                       <a href={lead.contact.website} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-primary hover:text-primary/80">
                         Visit site <ExternalLink className="h-3 w-3" />
@@ -294,23 +364,24 @@ export default function LeadDetail() {
               </dl>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            {/* Business DNA — AI summary */}
+            <div className="wl-card p-6">
               <div className="mb-4 flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold tracking-[-0.04em] text-foreground">Business DNA</h2>
+                <h2 className="font-display text-xl font-bold tracking-[-0.04em] text-foreground">Business DNA</h2>
                 <StatusBadge status={analysisState} />
               </div>
               {analysisState === 'failed' && (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4">
-                  <p className="flex items-center gap-2 text-sm font-medium text-red-700">
+                <div className="mb-4 rounded-xl border border-destructive/25 bg-destructive/10 p-4">
+                  <p className="flex items-center gap-2 text-sm font-medium text-destructive">
                     <AlertCircle className="h-4 w-4" />
                     Brand DNA generation failed
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-red-600/80">The business profile is still valid, but the AI analysis did not complete. Retry to regenerate.</p>
+                  <p className="mt-1 text-xs leading-5 text-destructive/80">The business profile is still valid, but the AI analysis did not complete. Retry to regenerate.</p>
                 </div>
               )}
               <div className="mt-5 space-y-4">
-                <div className="rounded-xl border border-border bg-secondary p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Target audience</p>
+                <div className="rounded-2xl border border-border border-l-4 border-l-ai bg-gradient-to-br from-secondary via-card to-ai/5 p-4">
+                  <p className="wl-eyebrow">Target audience</p>
                   <p className="mt-2 text-sm leading-6 text-foreground">{showDna ? (lead?.analysis?.brandDNA?.audience?.primary?.segment || dnaEmptyText) : dnaEmptyText}</p>
                   {showDna && lead?.analysis?.brandDNA?.audience?.primary?.demographics && (
                     <p className="mt-2 text-xs leading-5 text-muted-foreground">
@@ -322,39 +393,41 @@ export default function LeadDetail() {
                     </p>
                   )}
                 </div>
-                <div className="rounded-xl border border-border bg-secondary p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Positioning statement</p>
+                <div className="rounded-2xl border border-border border-l-4 border-l-opportunity bg-gradient-to-br from-secondary via-card to-opportunity/5 p-4">
+                  <p className="wl-eyebrow">Positioning statement</p>
                   <p className="mt-2 text-sm leading-6 text-foreground">{showDna ? (lead?.analysis?.brandDNA?.positioning?.statement || dnaEmptyText) : dnaEmptyText}</p>
                   {showDna && lead?.analysis?.brandDNA?.positioning?.differentiation && (
                     <p className="mt-2 text-xs leading-5 text-muted-foreground">{lead.analysis.brandDNA.positioning.differentiation}</p>
                   )}
                 </div>
-                <div className="rounded-xl border border-border bg-secondary p-4">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Brand personality</p>
+                <div className="rounded-2xl border border-border border-l-4 border-l-creative bg-gradient-to-br from-secondary via-card to-creative/5 p-4">
+                  <p className="wl-eyebrow">Brand personality</p>
                   {showDna && lead?.analysis?.brandDNA?.brandPersonality?.primary?.length ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {lead.analysis.brandDNA.brandPersonality.primary.map((trait: string) => (
-                        <span key={trait} className="inline-flex items-center rounded-full border border-border bg-card px-2.5 py-1 text-xs text-foreground">{trait}</span>
+                        <span key={trait} className="inline-flex items-center rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground">{trait}</span>
                       ))}
                       {lead.analysis.brandDNA.brandPersonality.archetype && (
-                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs text-primary">Archetype: {lead.analysis.brandDNA.brandPersonality.archetype}</span>
+                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">Archetype: {lead.analysis.brandDNA.brandPersonality.archetype}</span>
                       )}
                     </div>
                   ) : <p className="mt-2 text-sm leading-6 text-foreground">{dnaEmptyText}</p>}
                 </div>
                 {showDna && lead?.analysis?.brandDNA?.toneOfVoice && (
-                  <div className="rounded-xl border border-border bg-secondary p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tone of voice</p>
+                  <div className="rounded-2xl border border-border border-l-4 border-l-verified bg-gradient-to-br from-secondary via-card to-verified/5 p-4">
+                    <p className="wl-eyebrow">Tone of voice</p>
                     <p className="mt-2 text-sm leading-6 text-foreground">{lead.analysis.brandDNA.toneOfVoice.characteristics?.join(', ') || '—'}</p>
                   </div>
                 )}
                 {showDna && lead?.analysis?.brandDNA?.strategicRecommendations?.length ? (
-                  <div className="rounded-xl border border-border bg-secondary p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Strategic recommendations</p>
+                  <div className="rounded-2xl border border-ai/25 bg-ai/5 p-4">
+                    <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ai">
+                      <Sparkles className="h-3.5 w-3.5" /> Strategic recommendations
+                    </p>
                     <ul className="mt-2 space-y-2">
                       {lead.analysis.brandDNA.strategicRecommendations.slice(0, 4).map((rec: { recommendation?: string }, i: number) => (
                         <li key={i} className="flex items-start gap-2 text-sm leading-5 text-foreground">
-                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-verified" />
                           {rec.recommendation}
                         </li>
                       ))}
@@ -364,42 +437,72 @@ export default function LeadDetail() {
               </div>
             </div>
 
-          {/* Provenance / Source Information */}
+          {/* Provenance / Source Information — evidence color language:
+              verified = green, discovered = blue, AI-extracted = violet,
+              uncertain = yellow. Never implies AI data is verified. */}
             {(lead?.analysis?.metrics?.trustSignals || services.length > 0) && (
-              <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-                <h2 className="text-xl font-semibold tracking-[-0.04em] text-foreground">Business details</h2>
+              <div className="wl-card p-6">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h2 className="font-display text-xl font-bold tracking-[-0.04em] text-foreground">Business details & evidence</h2>
+                  <StatusBadge status="verified" />
+                </div>
+                <div className="mt-4 flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-verified/10 px-2 py-0.5 text-verified"><CheckCircle2 className="h-3 w-3" /> verified</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-primary">discovered</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-ai/10 px-2 py-0.5 text-ai">AI-extracted</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-warning-foreground">uncertain</span>
+                </div>
                 <div className="mt-5 space-y-3">
                   {services.length > 0 && (
-                    <div className="rounded-xl border border-border bg-secondary p-4">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Services</p>
+                    <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-ai/5 p-4">
+                      <p className="wl-eyebrow">Services</p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {services.map((s: string) => (
-                          <span key={s} className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-foreground">
-                            <Tag className="h-3 w-3 text-muted-foreground" /> {s}
+                          <span key={s} className="wl-chip">
+                            <Tag className="h-3 w-3" /> {s}
                           </span>
                         ))}
                       </div>
                     </div>
                   )}
                   {!!lead?.businessData?.openingHours && (
-                    <div className="rounded-xl border border-border bg-secondary p-4">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Hours</p>
+                    <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-primary/5 p-4">
+                      <p className="wl-eyebrow">Hours</p>
                       <div className="mt-2 flex items-center gap-2 text-sm text-foreground">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/12 text-primary"><Clock className="h-4 w-4" /></span>
                         <span>Hours data available</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-verified/10 px-2 py-0.5 text-[10px] font-semibold text-verified">
+                          <CheckCircle2 className="h-3 w-3" /> discovered
+                        </span>
                       </div>
                     </div>
                   )}
                   {lead?.analysis?.metrics?.trustSignals && (
-                    <div className="rounded-xl border border-border bg-secondary p-4">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Source confidence</p>
+                    <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-verified/5 p-4">
+                      <p className="wl-eyebrow">Source confidence</p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {Array.isArray(lead.analysis.metrics.trustSignals) ? (
-                          lead.analysis.metrics.trustSignals.slice(0, 3).map((signal, i: number) => (
-                            <span key={i} className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
-                              <CheckCircle2 className="h-3 w-3" /> {trustSignalLabel(signal)}
-                            </span>
-                          ))
+                          lead.analysis.metrics.trustSignals.slice(0, 6).map((signal, i: number) => {
+                            const s = typeof signal === 'object' && signal ? signal as { verified?: boolean; verification?: string | null } : null;
+                            const verified = !!s?.verified || s?.verification === 'verified';
+                            const aiExtracted = !!s && s.verification === 'ai_generated';
+                            return (
+                              <span
+                                key={i}
+                                className={[
+                                  'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium',
+                                  aiExtracted
+                                    ? 'bg-ai/10 text-ai'
+                                    : verified
+                                    ? 'bg-verified/10 text-verified'
+                                    : 'bg-primary/10 text-primary',
+                                ].join(' ')}
+                              >
+                                {aiExtracted ? <Sparkles className="h-3 w-3" /> : verified ? <CheckCircle2 className="h-3 w-3" /> : <Info className="h-3 w-3" />}
+                                {trustSignalLabel(signal)}
+                              </span>
+                            );
+                          })
                         ) : (
                           <span className="text-sm text-foreground">{trustSignalLabel(lead.analysis.metrics.trustSignals)}</span>
                         )}
@@ -418,9 +521,9 @@ export default function LeadDetail() {
               description={scoreDescription}
             />
 
-            <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
-              <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Digital audit</h2>
-              <p className="mt-1 text-xs text-webloom-muted">
+            <div className="wl-card p-6">
+              <h2 className="font-display text-xl font-bold tracking-[-0.04em] text-foreground">Digital audit</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
                 {lead?.analysis?.audit?.status === 'degraded'
                   ? `Audit incomplete — ${lead.analysis.audit.websiteExists ? 'website detected but not scored' : 'no website detected'}`
                   : lead?.analysis?.audit?.websiteExists
@@ -446,9 +549,9 @@ export default function LeadDetail() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div className="wl-card p-6">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold tracking-[-0.04em] text-foreground">Recommended action</h2>
+                <h2 className="font-display text-xl font-bold tracking-[-0.04em] text-foreground">Recommended action</h2>
                 <button
                   type="button"
                   onClick={() => generateDNAMutation.mutate()}
@@ -460,17 +563,17 @@ export default function LeadDetail() {
               </div>
 
               {generateDNAMutation.isError ? (
-                <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm leading-6">
-                  <p className="flex items-center gap-2 font-medium text-red-700">
+                <div className="mt-5 rounded-xl border border-destructive/25 bg-destructive/10 p-4 text-sm leading-6">
+                  <p className="flex items-center gap-2 font-medium text-destructive">
                     <AlertCircle className="h-4 w-4" />
                     Refresh failed
                   </p>
-                  <p className="mt-1 text-xs text-red-600/80">The analysis could not be regenerated. Check the API and try again.</p>
+                  <p className="mt-1 text-xs text-destructive/80">The analysis could not be regenerated. Check the API and try again.</p>
                 </div>
               ) : (
-                <div className="mt-5 rounded-xl border border-border bg-secondary p-4 text-sm leading-6 text-foreground">
-                  <p className="flex items-center gap-2 font-medium">
-                    <Sparkles className="h-4 w-4 text-primary" />
+                <div className="mt-5 rounded-2xl border border-ai/25 bg-gradient-to-br from-ai/10 to-creative/5 p-4 text-sm leading-6 text-foreground shadow-glow-violet">
+                  <p className="flex items-center gap-2 font-semibold">
+                    <Sparkles className="h-4 w-4 text-ai" />
                     {recommendedAction}
                   </p>
                 </div>
@@ -482,20 +585,36 @@ export default function LeadDetail() {
 
       {activeTab === 'Analysis' && (
         <div className="space-y-6">
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <div className="wl-card p-6">
             <div className="mb-6 flex items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold tracking-[-0.04em] text-foreground">Opportunity breakdown</h2>
+              <h2 className="font-display text-xl font-bold tracking-[-0.04em] text-foreground">Opportunity breakdown</h2>
               <StatusBadge status={lead?.opportunityScore?.priority || 'high'} />
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-2xl border border-border bg-secondary p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Website</p>
-                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-foreground">{lead?.contact?.website ? 'Present' : 'Missing'}</p>
+              <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-primary/5 p-4">
+                <p className="wl-eyebrow">Website</p>
+                <p className="mt-3 font-display text-2xl font-bold tracking-[-0.05em] text-foreground">
+                  {lead?.contact?.website ? (
+                    <span className="text-verified">Present</span>
+                  ) : <span className="text-opportunity">Missing</span>}
+                </p>
               </div>
-              <div className="rounded-2xl border border-border bg-secondary p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Score</p>
-                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-foreground">{lead?.opportunityScore?.total ?? '—'}</p>
+              <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-ai/5 p-4">
+                <p className="wl-eyebrow">Score</p>
+                <p className="mt-3 font-display text-2xl font-bold tracking-[-0.05em] tabular-nums text-foreground">{lead?.opportunityScore?.total ?? '—'}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-verified/5 p-4">
+                <p className="wl-eyebrow">Reputation</p>
+                <p className="mt-3 font-display text-2xl font-bold tracking-[-0.05em] tabular-nums text-foreground">
+                  {lead?.businessData?.reputation?.rating ?? lead?.businessData?.rating ?? '—'}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-creative/5 p-4">
+                <p className="wl-eyebrow">Analysis status</p>
+                <p className="mt-3 font-display text-2xl font-bold tracking-[-0.05em] text-foreground">
+                  {lead?.analysis?.brandStrategyStatus === 'ok' ? <span className="text-verified">Complete</span> : <span className="text-warning-foreground">Pending</span>}
+                </p>
               </div>
             </div>
           </div>
@@ -505,35 +624,35 @@ export default function LeadDetail() {
 
           {/* Brand DNA deep dive */}
           {lead?.analysis?.brandDNA && (
-            <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div className="wl-card p-6">
               <div className="mb-5 flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold tracking-[-0.04em] text-foreground">Brand DNA deep dive</h2>
+                <h2 className="font-display text-xl font-bold tracking-[-0.04em] text-foreground">Brand DNA deep dive</h2>
                 <StatusBadge status={lead?.analysis?.brandStrategyStatus || 'new'} />
               </div>
               <div className="grid gap-4 lg:grid-cols-2">
                 {lead.analysis.brandDNA.customerIntent && (
-                  <div className="rounded-xl border border-border bg-secondary p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Customer intent</p>
+                  <div className="rounded-2xl border border-border border-l-4 border-l-primary bg-gradient-to-br from-secondary via-card to-primary/5 p-4">
+                    <p className="wl-eyebrow">Customer intent</p>
                     <div className="mt-2">
                       <IntentList items={toIntentItems(lead.analysis.brandDNA.customerIntent)} />
                     </div>
                   </div>
                 )}
                 {lead.analysis.brandDNA.purchaseTriggers && (
-                  <div className="rounded-xl border border-border bg-secondary p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Purchase triggers</p>
+                  <div className="rounded-2xl border border-border border-l-4 border-l-opportunity bg-gradient-to-br from-secondary via-card to-opportunity/5 p-4">
+                    <p className="wl-eyebrow">Purchase triggers</p>
                     <div className="mt-2">
                       <TriggerList items={toTriggerItems(lead.analysis.brandDNA.purchaseTriggers)} />
                     </div>
                   </div>
                 )}
                 {lead.analysis.brandDNA.painPoints?.length ? (
-                  <div className="rounded-xl border border-border bg-secondary p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Pain points</p>
+                  <div className="rounded-2xl border border-border border-l-4 border-l-destructive bg-gradient-to-br from-secondary via-card to-destructive/5 p-4">
+                    <p className="wl-eyebrow">Pain points</p>
                     <ul className="mt-2 space-y-1.5">
                       {lead.analysis.brandDNA.painPoints.slice(0, 5).map((pp: { pain?: string } | string, i: number) => (
                         <li key={i} className="flex items-start gap-2 text-sm leading-5 text-foreground">
-                          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
+                          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
                           {typeof pp === 'string' ? pp : pp.pain || ''}
                         </li>
                       ))}
@@ -541,12 +660,12 @@ export default function LeadDetail() {
                   </div>
                 ) : null}
                 {lead.analysis.brandDNA.competitiveAdvantages?.length ? (
-                  <div className="rounded-xl border border-border bg-secondary p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Competitive advantages</p>
+                  <div className="rounded-2xl border border-border border-l-4 border-l-verified bg-gradient-to-br from-secondary via-card to-verified/5 p-4">
+                    <p className="wl-eyebrow">Competitive advantages</p>
                     <ul className="mt-2 space-y-1.5">
                       {lead.analysis.brandDNA.competitiveAdvantages.slice(0, 5).map((adv: { advantage?: string } | string, i: number) => (
                         <li key={i} className="flex items-start gap-2 text-sm leading-5 text-foreground">
-                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-verified" />
                           {typeof adv === 'string' ? adv : adv.advantage || ''}
                         </li>
                       ))}
@@ -554,25 +673,25 @@ export default function LeadDetail() {
                   </div>
                 ) : null}
                 {lead.analysis.brandDNA.conversionStrategy?.primaryCTA && (
-                  <div className="rounded-xl border border-border bg-secondary p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Primary CTA</p>
-                    <p className="mt-2 text-sm font-medium text-foreground">{lead.analysis.brandDNA.conversionStrategy.primaryCTA.text || lead.analysis.brandDNA.conversionStrategy.primaryCTA.action}</p>
+                  <div className="rounded-2xl border border-ai/25 bg-gradient-to-br from-ai/10 to-card p-4">
+                    <p className="wl-eyebrow">Primary CTA</p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{lead.analysis.brandDNA.conversionStrategy.primaryCTA.text || lead.analysis.brandDNA.conversionStrategy.primaryCTA.action}</p>
                     {lead.analysis.brandDNA.conversionStrategy.primaryCTA.reasoning && (
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">{lead.analysis.brandDNA.conversionStrategy.primaryCTA.reasoning}</p>
                     )}
                   </div>
                 )}
                 {lead.analysis.brandDNA.visualDirection && (
-                  <div className="rounded-xl border border-border bg-secondary p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Visual direction</p>
+                  <div className="rounded-2xl border border-border border-l-4 border-l-creative bg-gradient-to-br from-secondary via-card to-creative/5 p-4">
+                    <p className="wl-eyebrow">Visual direction</p>
                     <div className="mt-2">
                       <VisualDirectionPanel data={toVisualDirectionData(lead.analysis.brandDNA.visualDirection)} />
                     </div>
                   </div>
                 )}
                 {lead.analysis.brandDNA.websiteObjectives && (
-                  <div className="rounded-xl border border-border bg-secondary p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Website objectives</p>
+                  <div className="rounded-2xl border border-border border-l-4 border-l-ai bg-gradient-to-br from-secondary via-card to-ai/5 p-4">
+                    <p className="wl-eyebrow">Website objectives</p>
                     <div className="mt-2">
                       <ObjectiveList items={toObjectiveItems(lead.analysis.brandDNA.websiteObjectives)} />
                     </div>
@@ -582,14 +701,19 @@ export default function LeadDetail() {
             </div>
           )}
 
-          {/* Research / Analysis Details */}
+          {/* Research / Analysis Details — color-coded evidence */}
           {lead?.analysis?.metrics?.facts && lead.analysis.metrics.facts.length > 0 && (
-            <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
-              <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Key findings</h2>
+            <div className="wl-card p-6">
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-xl font-bold tracking-[-0.04em] text-foreground">Key findings</h2>
+                <span className="inline-flex items-center gap-1 rounded-full bg-verified/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-verified">
+                  <CheckCircle2 className="h-3 w-3" /> evidence-backed
+                </span>
+              </div>
               <div className="mt-4 space-y-2">
                 {lead.analysis.metrics.facts.slice(0, 8).map((fact: any, i: number) => (
-                  <div key={i} className="flex items-start gap-2.5 rounded-xl border border-webloom-border bg-webloom-raised px-4 py-3 text-sm text-webloom-text">
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
+                  <div key={i} className="flex items-start gap-2.5 rounded-xl border border-border bg-gradient-to-br from-secondary/70 to-card px-4 py-3 text-sm text-foreground">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-verified mt-0.5" />
                     <span className="leading-6">{typeof fact === 'string' ? fact : fact.claim}</span>
                   </div>
                 ))}
@@ -598,12 +722,17 @@ export default function LeadDetail() {
           )}
 
           {lead?.analysis?.metrics?.unknowns && lead.analysis.metrics.unknowns.length > 0 && (
-            <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
-              <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Information gaps</h2>
+            <div className="wl-card p-6">
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-xl font-bold tracking-[-0.04em] text-foreground">Information gaps</h2>
+                <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-warning-foreground">
+                  <AlertCircle className="h-3 w-3" /> unknowns
+                </span>
+              </div>
               <div className="mt-4 space-y-2">
                 {lead.analysis.metrics.unknowns.slice(0, 5).map((unknown: string, i: number) => (
-                  <div key={i} className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div key={i} className="flex items-start gap-2.5 rounded-xl border border-warning/25 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
+                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-warning" />
                     <span className="leading-6">{unknown}</span>
                   </div>
                 ))}
@@ -623,16 +752,16 @@ export default function LeadDetail() {
       )}
 
       {activeTab === 'Outreach' && (
-        <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
-          <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Outreach drafts</h2>
+        <div className="wl-card p-6">
+          <h2 className="font-display text-xl font-bold tracking-[-0.04em] text-foreground">Outreach drafts</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {['WhatsApp', 'Email', 'Instagram', 'Call Script'].map((channel) => (
-              <div key={channel} className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">{channel}</p>
-                <p className="mt-3 text-sm leading-6 text-webloom-text">{channel === 'WhatsApp' ? 'Hi, I noticed your current digital presence...' : 'We can help improve...'}</p>
+              <div key={channel} className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-ai/5 p-4 transition-all duration-200 hover:border-primary/40 hover:shadow-card-hover">
+                <p className="wl-eyebrow">{channel}</p>
+                <p className="mt-3 text-sm leading-6 text-foreground">{channel === 'WhatsApp' ? 'Hi, I noticed your current digital presence...' : 'We can help improve...'}</p>
                 <div className="mt-4 flex gap-2">
-                  <button type="button" className="rounded-full bg-webloom-raised px-3 py-2 text-xs font-medium text-white">Copy</button>
-                  <button type="button" className="rounded-full border border-webloom-border bg-webloom-surface px-3 py-2 text-xs font-medium text-webloom-text">Regenerate</button>
+                  <button type="button" className="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-glow-blue transition-all hover:bg-primary/90">Copy</button>
+                  <button type="button" className="rounded-full border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-secondary">Regenerate</button>
                 </div>
               </div>
             ))}

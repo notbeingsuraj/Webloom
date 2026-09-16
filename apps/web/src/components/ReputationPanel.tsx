@@ -69,15 +69,15 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
       : null;
 
   return (
-    <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
+    <div className="wl-card p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Reviews & reputation</h2>
+        <h2 className="text-xl font-semibold tracking-[-0.04em] text-foreground">Reviews & reputation</h2>
         {status && (
           <span
             className={[
               'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide',
               isUnavailable ? 'bg-secondary text-muted-foreground border border-border'
-                : isConflicting ? 'bg-red-50 text-red-700 border border-red-200'
+                : isConflicting ? 'bg-red-50 text-destructive border border-red-200'
                 : status === 'ai_extracted_from_evidence' ? 'bg-purple-50 text-purple-700 border border-purple-200'
                 : 'bg-blue-50 text-blue-700 border border-blue-200',
             ].join(' ')}
@@ -90,41 +90,41 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
 
       {/* Rating + review count */}
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Rating</p>
+        <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-primary/5 p-4">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Rating</p>
           <div className="mt-3 flex items-center gap-1.5">
             {rating != null ? (
               <>
                 <Star className="h-4 w-4 text-[#F59E0B] fill-[#F59E0B]" />
-                <span className="text-2xl font-semibold tracking-[-0.05em] text-webloom-text">
+                <span className="text-2xl font-semibold tracking-[-0.05em] text-foreground">
                   {typeof rating === 'number' ? rating.toFixed(1) : rating}
                 </span>
-                <span className="text-sm text-webloom-muted">/ 5</span>
+                <span className="text-sm text-muted-foreground">/ 5</span>
               </>
             ) : (
-              <span className="text-lg font-medium leading-7 text-webloom-muted">Unavailable</span>
+              <span className="text-lg font-medium leading-7 text-muted-foreground">Unavailable</span>
             )}
           </div>
         </div>
 
-        <div className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Reviews</p>
-          <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-webloom-text">
+        <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-primary/5 p-4">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Reviews</p>
+          <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-foreground">
             {reviewCount != null ? (
               <>
-                {reviewCount.toLocaleString()}<span className="ml-1 text-sm font-normal text-webloom-muted">reviews</span>
+                {reviewCount.toLocaleString()}<span className="ml-1 text-sm font-normal text-muted-foreground">reviews</span>
               </>
             ) : (
-              <span className="text-lg font-medium leading-7 text-webloom-muted">
+              <span className="text-lg font-medium leading-7 text-muted-foreground">
                 {sampleCount > 0 ? 'Total count unavailable' : 'Unavailable'}
               </span>
             )}
           </p>
         </div>
 
-        <div className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Review source</p>
-          <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-webloom-text">
+        <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-primary/5 p-4">
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Review source</p>
+          <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-foreground">
             <span className="flex items-center gap-1.5 text-lg font-medium leading-7">
               <MessageSquare className="h-4 w-4 text-primary" />
               {sourceLabel(rep?.source)}
@@ -135,38 +135,38 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
 
       {/* Unavailable / conflicting states */}
       {isUnavailable && !partialNote && (
-        <p className="mt-4 rounded-[18px] border border-webloom-border bg-webloom-raised px-4 py-3 text-sm text-webloom-muted">
+        <p className="mt-4 rounded-xl border border-border bg-secondary px-4 py-3 text-sm text-muted-foreground">
           {statusText || 'Rating unavailable from supplied sources'}
         </p>
       )}
       {isConflicting && (
-        <p className="mt-4 rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p className="mt-4 rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           Reputation data could not be verified for this business.
         </p>
       )}
 
       {/* Partial note: sample count vs total */}
       {partialNote && (
-        <p className="mt-4 rounded-[18px] border border-webloom-border bg-webloom-raised px-4 py-3 text-sm text-webloom-muted">
+        <p className="mt-4 rounded-xl border border-border bg-secondary px-4 py-3 text-sm text-muted-foreground">
           {partialNote}
         </p>
       )}
 
       {/* Review summary */}
       {reviewSummary && (
-        <div className="mt-4 rounded-[18px] border border-webloom-border bg-webloom-raised px-4 py-3">
-          <p className="text-[11px] uppercase tracking-[0.14em] text-webloom-muted">Review summary</p>
-          <p className="mt-1 text-sm leading-6 text-webloom-text">{reviewSummary}</p>
+        <div className="mt-4 rounded-xl border border-border bg-secondary px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Review summary</p>
+          <p className="mt-1 text-sm leading-6 text-foreground">{reviewSummary}</p>
         </div>
       )}
 
       {/* Review samples */}
       {sampleCount > 0 && (
         <div className="mt-5">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Review samples ({sampleCount})</p>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Review samples ({sampleCount})</p>
           <ul className="mt-3 space-y-2">
             {reviews.slice(0, 10).map((r, idx) => (
-              <li key={idx} className="rounded-[18px] border border-webloom-border bg-webloom-surface p-4">
+              <li key={idx} className="rounded-xl border border-border bg-card p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   {r.rating != null && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
@@ -174,12 +174,12 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
                       {r.rating}
                     </span>
                   )}
-                  {r.author && <span className="text-xs font-medium text-webloom-text">{r.author}</span>}
-                  {r.publishedAt && <span className="text-xs text-webloom-muted">{r.publishedAt}</span>}
+                  {r.author && <span className="text-xs font-medium text-foreground">{r.author}</span>}
+                  {r.publishedAt && <span className="text-xs text-muted-foreground">{r.publishedAt}</span>}
                 </div>
-                {r.text && <p className="mt-2 text-sm leading-6 text-webloom-text">{r.text}</p>}
+                {r.text && <p className="mt-2 text-sm leading-6 text-foreground">{r.text}</p>}
                 {r.provenance === 'ai_generated' && (
-                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-purple-300">
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-ai">
                     Extracted from source evidence
                   </p>
                 )}

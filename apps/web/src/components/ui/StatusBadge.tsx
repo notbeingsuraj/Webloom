@@ -9,18 +9,23 @@ type StatusBadgeProps = React.HTMLAttributes<HTMLSpanElement> & {
 const variantByStatus: Record<string, VariantProps<typeof badgeVariants>['variant']> = {
   new: 'muted',
   analysing: 'info',
+  analysed: 'ai',
   qualified: 'success',
-  contacted: 'warning',
-  won: 'success',
+  contacted: 'opportunity',
+  won: 'verified',
   lost: 'destructive',
   follow_up: 'info',
-  high: 'info',
+  high: 'opportunity',
   critical: 'destructive',
-  complete: 'success',
-  ok: 'success',
+  complete: 'verified',
+  ok: 'verified',
   failed: 'destructive',
   medium: 'warning',
   low: 'muted',
+  not_attempted: 'muted',
+  pending: 'muted',
+  generated: 'verified',
+  not_started: 'muted',
 };
 
 export default function StatusBadge({ status, className, ...props }: StatusBadgeProps) {
