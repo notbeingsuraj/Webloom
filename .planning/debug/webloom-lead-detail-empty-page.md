@@ -95,3 +95,10 @@ started: "current"
   checked: live trustSignals/facts/unknowns shapes
   found: trustSignals = [ {type:'rating',value:4.2,source:'google_maps_public',verified:false,verification:'discovered',confidence:0.6}, {type:'review_count',...} ]. facts = [ {claim,source,verified,verification}... ]; unknowns = ['email'].
   implication: trustSignals must be rendered defensively (object → label from type/value), facts handled via .claim (already), unknowns strings (already).
+
+## Resolution
+
+root_cause: "LeadDetail.tsx Overview 'Source confidence' block renders each entry of `analysis.metrics.trustSignals` directly as a React child (`{signal}`). The live API returns objects `{ type, value, source, verified, verification, confidence }`, not strings. React throws 'Objects are not valid as a React child', and since the app has no ErrorBoundary the entire tree unmounts → empty page. Backend data, envelope unwrap, route param, proxy, CORS all verified correct."
+fix: ""
+verification: ""
+files_changed: []
