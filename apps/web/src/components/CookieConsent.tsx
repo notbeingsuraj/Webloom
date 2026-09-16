@@ -68,7 +68,7 @@ export default function CookieConsent() {
           <div className="rounded-[22px] border border-webloom-border bg-webloom-surface p-4 shadow-2xl backdrop-blur-xl sm:p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-900/40 text-primary-400">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <ShieldCheck className="h-4 w-4" />
                 </span>
                 <div className="min-w-0">

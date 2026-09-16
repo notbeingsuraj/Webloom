@@ -62,7 +62,7 @@ export default function Contact() {
 
   const field = (id: 'name' | 'email' | 'message') => (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-webloom-text capitalize">{id === 'name' ? 'Your name' : id === 'email' ? 'Email address' : 'Message'}</label>
+      <label htmlFor={id} className="mb-1 block text-sm font-medium text-foreground capitalize">{id === 'name' ? 'Your name' : id === 'email' ? 'Email address' : 'Message'}</label>
       {id === 'message' ? (
         <textarea
           id={id}
@@ -71,7 +71,7 @@ export default function Contact() {
           onChange={(e) => setForm({ ...form, [id]: e.target.value })}
           aria-invalid={!!errors[id]}
           aria-describedby={errors[id] ? `${id}-error` : undefined}
-          className={`w-full rounded-2xl border ${errors[id] ? 'border-webloom-danger' : 'border-webloom-border'} bg-webloom-surface px-4 py-3 text-sm text-webloom-text outline-none transition focus:border-primary-500 focus:bg-webloom-raised`}
+          className={`w-full rounded-2xl border ${errors[id] ? 'border-destructive' : 'border-border'} bg-background px-4 py-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring`}
         />
       ) : (
         <input
@@ -81,11 +81,11 @@ export default function Contact() {
           onChange={(e) => setForm({ ...form, [id]: e.target.value })}
           aria-invalid={!!errors[id]}
           aria-describedby={errors[id] ? `${id}-error` : undefined}
-          className={`w-full rounded-2xl border ${errors[id] ? 'border-webloom-danger' : 'border-webloom-border'} bg-webloom-surface px-4 py-3 text-sm text-webloom-text outline-none transition focus:border-primary-500 focus:bg-webloom-raised`}
+          className={`w-full rounded-2xl border ${errors[id] ? 'border-destructive' : 'border-border'} bg-background px-4 py-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring`}
         />
       )}
       {errors[id] && (
-        <p id={`${id}-error`} className="flex items-center gap-1.5 text-xs text-webloom-danger" role="alert">
+        <p id={`${id}-error`} className="flex items-center gap-1.5 text-xs text-destructive" role="alert">
           <AlertCircle className="h-3.5 w-3.5 shrink-0" />
           {errors[id]}
         </p>
@@ -96,22 +96,22 @@ export default function Contact() {
   return (
     <div className="mx-auto max-w-3xl pb-12">
       <header className="mb-10">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-dim">Contact</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-webloom-text">Talk to the Webloom team</h1>
-        <p className="mt-4 max-w-xl text-base leading-relaxed text-webloom-muted">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Contact</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground">Talk to the Webloom team</h1>
+        <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
           Have a question about business intelligence, website generation, or platform access? Send a message and we will get back to you.
         </p>
       </header>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_0.38fr]">
-        <form onSubmit={onSubmit} className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-lg sm:p-8" noValidate>
+        <form onSubmit={onSubmit} className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8" noValidate>
           <div className="space-y-5">
             {field('name')}
             {field('email')}
             {field('message')}
 
             {serverError && (
-              <div className="rounded-2xl border border-red-800/50 bg-red-900/30 px-4 py-3 text-sm text-red-300" role="alert">
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
                 {serverError}
               </div>
             )}
@@ -124,25 +124,25 @@ export default function Contact() {
           </div>
         </form>
 
-        <aside className="rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-lg">
-          <h2 className="text-lg font-semibold text-webloom-text">Get in touch</h2>
-          <div className="mt-5 space-y-4 text-sm text-webloom-muted">
+        <aside className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground">Get in touch</h2>
+          <div className="mt-5 space-y-4 text-sm text-muted-foreground">
             <p className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-webloom-raised text-primary-400">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
                 <Mail className="h-4 w-4" />
               </span>
               <span>
                 Email us at<br />
-                <a href={`mailto:${siteConfig.contact.email}`} className="font-medium text-webloom-accent hover:text-webloom-accent-hover">{siteConfig.contact.email}</a>
+                <a href={`mailto:${siteConfig.contact.email}`} className="font-medium text-primary hover:text-primary/80">{siteConfig.contact.email}</a>
               </span>
             </p>
             <p className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-webloom-raised text-primary-400">
+              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
                 <MapPin className="h-4 w-4" />
               </span>
               <span>
                 Registered address<br />
-                <span className="font-medium text-webloom-warning">
+                <span className="font-medium text-amber-600">
                   {typeof siteConfig.contact.address === 'string'
                     ? siteConfig.contact.address
                     : siteConfig.contact.address.line1 || 'TODO: provide registered address'}

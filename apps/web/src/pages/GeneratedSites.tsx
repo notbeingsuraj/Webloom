@@ -20,12 +20,12 @@ interface AnalyzedBusiness {
 }
 
 const styles = {
-  card: 'rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)]',
-  eyebrow: 'text-[11px] uppercase tracking-[0.18em] text-webloom-dim',
-  field: 'w-full rounded-[20px] border border-webloom-border bg-webloom-raised px-4 py-3 text-base text-webloom-text outline-none transition focus:border-primary-500 focus:bg-webloom-hover',
-  label: 'mb-2 block text-sm font-medium text-webloom-text',
-  stat: 'rounded-[22px] border border-webloom-border bg-webloom-surfaced p-4',
-  chip: 'inline-flex items-center gap-1.5 rounded-full border border-webloom-border bg-webloom-raised px-3 py-1.5 text-xs font-medium text-webloom-muted',
+  card: 'rounded-2xl border border-border bg-card p-6 shadow-sm',
+  eyebrow: 'text-[11px] uppercase tracking-[0.18em] text-muted-foreground',
+  field: 'flex h-11 w-full rounded-xl border border-input bg-background px-4 py-3 text-base text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring',
+  label: 'mb-2 block text-sm font-medium text-foreground',
+  stat: 'rounded-2xl border border-border bg-card p-4 shadow-sm',
+  chip: 'inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground',
 };
 
 export default function GeneratedSites() {
@@ -115,16 +115,16 @@ export default function GeneratedSites() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className={styles.eyebrow}>Website generation</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-webloom-text md:text-[2.7rem]">
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-foreground md:text-[2.7rem]">
               Local websites, generated from verified facts.
             </h1>
-            <p className="mt-3 max-w-2xl text-base text-webloom-muted">
+            <p className="mt-3 max-w-2xl text-base text-muted-foreground">
               Paste a Google Maps URL. Webloom analyzes the business, then renders a polished local website from the
               verified profile — no fabricated phone numbers, addresses, or reviews.
             </p>
           </div>
           <div className={styles.chip}>
-            <Globe className="h-3.5 w-3.5 text-primary-400" />
+            <Globe className="h-3.5 w-3.5 text-primary" />
             Runs on localhost only
           </div>
         </div>
@@ -143,7 +143,7 @@ export default function GeneratedSites() {
           <div>
             <label className={styles.label} htmlFor="maps-url">Google Maps URL</label>
             <div className="relative">
-              <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-webloom-dim" />
+              <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
               <input
                 id="maps-url"
                 type="url"
@@ -160,31 +160,31 @@ export default function GeneratedSites() {
               {busy ? 'Working…' : 'Analyze & Generate Website'}
             </Button>
             {statusMessage && (
-              <span className="text-sm text-webloom-muted">{statusMessage}</span>
+              <span className="text-sm text-muted-foreground">{statusMessage}</span>
             )}
           </div>
         </form>
 
         {generateMutation.isPending && (
-          <div className="mt-5 rounded-[20px] border border-webloom-border bg-webloom-raised p-4" role="status" aria-live="polite">
+          <div className="mt-5 rounded-xl border border-border bg-secondary p-4" role="status" aria-live="polite">
             <div className="flex items-center gap-3">
-              <Loader className="h-5 w-5 animate-spin text-primary-400" />
-              <p className="text-sm text-webloom-text">{statusMessage || 'Generating…'} This can take a minute (dependencies, Astro build, local server).</p>
+              <Loader className="h-5 w-5 animate-spin text-primary" />
+              <p className="text-sm text-foreground">{statusMessage || 'Generating…'} This can take a minute (dependencies, Astro build, local server).</p>
             </div>
           </div>
         )}
       </section>
 
       {generated && generated.url && (
-        <section className={`${styles.card} flex flex-wrap items-center justify-between gap-4 border-emerald-800/50 bg-emerald-950/20`}>
+        <section className={`${styles.card} flex flex-wrap items-center justify-between gap-4 border-emerald-200 bg-emerald-50`}>
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-600 text-white">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
               <Globe className="h-6 w-6" />
             </div>
             <div>
               <p className={styles.eyebrow}>Just generated</p>
-              <p className="text-lg font-semibold tracking-[-0.04em] text-webloom-text">{generated.slug}</p>
-              <p className="text-sm text-webloom-muted">{generated.url}</p>
+              <p className="text-lg font-semibold tracking-[-0.04em] text-foreground">{generated.slug}</p>
+              <p className="text-sm text-muted-foreground">{generated.url}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -204,27 +204,27 @@ export default function GeneratedSites() {
       {/* Generated sites list */}
       <section className={styles.card}>
         <div className="mb-5 flex items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold tracking-[-0.04em] text-webloom-text">Generated sites</h2>
-          <span className="text-sm text-webloom-muted">{sites.length} total</span>
+          <h2 className="text-xl font-semibold tracking-[-0.04em] text-foreground">Generated sites</h2>
+          <span className="text-sm text-muted-foreground">{sites.length} total</span>
         </div>
 
         {isLoading ? (
-          <div className="py-10 text-center text-sm text-webloom-muted" role="status">Loading sites…</div>
+          <div className="py-10 text-center text-sm text-muted-foreground" role="status">Loading sites…</div>
         ) : sites.length === 0 ? (
-          <div className="py-10 text-center text-sm text-webloom-muted">
+          <div className="py-10 text-center text-sm text-muted-foreground">
             No generated sites yet. Paste a Google Maps URL above to create your first one.
           </div>
         ) : (
           <div className="space-y-3">
             {sites.map((site) => (
-              <div key={site.slug} className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
+              <div key={site.slug} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-secondary p-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-webloom-surface text-primary-400">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-background text-primary">
                     <Globe className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-webloom-text">{site.slug}</p>
-                    <p className="text-xs text-webloom-muted">{site.url || `Port ${site.port ?? '—'}`}</p>
+                    <p className="text-sm font-semibold text-foreground">{site.slug}</p>
+                    <p className="text-xs text-muted-foreground">{site.url || `Port ${site.port ?? '—'}`}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

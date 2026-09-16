@@ -4,17 +4,17 @@ import Navbar from './Navbar';
 export default function Layout() {
   const location = useLocation();
   return (
-    <div className="min-h-screen bg-webloom-bg text-webloom-text">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex max-w-[1600px] gap-6 px-4 py-4 lg:px-6">
         {/* Desktop sidebar */}
-        <aside className="hidden w-72 shrink-0 rounded-[28px] border border-webloom-border bg-webloom-surface p-4 shadow-[0_20px_50px_rgba(0,0,0,0.25)] lg:block">
+        <aside className="hidden w-72 shrink-0 rounded-2xl border border-border bg-card p-4 shadow-sm lg:block">
           <div className="flex h-full flex-col">
             <div className="px-3 pb-5 pt-2">
-              <Link to="/" className="flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-xl">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-600 text-sm font-bold text-white">W</div>
+              <Link to="/" className="flex items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">W</div>
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.2em] text-webloom-dim">Webloom</p>
-                  <p className="text-sm font-medium text-webloom-text">Intelligence</p>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Webloom</p>
+                  <p className="text-sm font-medium text-foreground">Intelligence</p>
                 </div>
               </Link>
             </div>
@@ -27,10 +27,10 @@ export default function Layout() {
               <SidebarItem label="Contact" to="/contact" active={location.pathname === '/contact'} />
             </nav>
 
-            <div className="mt-auto rounded-2xl border border-webloom-border bg-webloom-raised p-4">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-dim">Web Intelligence</p>
-              <p className="mt-2 text-sm font-medium text-webloom-text">Start with a Google Maps URL</p>
-              <p className="mt-1 text-xs text-webloom-muted">Structured extraction · verified data · AI enrichment</p>
+            <div className="mt-auto rounded-xl border border-border bg-secondary p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Web Intelligence</p>
+              <p className="mt-2 text-sm font-medium text-foreground">Start with a Google Maps URL</p>
+              <p className="mt-1 text-xs text-muted-foreground">Structured extraction · verified data · AI enrichment</p>
             </div>
           </div>
         </aside>
@@ -52,10 +52,10 @@ function SidebarItem({ label, to, active = false }: { label: string; to: string;
       to={to}
       className={[
         'flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-        active ? 'bg-primary-600 text-white' : 'text-webloom-muted hover:bg-webloom-hover hover:text-webloom-text',
+        active ? 'bg-secondary text-foreground shadow-sm' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
       ].join(' ')}
     >
-      <span className="inline-block h-2 w-2 rounded-full bg-current opacity-80" />
+      <span className={['inline-block h-2 w-2 rounded-full', active ? 'bg-primary' : 'bg-border'].join(' ')} />
       <span className="ml-3">{label}</span>
     </Link>
   );

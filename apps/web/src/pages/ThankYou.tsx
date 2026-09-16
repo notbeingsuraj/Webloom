@@ -25,20 +25,20 @@ export default function ThankYou() {
 
   return (
     <div className="mx-auto flex min-h-[65vh] flex-col items-center justify-center px-4 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-900/40 text-emerald-400 shadow-lg">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-sm">
         <CheckCircle2 className="h-7 w-7" />
       </div>
 
-      <h1 className="mt-6 text-3xl font-semibold tracking-tight text-webloom-text sm:text-4xl">
+      <h1 className="mt-6 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
         Message sent
       </h1>
 
-      <p className="mt-4 max-w-md text-base leading-relaxed text-webloom-muted">
+      <p className="mt-4 max-w-md text-base leading-relaxed text-muted-foreground">
         Thanks for reaching out. We will review your message and get back to you
         within two business days if a response is required.
       </p>
 
-      <p className="mt-2 text-sm text-webloom-dim">
+      <p className="mt-2 text-sm text-muted-foreground">
         You can also continue using Webloom to analyse businesses and generate websites right away.
       </p>
 

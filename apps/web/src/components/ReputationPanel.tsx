@@ -76,10 +76,10 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
           <span
             className={[
               'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium tracking-wide',
-              isUnavailable ? 'bg-webloom-surface text-webloom-muted border border-webloom-border'
-                : isConflicting ? 'bg-red-900/30 text-red-400 border border-red-800/50'
-                : status === 'ai_extracted_from_evidence' ? 'bg-purple-900/30 text-purple-300 border border-purple-800/50'
-                : 'bg-primary-900/30 text-primary-400 border border-primary-800/50',
+              isUnavailable ? 'bg-secondary text-muted-foreground border border-border'
+                : isConflicting ? 'bg-red-50 text-red-700 border border-red-200'
+                : status === 'ai_extracted_from_evidence' ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                : 'bg-blue-50 text-blue-700 border border-blue-200',
             ].join(' ')}
           >
             {isConflicting ? <AlertTriangle className="h-3 w-3" /> : <Info className="h-3 w-3" />}
@@ -126,7 +126,7 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
           <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Review source</p>
           <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-webloom-text">
             <span className="flex items-center gap-1.5 text-lg font-medium leading-7">
-              <MessageSquare className="h-4 w-4 text-primary-400" />
+              <MessageSquare className="h-4 w-4 text-primary" />
               {sourceLabel(rep?.source)}
             </span>
           </p>
@@ -140,7 +140,7 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
         </p>
       )}
       {isConflicting && (
-        <p className="mt-4 rounded-[18px] border border-red-800/50 bg-red-900/30 px-4 py-3 text-sm text-red-400">
+        <p className="mt-4 rounded-[18px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           Reputation data could not be verified for this business.
         </p>
       )}
@@ -169,7 +169,7 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
               <li key={idx} className="rounded-[18px] border border-webloom-border bg-webloom-surface p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   {r.rating != null && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-900/30 px-2 py-0.5 text-xs font-medium text-amber-300">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                       <Star className="h-3 w-3 fill-[#F59E0B] text-[#F59E0B]" />
                       {r.rating}
                     </span>

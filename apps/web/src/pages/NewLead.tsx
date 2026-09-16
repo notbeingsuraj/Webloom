@@ -7,9 +7,9 @@ import usePageMetadata from '../hooks/usePageMetadata';
 import analytics from '../services/analytics';
 import { leadService } from '../services/leadService';
 
-const surface = 'rounded-[30px] border border-webloom-border bg-webloom-surface p-6 shadow-[0_18px_50px_rgba(0,0,0,0.25)] md:p-8';
-const eyebrow = 'text-[11px] uppercase tracking-[0.18em] text-webloom-dim';
-const input = 'w-full rounded-[18px] border border-webloom-border bg-webloom-raised px-4 py-3 text-[15px] text-webloom-text outline-none transition focus:border-primary-500 focus:bg-webloom-hover';
+const surface = 'rounded-2xl border border-border bg-card p-6 shadow-sm md:p-8';
+const eyebrow = 'text-[11px] uppercase tracking-[0.18em] text-muted-foreground';
+const input = 'w-full rounded-xl border border-input bg-background px-4 py-3 text-[15px] text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring';
 
 /**
  * Analysis phase markers. The UI advances these as the pipeline progresses —
@@ -435,15 +435,15 @@ export default function NewLead() {
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className={eyebrow}>Analysis</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-webloom-text md:text-[2.7rem]">
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.06em] text-foreground md:text-[2.7rem]">
               Turn local businesses into opportunities.
             </h1>
-            <p className="mt-3 max-w-2xl text-base text-webloom-muted">
+            <p className="mt-3 max-w-2xl text-base text-muted-foreground">
               Paste a Google Maps URL to uncover business value, identify digital gaps, and generate a premium outreach plan.
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-webloom-border bg-webloom-raised px-3 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-webloom-muted">
-            <Sparkles className="h-3.5 w-3.5 text-primary-400" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
             Lead workflow
           </div>
         </div>
@@ -453,16 +453,16 @@ export default function NewLead() {
         <form onSubmit={handleSubmit} className={surface} noValidate>
           <div className="space-y-6">
             <div>
-              <label htmlFor="maps-url" className="mb-2 block text-sm font-medium text-webloom-text">Google Maps URL</label>
+              <label htmlFor="maps-url" className="mb-2 block text-sm font-medium text-foreground">Google Maps URL</label>
               <div className="relative">
-                <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-webloom-dim" />
+                <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
                 <input
                   id="maps-url"
                   type="url"
                   required
                   aria-invalid={!!urlError}
                   aria-describedby={urlError ? 'maps-url-error' : 'maps-url-hint'}
-                  className={`w-full rounded-[20px] border ${urlError ? 'border-webloom-danger bg-webloom-raised' : 'border-webloom-border bg-webloom-raised focus:border-primary-500'} py-4 pl-12 pr-4 text-base text-webloom-text outline-none transition focus:bg-webloom-hover ${isProcessing ? 'opacity-60' : ''}`}
+                  className={`w-full rounded-xl border ${urlError ? 'border-destructive bg-background' : 'border-input bg-background focus:border-primary focus:ring-2 focus:ring-ring'} py-4 pl-12 pr-4 text-base text-foreground outline-none transition ${isProcessing ? 'opacity-60' : ''}`}
                   placeholder="https://maps.google.com/place/..."
                   value={urlInput}
                   onChange={(e) => handleUrlChange(e.target.value)}
@@ -472,18 +472,18 @@ export default function NewLead() {
                 />
               </div>
               {urlError ? (
-                <p id="maps-url-error" className="mt-2 flex items-center gap-1.5 text-sm text-webloom-danger" role="alert">
+                <p id="maps-url-error" className="mt-2 flex items-center gap-1.5 text-sm text-destructive" role="alert">
                   <AlertCircle className="h-3.5 w-3.5" />
                   {urlError}
                 </p>
               ) : (
-                <p id="maps-url-hint" className="mt-2 text-sm text-webloom-muted">Paste a Google Maps link for any business — e.g. maps.google.com/place/... or maps.google.com/?cid=...</p>
+                <p id="maps-url-hint" className="mt-2 text-sm text-muted-foreground">Paste a Google Maps link for any business — e.g. maps.google.com/place/... or maps.google.com/?cid=...</p>
               )}
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-webloom-text">Lead name</span>
+                <span className="mb-2 block text-sm font-medium text-foreground">Lead name</span>
                 <input
                   type="text"
                   className={input}
@@ -493,14 +493,14 @@ export default function NewLead() {
                 />
               </label>
 
-              <div className="rounded-[18px] border border-dashed border-webloom-border bg-webloom-raised px-4 py-3 text-sm text-webloom-muted">
-                <p className="font-medium text-webloom-text">Workflow</p>
+              <div className="rounded-xl border border-dashed border-border bg-secondary px-4 py-3 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">Workflow</p>
                 <p className="mt-1">Business analysis → DNA → score → website → outreach</p>
               </div>
             </div>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-webloom-text">Internal notes</span>
+              <span className="mb-2 block text-sm font-medium text-foreground">Internal notes</span>
               <textarea
                 rows={3}
                 className={input}
@@ -511,7 +511,7 @@ export default function NewLead() {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-webloom-text">Custom instructions</span>
+              <span className="mb-2 block text-sm font-medium text-foreground">Custom instructions</span>
               <textarea
                 rows={3}
                 className={input}
@@ -522,7 +522,7 @@ export default function NewLead() {
             </label>
 
             {isHardTimedOut ? (
-              <div className="rounded-[18px] border border-red-800/50 bg-red-900/30 px-4 py-3 text-sm text-red-300" role="alert">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
                 <div className="font-medium">The analysis is taking longer than expected</div>
                 <div className="mt-1">
                   {timedOutLeadId ? (
@@ -531,7 +531,7 @@ export default function NewLead() {
                       <button
                         type="button"
                         onClick={() => navigateToLead(timedOutLeadId)}
-                        className="underline underline-offset-2 hover:text-red-100"
+                        className="underline underline-offset-2 hover:text-red-900"
                       >
                         View results for {timedOutLeadName ?? 'this lead'}
                       </button>
@@ -542,7 +542,7 @@ export default function NewLead() {
                 </div>
               </div>
             ) : isBeyondExpected ? (
-              <div className="rounded-[18px] border border-amber-800/50 bg-amber-900/30 px-4 py-3 text-sm text-amber-200" role="status">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">
                 <div className="flex items-center gap-2 font-medium">
                   <Clock className="h-4 w-4" />
                   Still working — this analysis can take a few minutes
@@ -552,7 +552,7 @@ export default function NewLead() {
                 </div>
               </div>
             ) : isFailed ? (
-              <div className="rounded-[18px] border border-red-800/50 bg-red-900/30 px-4 py-3 text-sm text-red-300" role="alert">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
                 <div className="font-medium">Something went wrong</div>
                 <div className="mt-1">{errorMessage}</div>
               </div>
@@ -576,9 +576,9 @@ export default function NewLead() {
           </div>
         </form>
 
-        <aside className={`${surface} bg-webloom-raised`}>
+        <aside className={`${surface} bg-secondary`}>
           <p className={eyebrow}>Status</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-webloom-text">
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-foreground">
             {headerTitle}
           </h2>
 
@@ -601,19 +601,19 @@ export default function NewLead() {
                   <div className={[
                     'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold transition-colors duration-300',
                     isComplete
-                      ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-800/60'
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
                       : isActive
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-webloom-surface text-webloom-dim border border-webloom-border',
+                      ? 'bg-primary text-white'
+                      : 'bg-card text-muted-foreground border border-border',
                   ].join(' ')}>
                     {isComplete ? <CheckCircle2 className="h-3.5 w-3.5" /> : isActive ? <Loader className="h-3 w-3 animate-spin" /> : index + 1}
                   </div>
                   <div className="min-w-0">
-                    <span className={['text-sm block truncate', isComplete ? 'text-emerald-400' : isActive ? 'text-webloom-text font-medium' : 'text-webloom-muted'].join(' ')}>
+                    <span className={['text-sm block truncate', isComplete ? 'text-emerald-600' : isActive ? 'text-foreground font-medium' : 'text-muted-foreground'].join(' ')}>
                       {step.label}
                     </span>
                     {isActive && (
-                      <span className="text-[11px] text-webloom-dim">{formatTime(elapsedTime)} elapsed</span>
+                      <span className="text-[11px] text-muted-foreground">{formatTime(elapsedTime)} elapsed</span>
                     )}
                   </div>
                 </div>
@@ -621,9 +621,9 @@ export default function NewLead() {
             })}
           </div>
 
-          <div className="mt-8 rounded-[22px] border border-webloom-border bg-webloom-surface p-4">
+          <div className="mt-8 rounded-xl border border-border bg-card p-4">
             <p className={eyebrow}>What Webloom does</p>
-            <ul className="mt-4 space-y-3 text-sm leading-6 text-webloom-muted">
+            <ul className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
               <li>• Resolves business identity from your Maps URL</li>
               <li>• Gathers verified business information from multiple sources</li>
               <li>• Produces a canonical business profile with provenance</li>

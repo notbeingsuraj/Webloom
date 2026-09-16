@@ -38,7 +38,7 @@ export default function WebsitePreview({
   if (isGenerating) {
     return (
       <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-10 text-center">
-        <Loader className="mx-auto h-8 w-8 animate-spin text-primary-400" />
+        <Loader className="mx-auto h-8 w-8 animate-spin text-primary" />
         <p className="mt-4 text-base font-medium text-webloom-text">Generating website specification…</p>
         <p className="mt-2 text-sm text-webloom-muted">
           Using the verified business profile and analysis. This takes a moment.
@@ -49,14 +49,14 @@ export default function WebsitePreview({
 
   if (generateError) {
     return (
-      <div className="rounded-[30px] border border-red-800/50 bg-webloom-surface p-10 text-center shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
-        <AlertCircle className="mx-auto h-8 w-8 text-red-400" />
-        <p className="mt-4 text-base font-medium text-red-400">Website specification generation failed</p>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-red-400/80">{generateError}</p>
+      <div className="rounded-2xl border border-red-200 bg-card p-10 text-center shadow-sm">
+        <AlertCircle className="mx-auto h-8 w-8 text-red-600" />
+        <p className="mt-4 text-base font-medium text-red-700">Website specification generation failed</p>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-red-600/80">{generateError}</p>
         <button
           type="button"
           onClick={onGenerate}
-          className="mt-6 inline-flex items-center gap-2 rounded-full bg-webloom-raised px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#2A2A2A]"
+          className="mt-6 inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-2.5 text-sm font-medium text-foreground transition hover:bg-secondary/80"
         >
           <RefreshCw className="h-4 w-4" /> Retry
         </button>
@@ -67,7 +67,7 @@ export default function WebsitePreview({
   if (!spec) {
     return (
       <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-10 text-center shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
-        <Sparkles className="mx-auto h-8 w-8 text-primary-400" />
+        <Sparkles className="mx-auto h-8 w-8 text-primary" />
         <p className="mt-4 text-base font-medium text-webloom-text">
           {status === 'failed' ? 'No website specification available' : 'Generate a website specification'}
         </p>
@@ -81,7 +81,7 @@ export default function WebsitePreview({
         <button
           type="button"
           onClick={onGenerate}
-          className="mt-6 inline-flex items-center gap-2 rounded-full bg-webloom-raised px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#2A2A2A]"
+          className="mt-6 inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-2.5 text-sm font-medium text-foreground transition hover:bg-secondary/80"
         >
           {status === 'failed' ? (
             <><RefreshCw className="h-4 w-4" /> Retry generation</>

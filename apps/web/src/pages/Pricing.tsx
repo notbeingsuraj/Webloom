@@ -40,11 +40,11 @@ export default function Pricing() {
     <div className="mx-auto max-w-5xl pb-20">
       {/* Above-the-fold: hero + primary CTA */}
       <header className="py-12 text-center sm:py-16">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-primary-400">Pricing</p>
-        <h1 className="mt-4 text-4xl font-semibold tracking-tight text-webloom-text sm:text-5xl">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-primary">Pricing</p>
+        <h1 className="mt-4 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           Intelligence that pays for itself
         </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-webloom-muted">
+        <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground">
           Turn Google Maps URLs into verified business profiles, digital audits, and conversion-ready websites — then focus on the outreach that wins.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -59,7 +59,7 @@ export default function Pricing() {
             </Button>
           </Link>
         </div>
-        <p className="mt-4 text-xs text-webloom-dim">No credit card required · Cancel anytime</p>
+        <p className="mt-4 text-xs text-muted-foreground">No credit card required · Cancel anytime</p>
       </header>
 
       {/* Plans */}
@@ -68,25 +68,25 @@ export default function Pricing() {
           <div
             key={plan.name}
             className={[
-              'relative flex flex-col rounded-[30px] border bg-webloom-surface p-6 shadow-lg transition-colors',
-              plan.featured ? 'border-primary-600 ring-1 ring-primary-600/40' : 'border-webloom-border',
+              'relative flex flex-col rounded-2xl border bg-card p-6 shadow-sm transition-colors',
+              plan.featured ? 'border-primary ring-1 ring-primary/40' : 'border-border',
             ].join(' ')}
           >
             {plan.featured && (
-              <span className="absolute -top-3 left-6 rounded-full bg-primary-600 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white">
+              <span className="absolute -top-3 left-6 rounded-full bg-primary px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary-foreground">
                 Most popular
               </span>
             )}
-            <h2 className="text-lg font-semibold text-webloom-text">{plan.name}</h2>
-            <p className="mt-1 text-sm text-webloom-muted">{plan.description}</p>
+            <h2 className="text-lg font-semibold text-foreground">{plan.name}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
             <p className="mt-6 flex items-baseline gap-1">
-              <span className="text-4xl font-bold tracking-tight text-webloom-text">{plan.price}</span>
-              {plan.cadence && <span className="text-sm text-webloom-dim">{plan.cadence}</span>}
+              <span className="text-4xl font-bold tracking-tight text-foreground">{plan.price}</span>
+              {plan.cadence && <span className="text-sm text-muted-foreground">{plan.cadence}</span>}
             </p>
-            <ul className="mt-6 space-y-3 text-sm text-webloom-muted">
+            <ul className="mt-6 space-y-3 text-sm text-muted-foreground">
               {plan.features.map((f) => (
                 <li key={f} className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-900/40 text-primary-400">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <Check className="h-3 w-3" />
                   </span>
                   {f}
@@ -104,7 +104,7 @@ export default function Pricing() {
         ))}
       </section>
 
-      <p className="mt-12 text-center text-xs text-webloom-dim">
+      <p className="mt-12 text-center text-xs text-muted-foreground">
         All plans include the Webloom extraction pipeline with provenance-aware quality control.
       </p>
     </div>
