@@ -35,6 +35,18 @@
     />
     <meta name="twitter:image" content="/og-image.png" />
     <title>Webloom | AI-Powered Web Intelligence</title>
+    <script>
+      // Apply the persisted theme before first paint to avoid a light-mode
+      // flash. Mirrors ThemeToggle's storage key and OS-preference fallback.
+      (function () {
+        try {
+          var stored = localStorage.getItem('webloom-theme');
+          var dark = stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
