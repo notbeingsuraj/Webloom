@@ -4,6 +4,7 @@ import type { LeadGeneratedWebsite } from '../types/websiteSpecification';
 export interface Lead {
   _id: string;
   businessName: string;
+  leadName?: string | null;
   businessCategory?: string;
   status: string;
   opportunityScore?: {
@@ -143,7 +144,20 @@ export interface Lead {
       opportunityGap?: string;
     };
     metrics?: {
-      trustSignals?: string[];
+      /** Trust signal entries may be legacy strings OR structured objects
+       *  ({ type, value, source, verified, ... }). Renderers must normalize —
+       *  never render entries raw as React children. */
+      trustSignals?: Array<
+        | string
+        | {
+            type?: string;
+            value?: unknown;
+            source?: string | null;
+            verified?: boolean;
+            verification?: string | null;
+            confidence?: number | null;
+          }
+      > | null;
       facts?: Array<{ claim?: string; source?: string; verified?: boolean }>;
       unknowns?: string[];
       digitalPresence?: Record<string, unknown>;
@@ -163,8 +177,7 @@ export interface CreateLeadData {
   forceRefresh?: boolean;
 }
 
-export const leadService = {
-  /**
+/**
  * The API wraps every response in an envelope: `{ success: true, data: ... }`.
  * Unwrap `data` here — in ONE place — so every consumer receives the payload
  * directly. Previously each caller unwrapped ad-hoc (or not at all), which made
@@ -172,45 +185,45 @@ export const leadService = {
  */
 type LeadEnvelope<T> = { success: boolean; data: T };
 
-function unwrap<T>(response: { data: LeadEnvelope<T> | T }): T {
-  const body = response.data;
-  // Envelope detection: a body with a `data` field AND no lead fields is the
-  // wrapper. A lead object itself never has a top-level `data` key.
-  if (body && typeof body === 'object' && 'data' in body && !('_id' in body)) {
-    return (body as LeadEnvelope<T>).data;
-  }
-  return body as T;
-}
-
 export const leadService = {
+  _unwrap<T>(response: { data: LeadEnvelope<T> | T }): T {
+    const body = response.data;
+    // Envelope detection: a body with a `data` field AND no lead fields is the
+    // wrapper. A lead object itself never has a top-level `data` key.
+    if (body && typeof body === 'object' && 'data' in body && !('_id' in body)) {
+      return (body as LeadEnvelope<T>).data;
+    }
+    return body as T;
+  },
+
   async createLead(data: CreateLeadData) {
     const response = await api.post('/leads', data);
-    return unwrap<Lead>(response);
+    return this._unwrap<Lead>(response);
   },
 
   async getLeads(params?: any) {
     const response = await api.get('/leads', { params });
-    return unwrap<Lead[]>(response);
+    return this._unwrap<Lead[]>(response);
   },
 
   async getLead(id: string) {
     const response = await api.get(`/leads/${id}`);
-    return unwrap<Lead>(response);
+    return this._unwrap<Lead>(response);
   },
 
   async updateLead(id: string, data: Partial<Lead>) {
     const response = await api.put(`/leads/${id}`, data);
-    return unwrap<Lead>(response);
+    return this._unwrap<Lead>(response);
   },
 
   async deleteLead(id: string) {
     const response = await api.delete(`/leads/${id}`);
-    return unwrap<{ message?: string; deleted?: boolean }>(response);
+    return this._unwrap<{ message?: string; deleted?: boolean }>(response);
   },
 
   async getDashboardStats() {
     const response = await api.get('/leads/stats/dashboard');
-    return unwrap<{ totalLeads: number; highPriority: number; websitesGenerated: number; contacted: number }>(response);
+    return this._unwrap<{ totalLeads: number; highPriority: number; websitesGenerated: number; contacted: number }>(response);
   },
 
   async generateBrandDNA(id: string) {
