@@ -44,7 +44,7 @@ export default function ThankYou() {
 
       <div className="mt-8 flex flex-col gap-3 sm:flex-row">
         <Link to="/">
-          <Button variant="primary" size="md" leadingIcon={<LayoutDashboard className="h-4 w-4" />}>
+          <Button variant="default" size="md" leadingIcon={<LayoutDashboard className="h-4 w-4" />}>
             Go to dashboard
           </Button>
         </Link>

@@ -63,7 +63,7 @@ export default function Dashboard() {
           </div>
 
           <Link to="/leads/new" onClick={() => analytics.primaryCta('dashboard_analyse')}>
-            <Button variant="primary" size="md" leadingIcon={<ArrowUpRight className="h-4 w-4" />}>
+            <Button variant="default" size="md" leadingIcon={<ArrowUpRight className="h-4 w-4" />}>
               Analyse Business
             </Button>
           </Link>
@@ -140,7 +140,7 @@ export default function Dashboard() {
                 <p className="mt-2 text-sm text-muted-foreground">Analyse your first business to start building your pipeline.</p>
                 <div className="mt-5">
                   <Link to="/leads/new" onClick={() => analytics.primaryCta('empty_analyse')}>
-                    <Button variant="primary" size="sm">Analyse Business</Button>
+                    <Button variant="default" size="sm">Analyse Business</Button>
                   </Link>
                 </div>
               </div>

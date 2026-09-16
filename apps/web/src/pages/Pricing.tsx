@@ -95,7 +95,7 @@ export default function Pricing() {
             </ul>
             <div className="mt-auto pt-8">
               <Link to="/leads/new" className="block">
-                <Button variant={plan.featured ? 'primary' : 'secondary'} className="w-full">
+                <Button variant={plan.featured ? 'default' : 'secondary'} className="w-full">
                   {plan.name === 'Momentum' ? 'Contact us' : 'Start free'}
                 </Button>
               </Link>

@@ -246,7 +246,7 @@ export default function GeneratedSites() {
                   <Button size="sm" variant="secondary" leadingIcon={<RefreshCw className="h-4 w-4" />} onClick={() => regenerateMutation.mutate(site.slug)}>
                     Regenerate
                   </Button>
-                  <Button size="sm" variant="danger" leadingIcon={<Trash2 className="h-4 w-4" />} onClick={() => {
+                  <Button size="sm" variant="destructive" leadingIcon={<Trash2 className="h-4 w-4" />} onClick={() => {
                     if (window.confirm(`Delete generated site "${site.slug}"?`)) removeMutation.mutate(site.slug);
                   }}>
                     Delete
