@@ -358,6 +358,7 @@ export async function runFallbackPipeline(profile, fallbackResult, sourceUrl, op
     };
 
     const syntheticRecord = {};
+    const syntheticEvidence = {};
     for (const [fallbackField, value] of Object.entries(fallbackResult.fields)) {
       const fieldPath = fieldMap[fallbackField];
       if (!fieldPath) continue;
@@ -368,11 +369,24 @@ export async function runFallbackPipeline(profile, fallbackResult, sourceUrl, op
         target = target[parts[i]];
       }
       target[parts[parts.length - 1]] = value;
+
+      // Forward per-field evidence (snippet + confidence) so the
+      // CandidatePipeline evidence gate can verify AI-generated
+      // identity-critical fields. Without this, evidence-grounded AI
+      // fallback (P1.8) rejects every recovered field.
+      const fieldEvidence = fallbackResult.evidence?.[fallbackField];
+      if (fieldEvidence) {
+        syntheticEvidence[fieldPath] = {
+          snippet: fieldEvidence.evidenceSnippet || fieldEvidence.evidence || fieldEvidence.sourceUrl || null,
+          evidenceId: fieldEvidence.evidenceId || null,
+          locator: fieldEvidence.locator || null,
+        };
+      }
     }
 
     const provenance = fallbackResult.aiExtracted ? 'ai_generated' : 'discovered';
     records.push({
-      record: syntheticRecord,
+      record: { ...syntheticRecord, evidence: syntheticEvidence },
       provenance,
       sourceInfo: { sourceUrl, provider: 'google_maps_fallback' },
     });
