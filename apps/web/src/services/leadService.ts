@@ -10,6 +10,8 @@ export interface Lead {
   opportunityScore?: {
     total: number;
     priority: string;
+    status?: string;
+    explanation?: string;
   };
   location?: {
     address?: string;

@@ -311,7 +311,7 @@ export default function LeadDetail() {
               <div className="mt-5 space-y-4">
                 <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
                   <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Target audience</p>
-                  <p className="mt-2 text-sm leading-6 text-webloom-text">{showDna ? (lead?.analysis?.brandDNA?.audience?.primary?.segment || lead?.analysis?.brandDNA?.audience || dnaEmptyText) : dnaEmptyText}</p>
+                  <p className="mt-2 text-sm leading-6 text-webloom-text">{showDna ? (lead?.analysis?.brandDNA?.audience?.primary?.segment || dnaEmptyText) : dnaEmptyText}</p>
                   {showDna && lead?.analysis?.brandDNA?.audience?.primary?.demographics && (
                     <p className="mt-2 text-xs leading-5 text-webloom-muted">
                       {[
@@ -381,7 +381,7 @@ export default function LeadDetail() {
                       </div>
                     </div>
                   )}
-                  {lead?.businessData?.openingHours && (
+                  {!!lead?.businessData?.openingHours && (
                     <div className="rounded-[20px] border border-webloom-border bg-webloom-raised p-4">
                       <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Hours</p>
                       <div className="mt-2 flex items-center gap-2 text-sm text-webloom-text">
