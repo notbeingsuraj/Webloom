@@ -35,24 +35,24 @@ export default function CookieConsent() {
     <div className="fixed inset-x-0 bottom-0 z-50" role="dialog" aria-label="Cookie consent" aria-live="polite">
       {/* Backdrop on preference panel */}
       {prefOpen && (
-        <div className="absolute inset-0 bg-black/40" onClick={() => setPrefOpen(false)} aria-hidden="true" />
+        <div className="absolute inset-0 bg-black/20" onClick={() => setPrefOpen(false)} aria-hidden="true" />
       )}
 
       {/* Preference panel (floating card) */}
       {prefOpen && (
-        <div className="absolute bottom-4 left-1/2 z-50 -translate-x-1/2 w-full max-w-lg rounded-[24px] border border-webloom-border bg-webloom-surface p-5 shadow-2xl sm:bottom-6">
+        <div className="absolute bottom-4 left-1/2 z-50 -translate-x-1/2 w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-lg sm:bottom-6">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-webloom-text">Cookie Preferences</h2>
-            <button onClick={() => setPrefOpen(false)} className="p-1.5 text-webloom-muted hover:text-webloom-text rounded-md hover:bg-webloom-hover" aria-label="Close preferences">
+            <h2 className="text-base font-semibold text-foreground">Cookie Preferences</h2>
+            <button onClick={() => setPrefOpen(false)} className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary" aria-label="Close preferences">
               <X className="h-4 w-4" />
             </button>
           </div>
-          <p className="mt-3 text-sm leading-6 text-webloom-muted">
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
             Webloom uses only strictly necessary cookies required for core functionality.
-            Non-essential analytics are <strong className="font-medium text-webloom-text">not loaded until you explicitly consent</strong>.
+            Non-essential analytics are <strong className="font-medium text-foreground">not loaded until you explicitly consent</strong>.
           </p>
-          <p className="mt-2 text-xs leading-5 text-webloom-dim">
-            <a href="/privacy" className="underline underline-offset-2 hover:text-webloom-muted">Privacy Policy</a> — explains what is collected, how it is used, and your rights.
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            <a href="/privacy" className="underline underline-offset-2 hover:text-foreground">Privacy Policy</a> — explains what is collected, how it is used, and your rights.
           </p>
           <div className="mt-5 flex flex-col gap-2.5 sm:flex-row sm:justify-end">
             <Button variant="ghost" size="sm" onClick={() => setPrefOpen(false)}>Cancel</Button>

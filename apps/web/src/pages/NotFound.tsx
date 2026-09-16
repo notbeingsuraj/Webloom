@@ -15,15 +15,15 @@ export default function NotFound() {
   return (
     <div className="mx-auto flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
       {/* decorative icon */}
-      <div className="flex h-20 w-20 items-center justify-center rounded-[22px] border border-webloom-border bg-webloom-surface shadow-lg">
-        <span className="text-4xl font-bold tracking-tight text-webloom-accent">404</span>
+      <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+        <span className="text-4xl font-bold tracking-tight text-primary">404</span>
       </div>
 
-      <h1 className="mt-8 text-3xl font-semibold tracking-tight text-webloom-text sm:text-4xl">
+      <h1 className="mt-8 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
         Page not found
       </h1>
 
-      <p className="mt-4 max-w-lg text-base leading-relaxed text-webloom-muted">
+      <p className="mt-4 max-w-lg text-base leading-relaxed text-muted-foreground">
         The page you are looking for either doesn't exist, was moved, or is restricted to authenticated users.
       </p>
 

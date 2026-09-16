@@ -1,54 +1,56 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../../lib/utils";
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
-type ButtonSize = 'sm' | 'md' | 'lg';
+const buttonVariants = cva(
+  "inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 gap-2",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+        success: "bg-emerald-600 text-white hover:bg-emerald-500",
+      },
+      size: {
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-full px-3",
+        md: "h-11 rounded-full px-5",
+        lg: "h-12 rounded-full px-8",
+        icon: "h-10 w-10",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+);
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: ButtonVariant;
-  size?: ButtonSize;
-  leadingIcon?: ReactNode;
-  trailingIcon?: ReactNode;
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+  leadingIcon?: React.ReactNode;
+  trailingIcon?: React.ReactNode;
 }
 
-const variantClasses: Record<ButtonVariant, string> = {
-  primary:
-    'bg-primary-600 text-white hover:bg-primary-500 focus-visible:ring-primary-500',
-  secondary:
-    'bg-webloom-raised text-webloom-text border border-webloom-border hover:bg-webloom-hover focus-visible:ring-primary-500',
-  ghost:
-    'bg-transparent text-webloom-text hover:bg-webloom-hover focus-visible:ring-primary-500',
-  danger:
-    'bg-webloom-surface text-webloom-danger border border-webloom-border hover:bg-webloom-hover focus-visible:ring-webloom-danger',
-};
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, leadingIcon, trailingIcon, children, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button";
+    return (
+      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props}>
+        {leadingIcon ? <span className="inline-flex items-center">{leadingIcon}</span> : null}
+        {children}
+        {trailingIcon ? <span className="inline-flex items-center">{trailingIcon}</span> : null}
+      </Comp>
+    );
+  }
+);
+Button.displayName = "Button";
 
-const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'h-9 px-3.5 text-sm',
-  md: 'h-11 px-4 text-sm',
-  lg: 'h-12 px-5 text-base',
-};
-
-export default function Button({
-  variant = 'primary',
-  size = 'md',
-  leadingIcon,
-  trailingIcon,
-  className = '',
-  children,
-  ...props
-}: ButtonProps) {
-  return (
-    <button
-      className={[
-        'inline-flex items-center justify-center gap-2 rounded-full font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-webloom-bg disabled:cursor-not-allowed disabled:opacity-60',
-        variantClasses[variant],
-        sizeClasses[size],
-        className,
-      ].join(' ')}
-      {...props}
-    >
-      {leadingIcon ? <span className="inline-flex items-center">{leadingIcon}</span> : null}
-      {children}
-      {trailingIcon ? <span className="inline-flex items-center">{trailingIcon}</span> : null}
-    </button>
-  );
-}
+export { Button, buttonVariants };
