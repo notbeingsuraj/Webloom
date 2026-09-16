@@ -7,10 +7,10 @@ updated: 2026-09-16
 
 ## Current Focus
 
-hypothesis: (forming)
-test: (not yet)
-expecting: (not yet)
-next_action: "Verify the actual API response shape for lead 042e512c-aff9-4ff7-847a-084699c6272c and compare against what LeadDetail.tsx expects"
+hypothesis: "Data flow appears CORRECT end-to-end (axios → response.data → envelope.data → lead). Suspect the page may actually be rendering but appears empty due to a runtime crash in a child component, OR data was verified with a stale/wrong ID. Need live-render verification."
+test: "Capture the actual hydrated DOM with a headless browser that waits for React to mount, and capture console errors."
+expecting: "Either the page renders fully (bug in environment/stale server) or a specific console error pinpoints the crash."
+next_action: "Run headless Firefox with a wait/harness to capture hydrated DOM + console errors for /leads/042e512c-aff9-4ff7-847a-084699c6272c"
 
 ## Symptoms
 
@@ -40,3 +40,31 @@ started: "current"
   checked: apps/web/vite.config.ts
   found: proxy /api → http://localhost:5001, changeOrigin true. api.ts baseURL = VITE_API_URL || http://localhost:5001/api
   implication: http://localhost:5001/api/leads/:id reachable; also proxied via /api/leads/:id.
+- timestamp: 2026-09-16
+  checked: LIVE curl http://localhost:5001/api/leads/042e512c-aff9-4ff7-847a-084699c6272c
+  found: Full payload present: businessName='Tundai Kababi', location.address, contact.phone '+915224307223', contact.website 'https://www.tundaykababi.com/', businessData.rating 4.2, reviewCount 53110, opportunityScore.total 45 (complete), analysis.brandDNA fully populated (audience, positioning, brandPersonality, toneOfVoice, visualDirection, websiteObjectives, strategicRecommendations), analysis.audit.categories populated, metrics present.
+  implication: Backend is NOT the problem. The user's shorthand `analysis: {}` was misleading — the real payload has full data.
+- timestamp: 2026-09-16
+  checked: LIVE curl through Vite proxy http://localhost:5173/api/leads/042e512c-aff9-4ff7-847a-084699c6272c
+  found: HTTP 200, envelope keys ['success','data'], data keys include all business fields. Proxy works.
+  implication: Browser reaching localhost:5173/api/leads/:id gets the same full envelope.
+- timestamp: 2026-09-16
+  checked: apps/web/.env files
+  found: Only .env.example exists (VITE_API_URL=http://localhost:5001/api commented default). No local .env override.
+  implication: api.ts baseURL = default 'http://localhost:5001/api' — direct call, CORS must allow localhost:5173. app.js CORS allows !origin || localhost:5173 OR dev localhost regex. OK.
+- timestamp: 2026-09-16
+  checked: LeadDetail.tsx render paths (full read)
+  found: lead = data?.data. Header renders businessName/location.address/contact.phone/contact.website/businessCategory/location.city. Overview renders analysis.brandDNA (guard showDna), audit categories, ScoreIndicator(score.value), ReputationPanel(lead), intelligence renderers (all safe null-coalescing). WebsitePreview gets website={lead?.generatedWebsite} and NOT generatedAt (matches optional prop).
+  implication: All child component accesses are optional-chained or guarded. No obvious crash. TypeScript compiles with no errors (npx tsc --noEmit clean; vite build clean).
+- timestamp: 2026-09-16
+  checked: Dashboard.tsx navigation
+  found: Link to=`/leads/${lead._id}` — uses _id, matches route param.
+  implication: Navigation path is correct.
+- timestamp: 2026-09-16
+  checked: git log
+  found: HEAD bd18c48 "docs: add debug notes for empty lead detail page" — the debug file itself was committed. No code changes pending.
+  implication: Repo is clean; running servers may be stale or the issue is environmental.
+- timestamp: 2026-09-16
+  checked: headless Firefox screenshot/dump of /leads/:id
+  found: Screenshot 53KB produced but vision unavailable; --dump-dom returned only 72 bytes of headless noise (did not wait for hydration).
+  implication: Need a hydrated DOM capture with wait + console error capture to confirm rendering.
