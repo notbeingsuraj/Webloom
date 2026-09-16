@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Loader, MapPin, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Loader, MapPin, Sparkles, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import Button from '../components/ui/Button';
 import usePageMetadata from '../hooks/usePageMetadata';
 import analytics from '../services/analytics';
@@ -11,6 +11,13 @@ const surface = 'rounded-[30px] border border-webloom-border bg-webloom-surface 
 const eyebrow = 'text-[11px] uppercase tracking-[0.18em] text-webloom-dim';
 const input = 'w-full rounded-[18px] border border-webloom-border bg-webloom-raised px-4 py-3 text-[15px] text-webloom-text outline-none transition focus:border-primary-500 focus:bg-webloom-hover';
 
+/**
+ * Analysis phase markers. The UI advances these as the pipeline progresses —
+ * but a stage is NEVER marked complete merely because a timer elapsed: the
+ * final "Preparing analysis" marker only resolves when the backend response
+ * actually arrives (see onSuccess). The durations below are only a cadence
+ * hint for the spinner position; they are not a completion contract.
+ */
 const progressSteps = [
   { label: 'Reading business location', duration: 3000 },
   { label: 'Resolving business identity', duration: 8000 },
@@ -21,7 +28,24 @@ const progressSteps = [
   { label: 'Preparing analysis', duration: 35000 },
 ];
 
-const REQUEST_TIMEOUT_MS = 90000; // 90 seconds for the full request
+/**
+ * Analysis request timeout. The backend legitimately takes 20-60+ seconds
+ * (provider extraction, reconciliation, optional AI enrichment, website audit,
+ * Brand DNA generation, opportunity scoring). With AI enrichment enabled and
+ * slow upstream providers, runs have measured 90s+.
+ *
+ * We do NOT abort a live backend request at this limit — axios timeout is the
+ * hard safety net (services/api.ts default is 5 minutes; NewLead passes an
+ * explicit override). This value is:
+ *   - SOFT_LIMIT_WARNING_MS: when the UI switches to "longer than expected"
+ *     messaging while still processing (never a failure).
+ *   - REQUEST_TIMEOUT_MS: the absolute limit — at this point the request is
+ *     aborted and a persisted-lead lookup runs before showing a failure.
+ */
+const REQUEST_TIMEOUT_MS = 300_000; // 5 minutes — documented safety limit
+const SOFT_LIMIT_WARNING_MS = 90_000; // 90s: warn "longer than expected"
+
+type AnalysisStatus = 'idle' | 'submitting' | 'processing' | 'completed' | 'failed' | 'timed_out';
 
 function validateGoogleMapsUrl(url: string): string | null {
   const trimmed = url.trim();
@@ -44,6 +68,17 @@ function validateGoogleMapsUrl(url: string): string | null {
   }
 }
 
+/** Extract `_id` (the lead id) from a normalized lead payload. */
+function extractLeadId(payload: any): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  if (typeof payload._id === 'string' && payload._id) return payload._id;
+  // Defensive: some responses nest under `data`.
+  if (payload.data && typeof payload.data === 'object' && typeof payload.data._id === 'string') {
+    return payload.data._id;
+  }
+  return null;
+}
+
 export default function NewLead() {
   const navigate = useNavigate();
   usePageMetadata({
@@ -61,75 +96,243 @@ export default function NewLead() {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [urlError, setUrlError] = useState<string | null>(null);
+  // Explicit analysis state machine (idle/submitting/processing/completed/failed/timed_out).
+  const [status, setStatus] = useState<AnalysisStatus>('idle');
+  // Persisted-lead check result shown when the request genuinely times out.
+  const [timedOutLeadId, setTimedOutLeadId] = useState<string | null>(null);
+  const [timedOutLeadName, setTimedOutLeadName] = useState<string | null>(null);
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const stepTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const timeoutTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutWarningTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hardTimeoutTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  // Navigation latch — prevents duplicate navigations if onSuccess fires
+  // alongside a timer-driven check.
+  const navigatedRef = useRef(false);
 
   const createLeadMutation = useMutation({
-    mutationFn: leadService.createLead,
-    onSuccess: (data) => {
-      analytics.analysisCompleted();
-      navigate(`/leads/${data._id}`);
+    mutationFn: (vars: { data: Parameters<typeof leadService.createLead>[0]; signal: AbortSignal }) =>
+      leadService.createLead(vars.data, { signal: vars.signal, timeoutMs: REQUEST_TIMEOUT_MS }),
+    onMutate: () => {
+      navigatedRef.current = false;
+      setStatus('processing');
     },
-    onError: () => {
+    onSuccess: (lead) => {
+      console.debug('[NewLead] analysis onSuccess', {
+        status,
+        hasId: !!lead?._id,
+        _id: lead?._id,
+        leadName: lead?.leadName ?? lead?.businessName,
+      });
+      const leadId = extractLeadId(lead);
+      if (!leadId) {
+        // Response completed but carried no usable id — treat as failure so the
+        // UI never reports success with nowhere to go.
+        console.error('[NewLead] analysis completed WITHOUT a lead id', {
+          payloadKeys: lead ? Object.keys(lead) : null,
+        });
+        setStatus('failed');
+        analytics.analysisFailed();
+        return;
+      }
+      setStatus('completed');
+      // Event-driven completion: ALL steps resolve now, regardless of elapsed
+      // timers — a stage is never marked complete merely because time passed.
+      setCurrentStep(progressSteps.length - 1);
+      console.debug('[NewLead] analysis completed — navigating to results', {
+        target: `/leads/${leadId}`,
+        elapsedMs: startTimeRef.current ? Date.now() - startTimeRef.current : null,
+      });
+      analytics.analysisCompleted();
+      navigateToLead(leadId);
+    },
+    onError: (error: unknown) => {
+      const isAborted = (error as any)?.code === 'ERR_CANCELED' || (error as any)?.name === 'CanceledError';
+      console.debug('[NewLead] analysis onError', {
+        status,
+        isAborted,
+        message: (error as any)?.message,
+        responseStatus: (error as any)?.response?.status,
+        responseData: (error as any)?.response?.data,
+      });
+
+      if (isAborted) {
+        // Genuine abort (unmount / new submit) or the hard-timeout abort.
+        // The hard-timeout path already set status to 'timed_out' — don't
+        // clobber it with a generic failure.
+        if (statusRef.current === 'timed_out') {
+          console.debug('[NewLead] aborted by hard timeout — timed_out UI already set');
+          return;
+        }
+        console.debug('[NewLead] aborted by user/unmount — no error UI');
+        return;
+      }
+
+      // If we reached the hard timeout, the timeout handler already decided —
+      // do not override its UI state.
+      if (statusRef.current === 'timed_out') {
+        console.debug('[NewLead] onError after hard timeout — timeout UI already set');
+        return;
+      }
+
+      setStatus('failed');
       analytics.analysisFailed();
     },
   });
 
-  // Progress timer
+  // Keep a ref of status + startTime alongside state for handlers that capture
+  // stale closures.
+  const statusRef = useRef<AnalysisStatus>('idle');
+  statusRef.current = status;
+  const startTimeRef = useRef<number | null>(null);
+  startTimeRef.current = startTime;
+
+  const navigateToLead = useCallback((leadId: string) => {
+    if (navigatedRef.current) return;
+    navigatedRef.current = true;
+    console.debug('[NewLead] navigation target', { route: `/leads/${leadId}` });
+    navigate(`/leads/${leadId}`);
+  }, [navigate]);
+
+  // Cleanup on unmount: abort the in-flight request + clear all timers.
   useEffect(() => {
-    if (createLeadMutation.isPending && startTime) {
+    return () => {
+      abortControllerRef.current?.abort();
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
+      if (timeoutWarningTimerRef.current) clearTimeout(timeoutWarningTimerRef.current);
+      if (hardTimeoutTimerRef.current) clearTimeout(hardTimeoutTimerRef.current);
+    };
+  }, []);
+
+  // Progress timer (elapsed seconds) + defensive hard-limit check.
+  useEffect(() => {
+    if (status === 'processing' && startTime) {
       timerRef.current = setInterval(() => {
-        setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+        const now = Date.now();
+        setElapsedTime(Math.floor((now - startTime) / 1000));
+        // Defensive: if we pass the absolute limit while still pending
+        // (should not happen — axios timeout aborts first), surface timed_out.
+        if (now - startTime > REQUEST_TIMEOUT_MS && statusRef.current === 'processing') {
+          console.warn('[NewLead] reached absolute limit while still processing', {
+            elapsedMs: now - startTime,
+            limitMs: REQUEST_TIMEOUT_MS,
+          });
+          handleHardTimeout();
+        }
       }, 250);
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [createLeadMutation.isPending, startTime]);
+  }, [status === 'processing', startTime]);
 
-  // Step advancement timer
+  /**
+   * Handle the case where the request has consumed the entire configured
+   * window without a definitive backend response. We do NOT blindly show a
+   * failure — the backend may still be finishing. We check whether a persisted
+   * lead exists (GET /api/leads) and, if one matches this run, surface it so
+   * the user can navigate to results instead of seeing a dead failure.
+   * Idempotent.
+   */
+  const handleHardTimeout = useCallback(async () => {
+    if (navigatedRef.current || statusRef.current === 'timed_out') return;
+    navigatedRef.current = true; // latch to prevent re-entry
+    console.warn('[NewLead] analysis hit configured limit — checking for persisted lead', {
+      startedAt: startTimeRef.current ? new Date(startTimeRef.current).toISOString() : null,
+      limitMs: REQUEST_TIMEOUT_MS,
+      elapsedMs: startTimeRef.current ? Date.now() - startTimeRef.current : null,
+    });
+
+    // Abort the in-flight request so we do not double-handle onSuccess.
+    abortControllerRef.current?.abort();
+    setStatus('timed_out');
+
+    // Best-effort: try to find the lead that was persisted by the backend.
+    // The backend persists the lead only at the very end, so if the request
+    // truly timed out the lead likely does not exist yet — but if it DID
+    // complete server-side before the abort, we recover navigation.
+    try {
+      const leads = await leadService.getLeads({ sort: '-createdAt', limit: 10 });
+      const started = startTimeRef.current;
+      const recent = (leads || []).find((l) => {
+        if (!l?.createdAt || !started) return false;
+        const createdAt = new Date(l.createdAt).getTime();
+        // The persisted lead must have been created within this run's window
+        // (some slack for clock skew / server timestamps).
+        return Math.abs(createdAt - started) < REQUEST_TIMEOUT_MS * 2;
+      });
+      if (recent?._id) {
+        setTimedOutLeadId(recent._id);
+        setTimedOutLeadName(recent.leadName ?? recent.businessName ?? 'the lead');
+        console.debug('[NewLead] persisted lead found after timeout', {
+          _id: recent._id,
+          leadName: recent.leadName ?? recent.businessName,
+          createdAt: recent.createdAt,
+        });
+      } else {
+        console.debug('[NewLead] no persisted lead found after timeout — genuine failure');
+      }
+    } catch (lookupError) {
+      console.debug('[NewLead] persisted-lead lookup failed (non-fatal)', lookupError);
+    }
+  }, []);
+
+  // Soft warning: after SOFT_LIMIT_WARNING_MS the UI explains the analysis is
+  // still running (backend legitimately slow), NOT that it failed.
   useEffect(() => {
-    if (!createLeadMutation.isPending) return;
+    if (status !== 'processing') return;
+    timeoutWarningTimerRef.current = setTimeout(() => {
+      console.debug('[NewLead] soft warning: analysis exceeds expected duration', {
+        elapsedMs: Date.now() - (startTimeRef.current || Date.now()),
+        thresholdMs: SOFT_LIMIT_WARNING_MS,
+      });
+      setElapsedTime((current) => Math.max(current, Math.ceil(SOFT_LIMIT_WARNING_MS / 1000)));
+    }, SOFT_LIMIT_WARNING_MS);
+    return () => {
+      if (timeoutWarningTimerRef.current) clearTimeout(timeoutWarningTimerRef.current);
+    };
+  }, [status === 'processing']);
+
+  // Hard timeout: after REQUEST_TIMEOUT_MS the request is genuinely beyond the
+  // configured limit. Abort the request and check for a persisted lead.
+  useEffect(() => {
+    if (status !== 'processing') return;
+    hardTimeoutTimerRef.current = setTimeout(() => {
+      handleHardTimeout();
+    }, REQUEST_TIMEOUT_MS);
+    return () => {
+      if (hardTimeoutTimerRef.current) clearTimeout(hardTimeoutTimerRef.current);
+    };
+  }, [status === 'processing']);
+
+  // Step advancement — cadence hint only. Stages are NOT marked complete on a
+  // timer; they are marked complete in onSuccess (event-driven).
+  useEffect(() => {
+    if (status !== 'processing') return;
     const elapsed = Date.now() - (startTime || Date.now());
     let nextStep = 0;
     for (let i = 0; i < progressSteps.length; i++) {
       if (elapsed >= progressSteps[i].duration) nextStep = i + 1;
     }
-    setCurrentStep(Math.min(nextStep, progressSteps.length - 1));
+    // Never show "Preparing analysis" as complete on a timer alone: it resolves
+    // only when the response arrives. Cap at the second-to-last marker.
+    const maxTimerStep = Math.min(nextStep, progressSteps.length - 2);
+    setCurrentStep(maxTimerStep);
 
     // Calculate time until next step
-    let accumulated = 0;
-    for (let i = 0; i < progressSteps.length; i++) {
-      if (i >= nextStep) {
-        const delay = Math.max(0, progressSteps[i].duration - elapsed);
-        stepTimerRef.current = setTimeout(() => {
-          setCurrentStep(i);
-        }, delay);
-        break;
-      }
-      accumulated += progressSteps[i].duration;
+    for (let i = maxTimerStep; i < progressSteps.length - 1; i++) {
+      const delay = Math.max(0, progressSteps[i].duration - elapsed);
+      stepTimerRef.current = setTimeout(() => {
+        setCurrentStep((prev) => Math.max(prev, i));
+      }, delay);
+      break;
     }
     return () => {
       if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
     };
-  }, [createLeadMutation.isPending, startTime, elapsedTime]);
-
-  // Long-running analysis warning.
-  // Do NOT reset/cancel the mutation at 90 seconds: the API may still be
-  // finishing valid work (provider fetches + optional enrichment). Resetting
-  // previously orphaned that request, made the first run appear wasted, and
-  // encouraged users to paste the same URL again.
-  useEffect(() => {
-    if (createLeadMutation.isPending) {
-      timeoutTimerRef.current = setTimeout(() => {
-        setElapsedTime((current) => Math.max(current, Math.ceil(REQUEST_TIMEOUT_MS / 1000)));
-      }, REQUEST_TIMEOUT_MS);
-    }
-    return () => {
-      if (timeoutTimerRef.current) clearTimeout(timeoutTimerRef.current);
-    };
-  }, [createLeadMutation.isPending]);
+  }, [status === 'processing', startTime, elapsedTime]);
 
   const handleUrlChange = useCallback((value: string) => {
     setUrlInput(value);
@@ -144,33 +347,78 @@ export default function NewLead() {
       setUrlError(error);
       return;
     }
-    analytics.startAnalysis();
+    // Guard: no duplicate submissions while processing.
+    if (status === 'processing' || status === 'submitting') {
+      console.debug('[NewLead] submit blocked — analysis already in flight', { status });
+      return;
+    }
+
+    // Reset any previous terminal state.
+    setTimedOutLeadId(null);
+    setTimedOutLeadName(null);
+    navigatedRef.current = false;
     setCurrentStep(0);
     setStartTime(Date.now());
     setElapsedTime(0);
-    createLeadMutation.mutate({
+    // State machine: submitting → processing (set in onMutate).
+    setStatus('submitting');
+
+    analytics.startAnalysis();
+    const requestId =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `submit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    console.debug('[NewLead] analysis start', {
+      requestId,
+      requestUrl: '/api/leads',
+      requestStartTime: new Date().toISOString(),
       googleMapsUrl: trimmed,
-      // A submit always requests a current acquisition. This bypasses stale
-      // source-cache entries, so retrying an analysis does not repeat an old
-      // empty response from Google Maps.
       forceRefresh: true,
-      ...formData,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+    });
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    createLeadMutation.mutate({
+      data: {
+        googleMapsUrl: trimmed,
+        // A submit always requests a current acquisition. This bypasses stale
+        // source-cache entries, so retrying an analysis does not repeat an old
+        // empty response from Google Maps.
+        forceRefresh: true,
+        ...formData,
+      },
+      signal: controller.signal,
     });
   };
 
-  const isProcessing = createLeadMutation.isPending;
+  const isProcessing = status === 'processing' || status === 'submitting';
   const errorMessage = createLeadMutation.isError
     ? ((createLeadMutation.error as any)?.response?.data?.message ||
        (createLeadMutation.error as any)?.response?.data?.error ||
        'The request took too long or the server is unavailable. Please try again.')
     : null;
-  const isTimeout = elapsedTime > REQUEST_TIMEOUT_MS / 1000 && isProcessing;
+  // "Longer than expected" — the backend is still working; NOT a failure.
+  const isBeyondExpected = elapsedTime > SOFT_LIMIT_WARNING_MS / 1000 && isProcessing;
+  // Real timed_out terminal state (request aborted at the hard limit).
+  const isHardTimedOut = status === 'timed_out';
+  // Failure only reached once the mutation actually errors out.
+  const isFailed = status === 'failed' || (createLeadMutation.isError && !isHardTimedOut && !isProcessing);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return m > 0 ? `${m}m ${s}s` : `${s}s`;
   };
+
+  const headerTitle = isProcessing
+    ? 'Processing lead'
+    : isHardTimedOut
+    ? 'Analysis timed out'
+    : isFailed
+    ? 'Analysis failed'
+    : 'Ready to review';
 
   return (
     <div className="mx-auto max-w-6xl">
