@@ -273,7 +273,12 @@ check('17. Required environment variables documented', () => {
  * ============================================================ */
 check('18. Loading states and disabled submit during pending', () => {
   const dash = read(join(SRC, 'pages/Dashboard.tsx'));
-  assert.ok(dash.includes('animate-pulse'), 'dashboard skeleton');
+  // Loading skeletons: the design system ships a layout-matching shimmer
+  // primitive (.wl-shimmer) alongside Tailwind's animate-pulse. Accept either.
+  assert.ok(
+    dash.includes('animate-pulse') || dash.includes('wl-shimmer'),
+    'dashboard skeleton',
+  );
   const newLead = read(join(SRC, 'pages/NewLead.tsx'));
   assert.ok(newLead.includes('disabled={isProcessing}'), 'submit disabled while processing');
   assert.ok(newLead.includes('animate-spin'), 'spinner while processing');
