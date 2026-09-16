@@ -110,76 +110,9 @@ export default function NewLead() {
   // Navigation latch — prevents duplicate navigations if onSuccess fires
   // alongside a timer-driven check.
   const navigatedRef = useRef(false);
-
-  const createLeadMutation = useMutation({
-    mutationFn: (vars: { data: Parameters<typeof leadService.createLead>[0]; signal: AbortSignal }) =>
-      leadService.createLead(vars.data, { signal: vars.signal, timeoutMs: REQUEST_TIMEOUT_MS }),
-    onMutate: () => {
-      navigatedRef.current = false;
-      setStatus('processing');
-    },
-    onSuccess: (lead) => {
-      console.debug('[NewLead] analysis onSuccess', {
-        status,
-        hasId: !!lead?._id,
-        _id: lead?._id,
-        leadName: lead?.leadName ?? lead?.businessName,
-      });
-      const leadId = extractLeadId(lead);
-      if (!leadId) {
-        // Response completed but carried no usable id — treat as failure so the
-        // UI never reports success with nowhere to go.
-        console.error('[NewLead] analysis completed WITHOUT a lead id', {
-          payloadKeys: lead ? Object.keys(lead) : null,
-        });
-        setStatus('failed');
-        analytics.analysisFailed();
-        return;
-      }
-      setStatus('completed');
-      // Event-driven completion: ALL steps resolve now, regardless of elapsed
-      // timers — a stage is never marked complete merely because time passed.
-      setCurrentStep(progressSteps.length - 1);
-      console.debug('[NewLead] analysis completed — navigating to results', {
-        target: `/leads/${leadId}`,
-        elapsedMs: startTimeRef.current ? Date.now() - startTimeRef.current : null,
-      });
-      analytics.analysisCompleted();
-      navigateToLead(leadId);
-    },
-    onError: (error: unknown) => {
-      const isAborted = (error as any)?.code === 'ERR_CANCELED' || (error as any)?.name === 'CanceledError';
-      console.debug('[NewLead] analysis onError', {
-        status,
-        isAborted,
-        message: (error as any)?.message,
-        responseStatus: (error as any)?.response?.status,
-        responseData: (error as any)?.response?.data,
-      });
-
-      if (isAborted) {
-        // Genuine abort (unmount / new submit) or the hard-timeout abort.
-        // The hard-timeout path already set status to 'timed_out' — don't
-        // clobber it with a generic failure.
-        if (statusRef.current === 'timed_out') {
-          console.debug('[NewLead] aborted by hard timeout — timed_out UI already set');
-          return;
-        }
-        console.debug('[NewLead] aborted by user/unmount — no error UI');
-        return;
-      }
-
-      // If we reached the hard timeout, the timeout handler already decided —
-      // do not override its UI state.
-      if (statusRef.current === 'timed_out') {
-        console.debug('[NewLead] onError after hard timeout — timeout UI already set');
-        return;
-      }
-
-      setStatus('failed');
-      analytics.analysisFailed();
-    },
-  });
+  // Unmount latch — the cleanup effect aborts the in-flight request; onError
+  // must NOT run a recovery lookup on a component that is gone.
+  const unmountedRef = useRef(false);
 
   // Keep a ref of status + startTime alongside state for handlers that capture
   // stale closures.
@@ -194,39 +127,6 @@ export default function NewLead() {
     console.debug('[NewLead] navigation target', { route: `/leads/${leadId}` });
     navigate(`/leads/${leadId}`);
   }, [navigate]);
-
-  // Cleanup on unmount: abort the in-flight request + clear all timers.
-  useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
-      if (timeoutWarningTimerRef.current) clearTimeout(timeoutWarningTimerRef.current);
-      if (hardTimeoutTimerRef.current) clearTimeout(hardTimeoutTimerRef.current);
-    };
-  }, []);
-
-  // Progress timer (elapsed seconds) + defensive hard-limit check.
-  useEffect(() => {
-    if (status === 'processing' && startTime) {
-      timerRef.current = setInterval(() => {
-        const now = Date.now();
-        setElapsedTime(Math.floor((now - startTime) / 1000));
-        // Defensive: if we pass the absolute limit while still pending
-        // (should not happen — axios timeout aborts first), surface timed_out.
-        if (now - startTime > REQUEST_TIMEOUT_MS && statusRef.current === 'processing') {
-          console.warn('[NewLead] reached absolute limit while still processing', {
-            elapsedMs: now - startTime,
-            limitMs: REQUEST_TIMEOUT_MS,
-          });
-          handleHardTimeout();
-        }
-      }, 250);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [status === 'processing', startTime]);
 
   /**
    * Handle the case where the request has consumed the entire configured
@@ -280,6 +180,112 @@ export default function NewLead() {
       console.debug('[NewLead] persisted-lead lookup failed (non-fatal)', lookupError);
     }
   }, []);
+
+  const createLeadMutation = useMutation({
+    mutationFn: (vars: { data: Parameters<typeof leadService.createLead>[0]; signal: AbortSignal }) =>
+      leadService.createLead(vars.data, { signal: vars.signal, timeoutMs: REQUEST_TIMEOUT_MS }),
+    onMutate: () => {
+      navigatedRef.current = false;
+      setStatus('processing');
+    },
+    onSuccess: (lead) => {
+      console.debug('[NewLead] analysis onSuccess', {
+        status,
+        hasId: !!lead?._id,
+        _id: lead?._id,
+        leadName: lead?.leadName ?? lead?.businessName,
+      });
+      const leadId = extractLeadId(lead);
+      if (!leadId) {
+        // Response completed but carried no usable id — treat as failure so the
+        // UI never reports success with nowhere to go.
+        console.error('[NewLead] analysis completed WITHOUT a lead id', {
+          payloadKeys: lead ? Object.keys(lead) : null,
+        });
+        setStatus('failed');
+        analytics.analysisFailed();
+        return;
+      }
+      setStatus('completed');
+      // Event-driven completion: ALL steps resolve now, regardless of elapsed
+      // timers — a stage is never marked complete merely because time passed.
+      setCurrentStep(progressSteps.length - 1);
+      console.debug('[NewLead] analysis completed — navigating to results', {
+        target: `/leads/${leadId}`,
+        elapsedMs: startTimeRef.current ? Date.now() - startTimeRef.current : null,
+      });
+      analytics.analysisCompleted();
+      navigateToLead(leadId);
+    },
+    onError: (error: unknown) => {
+      const axError = error as any;
+      const isAborted =
+        axError?.code === 'ERR_CANCELED' ||
+        axError?.name === 'CanceledError' ||
+        axError?.code === 'ECONNABORTED'; // axios `timeout` option fired
+      const isTimedOutState = statusRef.current === 'timed_out';
+      console.debug('[NewLead] analysis onError', {
+        status,
+        isAborted,
+        message: axError?.message,
+        responseStatus: axError?.response?.status,
+        responseData: axError?.response?.data,
+      });
+
+      // The request was cancelled — either a user/unmount abort, or the
+      // hard-timeout abort (which already set 'timed_out'). Never show a
+      // generic failure for a cancelled request, and never clobber the
+      // timed_out UI.
+      if (isAborted || isTimedOutState) {
+        if (isAborted && !isTimedOutState && !unmountedRef.current) {
+          // Could be the axios `timeout` option rejecting (5 min) before the
+          // timer's handleHardTimeout ran. Route through the same recovery.
+          console.debug('[NewLead] request aborted/expired — running recovery check');
+          handleHardTimeout();
+          return;
+        }
+        console.debug('[NewLead] aborted by timeout/user/unmount — timed_out UI already set');
+        return;
+      }
+
+      setStatus('failed');
+      analytics.analysisFailed();
+    },
+  });
+
+  // Cleanup on unmount: abort the in-flight request + clear all timers.
+  useEffect(() => {
+    return () => {
+      unmountedRef.current = true;
+      abortControllerRef.current?.abort();
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
+      if (timeoutWarningTimerRef.current) clearTimeout(timeoutWarningTimerRef.current);
+      if (hardTimeoutTimerRef.current) clearTimeout(hardTimeoutTimerRef.current);
+    };
+  }, []);
+
+  // Progress timer (elapsed seconds) + defensive hard-limit check.
+  useEffect(() => {
+    if (status === 'processing' && startTime) {
+      timerRef.current = setInterval(() => {
+        const now = Date.now();
+        setElapsedTime(Math.floor((now - startTime) / 1000));
+        // Defensive: if we pass the absolute limit while still pending
+        // (should not happen — axios timeout aborts first), surface timed_out.
+        if (now - startTime > REQUEST_TIMEOUT_MS && statusRef.current === 'processing') {
+          console.warn('[NewLead] reached absolute limit while still processing', {
+            elapsedMs: now - startTime,
+            limitMs: REQUEST_TIMEOUT_MS,
+          });
+          handleHardTimeout();
+        }
+      }, 250);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [status === 'processing', startTime]);
 
   // Soft warning: after SOFT_LIMIT_WARNING_MS the UI explains the analysis is
   // still running (backend legitimately slow), NOT that it failed.
@@ -359,6 +365,7 @@ export default function NewLead() {
     setTimedOutLeadId(null);
     setTimedOutLeadName(null);
     navigatedRef.current = false;
+    unmountedRef.current = false;
     setCurrentStep(0);
     setStartTime(Date.now());
     setElapsedTime(0);
