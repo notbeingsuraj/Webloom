@@ -21,6 +21,8 @@ const leadCache = new Map();
  * Returns: Full lead object with business analysis, brand DNA, digital audit
  */
 router.post('/', async (req, res, next) => {
+  const requestStartTime = Date.now();
+  const requestStartIso = new Date(requestStartTime).toISOString();
   try {
     const { googleMapsUrl, leadName, internalNotes, customInstructions, forceRefresh } = req.body;
     
@@ -38,6 +40,15 @@ router.post('/', async (req, res, next) => {
         code: 'INVALID_URL'
       });
     }
+
+    console.log('[leads] analysis start', {
+      requestId: req.headers['x-request-id'] || null,
+      method: 'POST',
+      url: '/api/leads',
+      requestStartTime: requestStartIso,
+      googleMapsUrl,
+      forceRefresh,
+    });
 
     // Extract business data with optional forceRefresh
     let extractedData = null;
@@ -239,11 +250,43 @@ router.post('/', async (req, res, next) => {
 
     leadCache.set(leadId, lead);
 
+    const elapsedMs = Date.now() - requestStartTime;
+    console.log('[leads] analysis complete', {
+      requestId: req.headers['x-request-id'] || null,
+      method: 'POST',
+      url: '/api/leads',
+      requestStartTime: requestStartIso,
+      responseStatus: 201,
+      elapsedMs,
+      elapsed: `${(elapsedMs / 1000).toFixed(1)}s`,
+      leadId,
+      payloadShape: {
+        keys: Object.keys(lead),
+        hasId: !!lead._id,
+        leadName: lead.leadName,
+        hasAnalysis: !!lead.analysis,
+        hasBrandDNA: !!lead.analysis?.brandDNA,
+        hasAudit: !!lead.analysis?.audit,
+        hasOpportunityScore: !!lead.opportunityScore,
+      },
+    });
+
     res.status(201).json({
       success: true,
       data: lead,
     });
   } catch (error) {
+    const elapsedMs = Date.now() - requestStartTime;
+    console.error('[leads] analysis failed', {
+      requestId: req.headers['x-request-id'] || null,
+      method: 'POST',
+      url: '/api/leads',
+      requestStartTime: requestStartIso,
+      responseStatus: 'error',
+      elapsedMs,
+      elapsed: `${(elapsedMs / 1000).toFixed(1)}s`,
+      error: error?.message || String(error),
+    });
     next(error);
   }
 });
