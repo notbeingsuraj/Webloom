@@ -611,12 +611,15 @@ class BusinessResearchService {
           existingCanonicalProfile: profile.toObject(),
         });
         console.log('[FALLBACK DEBUG] extractFallbackFields returned, aiExtracted:', fallbackResult.aiExtracted);
+        console.log('[FALLBACK DEBUG] fallbackResult.fields:', JSON.stringify(fallbackResult.fields, null, 2));
+        console.log('[FALLBACK DEBUG] fallbackResult.evidence keys:', Object.keys(fallbackResult.evidence || {}));
 
         // Merge recovered fields through CandidatePipeline (preserves P1.8 semantics).
         const result = await runFallbackPipeline(profile, fallbackResult, sourceUrl, {
           onlyIfMissing: true,
         });
-        console.log('[FALLBACK DEBUG] runFallbackPipeline returned, accepted:', result.accepted.map(c => c.fieldPath));
+        console.log('[FALLBACK DEBUG] runFallbackPipeline returned, accepted:', JSON.stringify(result.accepted.map(c => c.fieldPath), null, 2));
+        console.log('[FALLBACK DEBUG] runFallbackPipeline rejected:', JSON.stringify(result.rejected.map(c => ({ field: c.fieldPath, reason: c.rejectionReason })), null, 2));
 
         // Surface fallback provenance for observability and canonicalization.
         if (fallbackResult.evidence && Object.keys(fallbackResult.evidence).length > 0) {

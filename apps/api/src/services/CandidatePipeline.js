@@ -349,7 +349,7 @@ export async function runFallbackPipeline(profile, fallbackResult, sourceUrl, op
     // Map fallback field names to BusinessProfile field paths
     const fieldMap = {
       address: 'location.full_address',
-      phone: 'contact.phone',
+      phone: 'contact.phone'
       email: 'contact.email',
       website: 'contact.website',
       coordinates: 'location.coordinates',
