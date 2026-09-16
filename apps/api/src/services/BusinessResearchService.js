@@ -621,6 +621,12 @@ class BusinessResearchService {
         console.log('[FALLBACK DEBUG] runFallbackPipeline returned, accepted:', JSON.stringify(result.accepted.map(c => c.fieldPath), null, 2));
         console.log('[FALLBACK DEBUG] runFallbackPipeline rejected:', JSON.stringify(result.rejected.map(c => ({ field: c.fieldPath, reason: c.rejectionReason })), null, 2));
 
+        // Apply accepted candidates to the profile. CandidatePipeline computes
+        // candidates but does NOT write them — the caller must apply. Without
+        // this, P1.8 fallback recovery was silently discarded.
+        const appliedFallback = result.applyToProfile ? result.applyToProfile(profile, { sourceUrl, provider: 'google_maps_fallback' }) : [];
+        console.log('[FALLBACK DEBUG] runFallbackPipeline applied to profile:', JSON.stringify(appliedFallback.map(a => a.fieldPath), null, 2));
+
         // Surface fallback provenance for observability and canonicalization.
         if (fallbackResult.evidence && Object.keys(fallbackResult.evidence).length > 0) {
           profile.fallbackEvidence = profile.fallbackEvidence || {};
