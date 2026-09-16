@@ -25,7 +25,7 @@ export default function ThankYou() {
 
   return (
     <div className="mx-auto flex min-h-[65vh] flex-col items-center justify-center px-4 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-sm">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-verified/10 text-verified shadow-sm">
         <CheckCircle2 className="h-7 w-7" />
       </div>
 

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, ArrowUpRight, Briefcase, Building2, CheckCircle2, Compass, MapPin, Sparkles, Users,
+  ArrowRight, ArrowUpRight, Briefcase, Building2, CheckCircle2, Compass, MapPin, Plus, Sparkles, Users,
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -11,8 +11,6 @@ import Reveal from '../components/Reveal';
 import usePageMetadata from '../hooks/usePageMetadata';
 import analytics from '../services/analytics';
 import { leadService } from '../services/leadService';
-
-const eyebrow = 'text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground';
 
 export default function Dashboard() {
   usePageMetadata({

@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { Compass, Globe2, LayoutDashboard, Mail, Plus, Sparkles, Zap } from 'lucide-react';
 import Navbar from './Navbar';
-import { cn } from '../../lib/utils';
+import { cn } from '../lib/utils';
 
 const NAV_ITEMS = [
   { label: 'Overview', to: '/', icon: LayoutDashboard, match: (p: string) => p === '/' },

@@ -295,7 +295,7 @@ export default function LeadDetail() {
         </div>
 
         <div className="relative mt-6 flex flex-wrap gap-2 border-t border-border/70 pt-5">
-          {tabs.map((tab, i) => (
+          {tabs.map((tab) => (
             <button
               key={tab}
               type="button"

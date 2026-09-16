@@ -15,11 +15,12 @@ export default function NotFound() {
   return (
     <div className="mx-auto flex min-h-[70vh] flex-col items-center justify-center px-4 text-center">
       {/* decorative icon */}
-      <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+      <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-border bg-card shadow-card">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-3 -top-3 h-10 w-10 rounded-full bg-creative/20 blur-xl" />
         <span className="text-4xl font-bold tracking-tight text-primary">404</span>
       </div>
 
-      <h1 className="mt-8 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+      <h1 className="font-display mt-8 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
         Page not found
       </h1>
 
@@ -40,9 +41,9 @@ export default function NotFound() {
         </Link>
       </div>
 
-      <p className="mt-8 text-xs text-webloom-dim">
+      <p className="mt-8 text-xs text-muted-foreground">
         If you believe this is a mistake, contact{' '}
-        <a href="mailto:hello@webloom.app" className="text-webloom-accent hover:text-webloom-accent-hover underline underline-offset-2">
+        <a href="mailto:hello@webloom.app" className="text-primary hover:text-primary/80 underline underline-offset-2">
           hello@webloom.app
         </a>
       </p>

@@ -65,18 +65,18 @@ export default function CookieConsent() {
       {/* Bottom banner */}
       {!prefOpen && (
         <div className="mx-auto max-w-5xl mb-4 px-4 sm:mb-6 sm:px-6">
-          <div className="rounded-[22px] border border-webloom-border bg-webloom-surface p-4 shadow-2xl backdrop-blur-xl sm:p-5">
+          <div className="wl-card p-4 backdrop-blur-xl sm:p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <ShieldCheck className="h-4 w-4" />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-webloom-text">We value your privacy</p>
-                  <p className="mt-1 text-xs leading-5 text-webloom-muted">
+                  <p className="text-sm font-medium text-foreground">We value your privacy</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
                     Webloom uses strictly necessary cookies for core functionality. Non-essential analytics
                     are only loaded with your explicit consent.
-                    <a href="/privacy" className="ml-1 underline underline-offset-2 hover:text-webloom-muted">Learn more</a>
+                    <a href="/privacy" className="ml-1 underline underline-offset-2 hover:text-muted-foreground">Learn more</a>
                   </p>
                 </div>
               </div>
@@ -84,7 +84,7 @@ export default function CookieConsent() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <button
                   onClick={() => setPrefOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-medium text-webloom-muted hover:text-webloom-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  className="inline-flex items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Settings className="h-3.5 w-3.5" />
                   Preferences

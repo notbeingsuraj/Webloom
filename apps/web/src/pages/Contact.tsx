@@ -104,14 +104,14 @@ export default function Contact() {
       </header>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_0.38fr]">
-        <form onSubmit={onSubmit} className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8" noValidate>
+        <form onSubmit={onSubmit} className="wl-card p-6 sm:p-8" noValidate>
           <div className="space-y-5">
             {field('name')}
             {field('email')}
             {field('message')}
 
             {serverError && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+              <div className="rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
                 {serverError}
               </div>
             )}
@@ -124,7 +124,7 @@ export default function Contact() {
           </div>
         </form>
 
-        <aside className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <aside className="wl-card p-6">
           <h2 className="text-lg font-semibold text-foreground">Get in touch</h2>
           <div className="mt-5 space-y-4 text-sm text-muted-foreground">
             <p className="flex items-start gap-3">

@@ -9,8 +9,8 @@
 import usePageMetadata from '../hooks/usePageMetadata';
 import { routes, siteConfig } from '../config/site';
 
-const accent = 'text-webloom-accent';
-const strong = 'font-medium text-webloom-text';
+const accent = 'text-primary';
+const strong = 'font-medium text-foreground';
 
 export default function PrivacyPolicy() {
   usePageMetadata(routes.PRIVACY);
@@ -18,12 +18,12 @@ export default function PrivacyPolicy() {
   return (
     <article className="mx-auto max-w-3xl pb-20">
       <header className="mb-10">
-        <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-dim">Legal</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-webloom-text">Privacy Policy</h1>
-        <p className="mt-3 text-sm text-webloom-muted">Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Legal</p>
+        <h1 className="mt-3 text-3xl font-bold font-display tracking-tight text-foreground">Privacy Policy</h1>
+        <p className="mt-3 text-sm text-muted-foreground">Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
       </header>
 
-      <div className="space-y-8 text-[15px] leading-[1.8] text-webloom-muted">
+      <div className="space-y-8 text-[15px] leading-[1.8] text-muted-foreground">
         <Section title="1. Who we are">
           <p>
             Webloom (<span className={strong}>{siteConfig.legal.companyName}</span>) provides an AI-powered web intelligence and structured business extraction platform.
@@ -103,7 +103,7 @@ export default function PrivacyPolicy() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="text-xl font-semibold tracking-tight text-webloom-text">{title}</h2>
+      <h2 className="text-xl font-bold tracking-tight text-foreground">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
   );

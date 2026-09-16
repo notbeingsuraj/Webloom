@@ -7,25 +7,25 @@ import type { IntentItem, TriggerItem, ObjectiveItem, VisualDirectionData } from
 
 const urgencyTone: Record<string, string> = {
   low: 'bg-secondary text-muted-foreground border border-border',
-  medium: 'bg-amber-50 text-amber-700 border border-amber-200',
-  high: 'bg-red-50 text-red-700 border border-red-200',
-  urgent: 'bg-red-50 text-red-700 border border-red-200',
+  medium: 'bg-warning/10 text-warning-foreground border border-warning/25',
+  high: 'bg-destructive/10 text-destructive border border-destructive/25',
+  urgent: 'bg-destructive/10 text-destructive border border-destructive/25',
 };
 
 const frequencyTone: Record<string, string> = {
   'one-time': 'bg-secondary text-muted-foreground border border-border',
-  recurring: 'bg-blue-50 text-blue-700 border border-blue-200',
-  seasonal: 'bg-purple-50 text-purple-700 border border-purple-200',
+  recurring: 'bg-ai/10 text-primary border border-primary/25',
+  seasonal: 'bg-ai/10 text-ai border border-ai/25',
 };
 
 const strengthTone: Record<string, string> = {
   weak: 'bg-secondary text-muted-foreground border border-border',
-  moderate: 'bg-amber-50 text-amber-700 border border-amber-200',
-  strong: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  moderate: 'bg-warning/10 text-warning-foreground border border-warning/25',
+  strong: 'bg-verified/10 text-verified border border-verified/25',
 };
 
 const priorityTone: Record<string, string> = {
-  primary: 'bg-blue-50 text-blue-700 border border-blue-200',
+  primary: 'bg-ai/10 text-primary border border-primary/25',
   secondary: 'bg-secondary text-muted-foreground border border-border',
   tertiary: 'bg-secondary text-muted-foreground border border-border',
 };
@@ -56,7 +56,7 @@ export function IntentList({ items }: { items: IntentItem[] | null }) {
   return (
     <ul className="space-y-2">
       {items.map((item, idx) => (
-        <li key={idx} className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2.5">
+        <li key={idx} className="rounded-xl border border-border bg-card px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <Target className="h-3.5 w-3.5 shrink-0 text-primary" />
             <span className="text-sm font-medium text-foreground">{item.intent}</span>
@@ -80,12 +80,12 @@ export function TriggerList({ items }: { items: TriggerItem[] | null }) {
   return (
     <ul className="space-y-2">
       {items.map((item, idx) => (
-        <li key={idx} className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2.5">
+        <li key={idx} className="rounded-xl border border-border bg-card px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <TrendingUp className="h-3.5 w-3.5 shrink-0 text-amber-600" />
             <span className="text-sm font-medium text-foreground">{item.trigger}</span>
             <span className="ml-auto flex items-center gap-1.5">
-              {item.type && <Badge label={item.type} tone="bg-purple-50 text-purple-700 border border-purple-200" />}
+              {item.type && <Badge label={item.type} tone="bg-ai/10 text-ai border border-ai/25" />}
               {item.strength && <Badge label={item.strength} tone={strengthTone[item.strength] || strengthTone.moderate} />}
             </span>
           </div>
@@ -104,9 +104,9 @@ export function ObjectiveList({ items }: { items: ObjectiveItem[] | null }) {
   return (
     <ul className="space-y-2">
       {items.map((item, idx) => (
-        <li key={idx} className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2.5">
+        <li key={idx} className="rounded-xl border border-border bg-card px-3 py-2.5">
           <div className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-verified" />
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-foreground">{item.objective}</span>
@@ -130,9 +130,9 @@ export function ObjectiveList({ items }: { items: ObjectiveItem[] | null }) {
 function LabeledRow({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;
   return (
-    <div className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2">
-      <p className="text-[10px] uppercase tracking-[0.14em] text-webloom-muted">{label}</p>
-      <p className="mt-0.5 text-sm text-webloom-text">{value}</p>
+    <div className="rounded-xl border border-border bg-card px-3 py-2">
+      <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm text-foreground">{value}</p>
     </div>
   );
 }
@@ -140,11 +140,11 @@ function LabeledRow({ label, value }: { label: string; value?: string | null }) 
 function ChipList({ label, values }: { label: string; values: string[] }) {
   if (!values?.length) return null;
   return (
-    <div className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2">
-      <p className="text-[10px] uppercase tracking-[0.14em] text-webloom-muted">{label}</p>
+    <div className="rounded-xl border border-border bg-card px-3 py-2">
+      <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {values.map((v) => (
-          <span key={v} className="inline-flex items-center rounded-full border border-webloom-border bg-webloom-raised px-2 py-0.5 text-xs text-webloom-text">{v}</span>
+          <span key={v} className="inline-flex items-center rounded-full border border-border bg-secondary px-2 py-0.5 text-xs text-foreground">{v}</span>
         ))}
       </div>
     </div>

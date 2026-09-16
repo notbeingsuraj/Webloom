@@ -95,7 +95,7 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
           <div className="mt-3 flex items-center gap-1.5">
             {rating != null ? (
               <>
-                <Star className="h-4 w-4 text-[#F59E0B] fill-[#F59E0B]" />
+                <Star className="h-4 w-4 text-warning fill-warning" />
                 <span className="text-2xl font-semibold tracking-[-0.05em] text-foreground">
                   {typeof rating === 'number' ? rating.toFixed(1) : rating}
                 </span>
@@ -170,7 +170,7 @@ export default function ReputationPanel({ lead }: { lead: Lead | undefined }) {
                 <div className="flex flex-wrap items-center gap-2">
                   {r.rating != null && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                      <Star className="h-3 w-3 fill-[#F59E0B] text-[#F59E0B]" />
+                      <Star className="h-3 w-3 fill-warning text-warning" />
                       {r.rating}
                     </span>
                   )}

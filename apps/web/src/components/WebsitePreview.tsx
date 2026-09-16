@@ -37,10 +37,10 @@ export default function WebsitePreview({
 
   if (isGenerating) {
     return (
-      <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-10 text-center">
+      <div className="wl-card p-10 text-center">
         <Loader className="mx-auto h-8 w-8 animate-spin text-primary" />
-        <p className="mt-4 text-base font-medium text-webloom-text">Generating website specification…</p>
-        <p className="mt-2 text-sm text-webloom-muted">
+        <p className="mt-4 text-base font-medium text-foreground">Generating website specification…</p>
+        <p className="mt-2 text-sm text-muted-foreground">
           Using the verified business profile and analysis. This takes a moment.
         </p>
       </div>
@@ -49,10 +49,10 @@ export default function WebsitePreview({
 
   if (generateError) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-card p-10 text-center shadow-sm">
-        <AlertCircle className="mx-auto h-8 w-8 text-red-600" />
-        <p className="mt-4 text-base font-medium text-red-700">Website specification generation failed</p>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-red-600/80">{generateError}</p>
+      <div className="wl-card p-10 text-center border-destructive/25">
+        <AlertCircle className="mx-auto h-8 w-8 text-destructive" />
+        <p className="mt-4 text-base font-medium text-destructive">Website specification generation failed</p>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-destructive/80">{generateError}</p>
         <button
           type="button"
           onClick={onGenerate}
@@ -66,12 +66,12 @@ export default function WebsitePreview({
 
   if (!spec) {
     return (
-      <div className="rounded-[30px] border border-webloom-border bg-webloom-surface p-10 text-center shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
+      <div className="wl-card p-10 text-center shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
         <Sparkles className="mx-auto h-8 w-8 text-primary" />
-        <p className="mt-4 text-base font-medium text-webloom-text">
+        <p className="mt-4 text-base font-medium text-foreground">
           {status === 'failed' ? 'No website specification available' : 'Generate a website specification'}
         </p>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-webloom-muted">
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
           {status === 'failed'
             ? 'The last generation attempt did not complete. You can retry — the analysis is still valid.'
             : website?.noSourceWebsite
@@ -96,18 +96,18 @@ export default function WebsitePreview({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-webloom-muted">
+        <p className="text-xs text-muted-foreground">
           {generatedAt ? `Generated ${new Date(generatedAt).toLocaleString()}` : 'Generated from verified analysis'}
           {website?.noSourceWebsite ? ' · No source website found — built from profile' : ''}
         </p>
-        <div className="flex items-center gap-2 rounded-full border border-webloom-border bg-webloom-raised p-1">
+        <div className="flex items-center gap-2 rounded-full border border-border bg-secondary p-1">
           {(['Desktop', 'Tablet', 'Mobile'] as const).map((v) => (
             <button
               key={v}
               type="button"
               onClick={() => setViewport(v)}
               className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                viewport === v ? 'bg-webloom-raised text-white' : 'text-webloom-muted hover:text-webloom-text'
+                viewport === v ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {v}
@@ -118,71 +118,71 @@ export default function WebsitePreview({
 
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.5fr_0.8fr]">
         {/* Sections */}
-        <div className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Sections</p>
-          <div className="mt-4 space-y-2 text-sm text-webloom-text">
+        <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-ai/5 p-4">
+          <p className="wl-eyebrow">Sections</p>
+          <div className="mt-4 space-y-2 text-sm text-foreground">
             {spec.sections?.length ? (
               spec.sections.map((section) => (
-                <div key={section.id ?? section.type ?? 'section'} className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2">
+                <div key={section.id ?? section.type ?? 'section'} className="rounded-xl border border-border bg-card px-3 py-2">
                   <span className="font-medium capitalize">{section.type || 'Section'}</span>
-                  {section.purpose && <span className="mt-0.5 block text-xs leading-4 text-webloom-muted">{section.purpose}</span>}
+                  {section.purpose && <span className="mt-0.5 block text-xs leading-4 text-muted-foreground">{section.purpose}</span>}
                 </div>
               ))
             ) : (
-              <div className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2 text-webloom-muted">Section list not available</div>
+              <div className="rounded-xl border border-border bg-card px-3 py-2 text-muted-foreground">Section list not available</div>
             )}
           </div>
         </div>
 
         {/* Preview */}
-        <div className={`rounded-[28px] border border-webloom-border bg-webloom-raised p-4 ${viewport === 'Mobile' ? 'max-w-sm' : viewport === 'Tablet' ? 'max-w-2xl' : ''}`}>
+        <div className={`rounded-3xl border border-border bg-secondary/60 p-4 ${viewport === 'Mobile' ? 'max-w-sm' : viewport === 'Tablet' ? 'max-w-2xl' : ''}`}>
           <PreviewCanvas spec={spec} />
         </div>
 
         {/* Appearance + regenerate */}
-        <div className="rounded-[22px] border border-webloom-border bg-webloom-raised p-4">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Appearance</p>
-          <div className="mt-4 space-y-3 text-sm text-webloom-text">
+        <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-ai/5 p-4">
+          <p className="wl-eyebrow">Appearance</p>
+          <div className="mt-4 space-y-3 text-sm text-foreground">
             {spec.visualDirection ? (
               <>
                 {spec.visualDirection.mood && (
-                  <div className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-[0.14em] text-webloom-muted">Mood</p>
+                  <div className="rounded-xl border border-border bg-card px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Mood</p>
                     <p className="mt-0.5">{spec.visualDirection.mood}</p>
                   </div>
                 )}
                 {spec.colorDirection && (
-                  <div className="flex items-center gap-2 rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2">
-                    <span className="h-4 w-4 shrink-0 rounded-full border border-webloom-border" style={{ background: spec.colorDirection }} />
+                  <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
+                    <span className="h-4 w-4 shrink-0 rounded-full border border-border" style={{ background: spec.colorDirection }} />
                     <div className="min-w-0">
-                      <p className="text-[10px] uppercase tracking-[0.14em] text-webloom-muted">Primary colour</p>
+                      <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Primary colour</p>
                       <p className="truncate">{spec.colorDirection}</p>
                     </div>
                   </div>
                 )}
                 {spec.typographyDirection && (
-                  <div className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-[0.14em] text-webloom-muted">Typography</p>
+                  <div className="rounded-xl border border-border bg-card px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Typography</p>
                     <p className="mt-0.5">{spec.typographyDirection}</p>
                   </div>
                 )}
                 {spec.imageryDirection && (
-                  <div className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2">
-                    <p className="text-[10px] uppercase tracking-[0.14em] text-webloom-muted">Imagery</p>
+                  <div className="rounded-xl border border-border bg-card px-3 py-2">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Imagery</p>
                     <p className="mt-0.5">{spec.imageryDirection}</p>
                   </div>
                 )}
               </>
             ) : (
-              <div className="rounded-xl border border-webloom-border bg-webloom-surface px-3 py-2 text-webloom-muted">
-                <p className="text-[10px] uppercase tracking-[0.14em] text-webloom-muted">Typography</p>
+              <div className="rounded-xl border border-border bg-card px-3 py-2 text-muted-foreground">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Typography</p>
                 <p className="mt-0.5">System default</p>
               </div>
             )}
             <button
               type="button"
               onClick={onGenerate}
-              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#111111] bg-webloom-surface px-4 py-2 text-sm font-medium text-webloom-text transition hover:bg-webloom-raised"
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
             >
               <RefreshCw className="h-3.5 w-3.5" /> Regenerate
             </button>
@@ -205,11 +205,11 @@ function PreviewCanvas({ spec }: { spec: WebsiteSpecification }) {
   const trust = spec.sections?.find((s) => s.type === 'trustIndicators');
 
   return (
-    <div className="overflow-hidden rounded-[20px] border border-webloom-border bg-webloom-surface shadow-[0_14px_40px_rgba(17,17,17,0.04)]">
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
       {/* Navigation */}
-      <div className="flex items-center justify-between border-b border-[#F0F0F2] px-5 py-3">
-        <span className="text-sm font-semibold tracking-tight text-webloom-text">{spec.businessName || 'Business'}</span>
-        <span className="hidden gap-4 text-xs text-webloom-muted sm:flex">
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <span className="text-sm font-semibold tracking-tight text-foreground">{spec.businessName || 'Business'}</span>
+        <span className="hidden gap-4 text-xs text-muted-foreground sm:flex">
           <span>About</span>
           <span>Services</span>
           <span>Contact</span>
@@ -217,11 +217,11 @@ function PreviewCanvas({ spec }: { spec: WebsiteSpecification }) {
       </div>
 
       {/* Hero */}
-      <div className="bg-webloom-raised px-6 py-8 text-white md:px-8 md:py-10">
+      <div className="bg-gradient-to-br from-[#1B1F3B] via-[#232A4E] to-[#3B2A63] px-6 py-8 text-white md:px-8 md:py-10">
         <p className="text-[11px] uppercase tracking-[0.18em] text-white/70">
           {spec.businessCategory || 'Local business'}
         </p>
-        <h3 className="mt-3 text-2xl font-semibold tracking-[-0.05em] md:text-3xl">
+        <h3 className="mt-3 font-display text-2xl font-bold tracking-[-0.05em] md:text-3xl">
           {hero?.headline || spec.headline || spec.businessName || 'Website specification unavailable'}
         </h3>
         <p className="mt-3 max-w-md text-sm leading-6 text-white/80">
@@ -230,7 +230,7 @@ function PreviewCanvas({ spec }: { spec: WebsiteSpecification }) {
         {(spec.primaryCTA?.text || hero?.items?.length) && (
           <div className="mt-6 flex flex-wrap gap-3">
             {spec.primaryCTA?.text && (
-              <span className="inline-flex items-center rounded-full bg-webloom-surface px-4 py-2 text-sm font-medium text-webloom-text">
+              <span className="inline-flex items-center rounded-full bg-gradient-to-r from-[#3B82F6] to-[#8B5CF6] px-4 py-2 text-sm font-semibold text-white">
                 {spec.primaryCTA.text}
               </span>
             )}
@@ -247,7 +247,7 @@ function PreviewCanvas({ spec }: { spec: WebsiteSpecification }) {
       {trust?.items?.length ? (
         <div className="flex flex-wrap gap-2 px-6 py-4">
           {trust.items.slice(0, 3).map((item) => (
-            <span key={item} className="rounded-full border border-webloom-border bg-webloom-raised px-3 py-1 text-xs text-webloom-muted">{item}</span>
+            <span key={item} className="rounded-full border border-border bg-secondary px-3 py-1 text-xs text-muted-foreground">{item}</span>
           ))}
         </div>
       ) : null}
@@ -255,10 +255,10 @@ function PreviewCanvas({ spec }: { spec: WebsiteSpecification }) {
       {/* Services */}
       {(spec.services?.length || servicesSection?.items?.length) ? (
         <div className="px-6 py-5 md:px-8">
-          <p className="text-[11px] uppercase tracking-[0.18em] text-webloom-muted">Services & offerings</p>
+          <p className="wl-eyebrow">Services & offerings</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
             {(spec.services?.slice(0, 6) || []).map((service) => (
-              <div key={service} className="rounded-2xl border border-webloom-border bg-webloom-raised p-3 text-sm font-medium text-webloom-text">
+              <div key={service} className="rounded-2xl border border-border bg-secondary p-3 text-sm font-medium text-foreground">
                 {service}
               </div>
             ))}
@@ -268,10 +268,10 @@ function PreviewCanvas({ spec }: { spec: WebsiteSpecification }) {
 
       {/* CTA band */}
       {cta?.items?.length || spec.primaryCTA?.text ? (
-        <div className="mx-6 mb-5 rounded-2xl bg-webloom-raised p-5 text-center md:mx-8">
-          <p className="text-sm font-medium text-webloom-text">{cta?.purpose || 'Ready to get started?'}</p>
+        <div className="mx-6 mb-5 rounded-2xl bg-gradient-to-br from-[#F4F6FB] to-[#EEEAF8] p-5 text-center md:mx-8">
+          <p className="text-sm font-medium text-foreground">{cta?.purpose || 'Ready to get started?'}</p>
           {spec.primaryCTA?.text && (
-            <span className="mt-3 inline-flex items-center rounded-full bg-webloom-raised px-5 py-2.5 text-sm font-medium text-white">
+            <span className="mt-3 inline-flex items-center rounded-full bg-gradient-to-r from-[#1B1F3B] to-[#3B2A63] px-5 py-2.5 text-sm font-semibold text-white">
               {spec.primaryCTA.text}
             </span>
           )}
@@ -279,8 +279,8 @@ function PreviewCanvas({ spec }: { spec: WebsiteSpecification }) {
       ) : null}
 
       {/* Footer */}
-      <div className="border-t border-[#F0F0F2] px-6 py-4 md:px-8">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-webloom-muted">
+      <div className="border-t border-border px-6 py-4 md:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <Globe className="h-3.5 w-3.5" />
             {spec.contact?.website || `${spec.businessName || 'Business'} website`}

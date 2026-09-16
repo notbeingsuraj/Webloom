@@ -20,7 +20,7 @@ interface AnalyzedBusiness {
 }
 
 const styles = {
-  card: 'rounded-2xl border border-border bg-card p-6 shadow-sm',
+  card: 'wl-card p-6',
   eyebrow: 'text-[11px] uppercase tracking-[0.18em] text-muted-foreground',
   field: 'flex h-11 w-full rounded-xl border border-input bg-background px-4 py-3 text-base text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-ring',
   label: 'mb-2 block text-sm font-medium text-foreground',
@@ -176,7 +176,7 @@ export default function GeneratedSites() {
       </section>
 
       {generated && generated.url && (
-        <section className={`${styles.card} flex flex-wrap items-center justify-between gap-4 border-emerald-200 bg-emerald-50`}>
+        <section className={`${styles.card} flex flex-wrap items-center justify-between gap-4 border-emerald-200 bg-verified/10`}>
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
               <Globe className="h-6 w-6" />
@@ -204,7 +204,7 @@ export default function GeneratedSites() {
       {/* Generated sites list */}
       <section className={styles.card}>
         <div className="mb-5 flex items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold tracking-[-0.04em] text-foreground">Generated sites</h2>
+          <h2 className="text-xl font-bold tracking-[-0.04em] text-foreground">Generated sites</h2>
           <span className="text-sm text-muted-foreground">{sites.length} total</span>
         </div>
 
