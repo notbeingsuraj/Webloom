@@ -512,12 +512,37 @@ export default function NewLead() {
               />
             </label>
 
-            {isTimeout ? (
+            {isHardTimedOut ? (
               <div className="rounded-[18px] border border-red-800/50 bg-red-900/30 px-4 py-3 text-sm text-red-300" role="alert">
-                <div className="font-medium">Request timed out</div>
-                <div className="mt-1">The analysis is taking longer than expected. You can try again with a simpler Google Maps URL.</div>
+                <div className="font-medium">The analysis is taking longer than expected</div>
+                <div className="mt-1">
+                  {timedOutLeadId ? (
+                    <>
+                      A lead was persisted while the analysis was running.{' '}
+                      <button
+                        type="button"
+                        onClick={() => navigateToLead(timedOutLeadId)}
+                        className="underline underline-offset-2 hover:text-red-100"
+                      >
+                        View results for {timedOutLeadName ?? 'this lead'}
+                      </button>
+                    </>
+                  ) : (
+                    'The analysis exceeded the configured time limit. The backend may still be finishing — please retry shortly, and the results will be available on the dashboard.'
+                  )}
+                </div>
               </div>
-            ) : errorMessage ? (
+            ) : isBeyondExpected ? (
+              <div className="rounded-[18px] border border-amber-800/50 bg-amber-900/30 px-4 py-3 text-sm text-amber-200" role="status">
+                <div className="flex items-center gap-2 font-medium">
+                  <Clock className="h-4 w-4" />
+                  Still working — this analysis can take a few minutes
+                </div>
+                <div className="mt-1">
+                  The analysis performs provider extraction, source reconciliation, AI enrichment, a website audit, and opportunity scoring. Please keep this tab open.
+                </div>
+              </div>
+            ) : isFailed ? (
               <div className="rounded-[18px] border border-red-800/50 bg-red-900/30 px-4 py-3 text-sm text-red-300" role="alert">
                 <div className="font-medium">Something went wrong</div>
                 <div className="mt-1">{errorMessage}</div>
@@ -545,12 +570,21 @@ export default function NewLead() {
         <aside className={`${surface} bg-webloom-raised`}>
           <p className={eyebrow}>Status</p>
           <h2 className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-webloom-text">
-            {createLeadMutation.isPending ? 'Processing lead' : 'Ready to review'}
+            {headerTitle}
           </h2>
 
           <div className="mt-6 space-y-4">
             {progressSteps.map((step, index) => {
-              const isComplete = isProcessing ? index < currentStep : false;
+              // During processing: steps before the current one are complete
+              // (timer cadence hint only — the final "Preparing analysis" step
+              // is never completed on a timer). On completion (status
+              // 'completed', immediately before navigation): all steps resolve
+              // together, event-driven.
+              const isComplete = isProcessing
+                ? index < currentStep
+                : status === 'completed'
+                ? true
+                : false;
               const isActive = isProcessing && index === currentStep;
 
               return (
