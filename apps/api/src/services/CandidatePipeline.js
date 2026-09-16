@@ -359,6 +359,7 @@ export async function runFallbackPipeline(profile, fallbackResult, sourceUrl, op
 
     const syntheticRecord = {};
     const syntheticEvidence = {};
+    const syntheticConfidence = {};
     for (const [fallbackField, value] of Object.entries(fallbackResult.fields)) {
       const fieldPath = fieldMap[fallbackField];
       if (!fieldPath) continue;
@@ -382,11 +383,15 @@ export async function runFallbackPipeline(profile, fallbackResult, sourceUrl, op
           locator: fieldEvidence.locator || null,
         };
       }
+      const fieldConfidence = fallbackResult.confidence?.[fallbackField];
+      if (fieldConfidence != null) {
+        syntheticConfidence[fallbackField] = fieldConfidence;
+      }
     }
 
     const provenance = fallbackResult.aiExtracted ? 'ai_generated' : 'discovered';
     records.push({
-      record: { ...syntheticRecord, evidence: syntheticEvidence },
+      record: { ...syntheticRecord, evidence: syntheticEvidence, confidence: syntheticConfidence },
       provenance,
       sourceInfo: { sourceUrl, provider: 'google_maps_fallback' },
     });
