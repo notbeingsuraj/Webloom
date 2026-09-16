@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: ["class"],
   content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
@@ -7,23 +8,15 @@ export default {
   theme: {
     extend: {
       colors: {
-        webloom: {
-          bg:       '#09090B',       // near-black base
-          surface:  '#131316',        // card / sidebar
-          raised:   '#1C1C1F',        // elevated surface
-          border:   '#27272A',        // default border
-          hover:    '#2E2E33',        // hover state
-          accent:   '#6366F1',        // indigo-500 accent
-          'accent-hover': '#818CF8',  // indigo-400
-          text:     '#FAFAFA',        // primary text
-          muted:    '#A1A1AA',        // secondary text
-          dim:      '#52525B',        // tertiary / disabled
-          success:  '#22C55E',        // green-500
-          danger:   '#EF4444',        // red-500
-          warning:  '#F59E0B',        // amber-500
-        },
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
         primary: {
-          50:  '#EEF2FF',
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+          50: '#EEF2FF',
           100: '#E0E7FF',
           200: '#C7D2FE',
           300: '#A5B4FC',
@@ -34,8 +27,52 @@ export default {
           800: '#3730A3',
           900: '#312E81',
         },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        webloom: {
+          bg:       'hsl(var(--background))',
+          surface:  'hsl(var(--card))',
+          raised:   'hsl(var(--secondary))',
+          border:   'hsl(var(--border))',
+          hover:    'hsl(210 40% 93%)',
+          accent:   'hsl(var(--primary))',
+          'accent-hover': 'hsl(221 83% 58%)',
+          text:     'hsl(var(--foreground))',
+          muted:    'hsl(var(--muted-foreground))',
+          dim:      'hsl(215 16% 55%)',
+          success:  '#22C55E',
+          danger:   '#EF4444',
+          warning:  '#F59E0B',
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
       },
     },
   },
-  plugins: [],
+  plugins: [require('tailwindcss-animate')],
 }
