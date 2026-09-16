@@ -232,6 +232,11 @@ export const leadService = {
 
     const elapsedMs = Date.now() - startedAt;
     const payload = this._unwrap<Lead>(response);
+    // brandDNA/audit may be top-level (envelope during migration) or nested
+    // under analysis (current backend shape). Log defensively.
+    const anyPayload = payload as any;
+    const brandDNA = anyPayload?.brandDNA ?? anyPayload?.analysis?.brandDNA;
+    const audit = anyPayload?.audit ?? anyPayload?.analysis?.audit;
     console.debug('[leadService] analysis response', {
       requestId,
       status: response.status,
@@ -242,8 +247,8 @@ export const leadService = {
         hasId: !!payload?._id,
         _id: payload?._id,
         hasAnalysis: !!payload?.analysis,
-        hasBrandDNA: !!payload?.brandDNA,
-        hasAudit: !!payload?.audit,
+        hasBrandDNA: !!brandDNA,
+        hasAudit: !!audit,
         hasOpportunityScore: !!payload?.opportunityScore,
       },
     });
