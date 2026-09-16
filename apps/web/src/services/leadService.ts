@@ -180,6 +180,16 @@ export interface CreateLeadData {
 }
 
 /**
+ * Options for createLead. `signal` allows the caller to abort the request
+ * (e.g. on unmount). `timeoutMs` overrides the axios default per request —
+ * the analysis pipeline legitimately takes 20-60+ seconds.
+ */
+export interface CreateLeadOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+/**
  * The API wraps every response in an envelope: `{ success: true, data: ... }`.
  * Unwrap `data` here — in ONE place — so every consumer receives the payload
  * directly. Previously each caller unwrapped ad-hoc (or not at all), which made
@@ -198,9 +208,46 @@ export const leadService = {
     return body as T;
   },
 
-  async createLead(data: CreateLeadData) {
-    const response = await api.post('/leads', data);
-    return this._unwrap<Lead>(response);
+  async createLead(data: CreateLeadData, options?: CreateLeadOptions) {
+    const startedAt = Date.now();
+    const requestId =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `lead-${startedAt}-${Math.random().toString(36).slice(2, 10)}`;
+
+    console.debug('[leadService] analysis start', {
+      requestId,
+      url: `/leads`,
+      method: 'POST',
+      startedAt: new Date(startedAt).toISOString(),
+      googleMapsUrl: data.googleMapsUrl,
+      timeoutMs: options?.timeoutMs ?? 'default(5m)',
+      signal: options?.signal ? 'provided' : 'none',
+    });
+
+    const response = await api.post('/leads', data, {
+      signal: options?.signal,
+      timeout: options?.timeoutMs,
+    });
+
+    const elapsedMs = Date.now() - startedAt;
+    const payload = this._unwrap<Lead>(response);
+    console.debug('[leadService] analysis response', {
+      requestId,
+      status: response.status,
+      elapsedMs,
+      elapsed: `${(elapsedMs / 1000).toFixed(1)}s`,
+      payloadShape: {
+        keys: payload ? Object.keys(payload) : null,
+        hasId: !!payload?._id,
+        _id: payload?._id,
+        hasAnalysis: !!payload?.analysis,
+        hasBrandDNA: !!payload?.brandDNA,
+        hasAudit: !!payload?.audit,
+        hasOpportunityScore: !!payload?.opportunityScore,
+      },
+    });
+    return payload;
   },
 
   async getLeads(params?: any) {
