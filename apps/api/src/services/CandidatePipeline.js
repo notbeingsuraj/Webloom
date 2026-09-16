@@ -324,11 +324,15 @@ export async function runCandidatePipeline({
  * Convenience: run pipeline for a single record merge (used by _mergeCanonical etc.)
  */
 export async function mergeRecordThroughPipeline(profile, record, provenance, sourceInfo, options = {}) {
-  return runCandidatePipeline({
+  const result = await runCandidatePipeline({
     records: [{ record, provenance, sourceInfo }],
-    profileContext: profile.toObject ? profile.toObject() : profile,
+    profileContext: profile?.toObject ? profile.toObject() : profile,
     options,
   });
+  if (profile && typeof profile.set === 'function') {
+    result.applyToProfile(profile, sourceInfo);
+  }
+  return result;
 }
 
 /**
@@ -396,11 +400,15 @@ export async function runFallbackPipeline(profile, fallbackResult, sourceUrl, op
       sourceInfo: { sourceUrl, provider: 'google_maps_fallback' },
     });
   }
-  return runCandidatePipeline({
+  const result = await runCandidatePipeline({
     records,
-    profileContext: profile.toObject ? profile.toObject() : profile,
+    profileContext: profile?.toObject ? profile.toObject() : profile,
     options,
   });
+  if (profile && typeof profile.set === 'function') {
+    result.applyToProfile(profile, { sourceUrl, provider: 'google_maps_fallback' });
+  }
+  return result;
 }
 
 /**
@@ -420,11 +428,18 @@ export async function runReputationPipeline(profile, reputation, result, options
   }
 
   const provenance = result?.aiExtracted ? 'ai_generated' : 'discovered';
-  return runCandidatePipeline({
+  const pipelineResult = await runCandidatePipeline({
     records: [{ record, provenance, sourceInfo: { sourceUrl: reputation.sourceUrl, provider: reputation.source } }],
-    profileContext: profile.toObject ? profile.toObject() : profile,
+    profileContext: profile?.toObject ? profile.toObject() : profile,
     options,
   });
+  if (profile && typeof profile.set === 'function') {
+    pipelineResult.applyToProfile(profile, {
+      ...(reputation.sourceUrl ? { sourceUrl: reputation.sourceUrl } : {}),
+      provider: reputation.source === 'provider_record' ? 'structured_provider' : 'google_maps',
+    });
+  }
+  return pipelineResult;
 }
 
 /**
@@ -440,11 +455,15 @@ export async function runAIEnrichmentPipeline(profile, aiResult, sourceUrl, opti
   if (aiResult.description) record.identity.description = aiResult.description;
   if (Array.isArray(aiResult.services) && aiResult.services.length) record.identity.services = aiResult.services;
 
-  return runCandidatePipeline({
+  const pipelineResult = await runCandidatePipeline({
     records: [{ record, provenance: 'inferred', sourceInfo: { sourceUrl, provider: 'ai_enrichment' } }],
-    profileContext: profile.toObject ? profile.toObject() : profile,
+    profileContext: profile?.toObject ? profile.toObject() : profile,
     options: { onlyIfMissing: true }, // AI enrichment always only fills gaps
   });
+  if (profile && typeof profile.set === 'function') {
+    pipelineResult.applyToProfile(profile, { sourceUrl, provider: 'ai_enrichment' });
+  }
+  return pipelineResult;
 }
 
 export default {

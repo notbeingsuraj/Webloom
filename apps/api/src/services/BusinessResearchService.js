@@ -471,7 +471,7 @@ class BusinessResearchService {
         }
         if (!coordinateReject) {
           geoapifyRecord = selectedRecord;
-          this._mergeCanonical(profile, geoapifyRecord, 'discovered', 'geoapify', sourceUrl);
+          await this._mergeCanonical(profile, geoapifyRecord, 'discovered', 'geoapify', sourceUrl);
           providerTrace.geoapify = 'ok';
         }
       }
@@ -518,17 +518,17 @@ class BusinessResearchService {
             // Decide merge behavior based on entity resolution result
             if (matchResult.matchType === 'same_entity') {
               // Confident match: normal merge behavior with onlyIfMissing=true to preserve Geoapify
-              this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ true, resolutionInfo);
+              await this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ true, resolutionInfo);
             } else if (matchResult.matchType === 'uncertain') {
               // Uncertain match: very conservative merge (only fill true gaps)
-              this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ true, resolutionInfo);
+              await this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ true, resolutionInfo);
             } else if (matchResult.matchType === 'different_entity') {
               // Different entities: prevent blindly merging conflicting data
               // Only merge non-identity fields that have no contradictions
               if (config?.debugBusinessAnalysis) {
                 console.warn(`[EntityResolution] Records appear to be different entities; skipping aggressive merge`);
               }
-              this._mergeConservativelyForDifferentEntities(profile, webRecord, sourceUrl, resolutionInfo);
+              await this._mergeConservativelyForDifferentEntities(profile, webRecord, sourceUrl, resolutionInfo);
             }
             
             // Store resolution metadata on profile for observability
@@ -538,11 +538,11 @@ class BusinessResearchService {
             // Entity Resolution failure must not crash the pipeline
             console.error(`[EntityResolution] Matching failed (best-effort): ${err?.message || String(err)}`);
             // Fall back to conservative merge
-            this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ true);
+            await this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ true);
           }
         } else {
           // No Geoapify record: merge web-extraction normally
-          this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ false);
+          await this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ false);
         }
       } else {
         // Lossless: preserve the exact status + error, not a bare 'error'
@@ -596,12 +596,6 @@ class BusinessResearchService {
       }
 
       if (sourceUrl || parsedSource || providerRecordForFallback || sourceText) {
-        // DEBUG
-        console.log('[FALLBACK DEBUG] Running fallback block');
-        console.log('[FALLBACK DEBUG] sourceText:', !!sourceText);
-        console.log('[FALLBACK DEBUG] providerRecordForFallback:', !!providerRecordForFallback);
-        console.log('[FALLBACK DEBUG] parsedSource:', !!parsedSource);
-        
         const fallbackResult = await extractFallbackFields({
           sourceUrl,
           sourceType: 'google_maps_url',
@@ -610,22 +604,11 @@ class BusinessResearchService {
           providerRecord: providerRecordForFallback,
           existingCanonicalProfile: profile.toObject(),
         });
-        console.log('[FALLBACK DEBUG] extractFallbackFields returned, aiExtracted:', fallbackResult.aiExtracted);
-        console.log('[FALLBACK DEBUG] fallbackResult.fields:', JSON.stringify(fallbackResult.fields, null, 2));
-        console.log('[FALLBACK DEBUG] fallbackResult.evidence keys:', Object.keys(fallbackResult.evidence || {}));
 
         // Merge recovered fields through CandidatePipeline (preserves P1.8 semantics).
         const result = await runFallbackPipeline(profile, fallbackResult, sourceUrl, {
           onlyIfMissing: true,
         });
-        console.log('[FALLBACK DEBUG] runFallbackPipeline returned, accepted:', JSON.stringify(result.accepted.map(c => c.fieldPath), null, 2));
-        console.log('[FALLBACK DEBUG] runFallbackPipeline rejected:', JSON.stringify(result.rejected.map(c => ({ field: c.fieldPath, reason: c.rejectionReason })), null, 2));
-
-        // Apply accepted candidates to the profile. CandidatePipeline computes
-        // candidates but does NOT write them — the caller must apply. Without
-        // this, P1.8 fallback recovery was silently discarded.
-        const appliedFallback = result.applyToProfile ? result.applyToProfile(profile, { sourceUrl, provider: 'google_maps_fallback' }) : [];
-        console.log('[FALLBACK DEBUG] runFallbackPipeline applied to profile:', JSON.stringify(appliedFallback.map(a => a.fieldPath), null, 2));
 
         // Surface fallback provenance for observability and canonicalization.
         if (fallbackResult.evidence && Object.keys(fallbackResult.evidence).length > 0) {
