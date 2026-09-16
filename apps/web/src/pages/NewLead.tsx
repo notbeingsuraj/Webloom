@@ -256,12 +256,14 @@ export default function NewLead() {
     try {
       const leads = await leadService.getLeads({ sort: '-createdAt', limit: 10 });
       const started = startTimeRef.current;
+      const now = Date.now();
       const recent = (leads || []).find((l) => {
         if (!l?.createdAt || !started) return false;
         const createdAt = new Date(l.createdAt).getTime();
-        // The persisted lead must have been created within this run's window
-        // (some slack for clock skew / server timestamps).
-        return Math.abs(createdAt - started) < REQUEST_TIMEOUT_MS * 2;
+        // The persisted lead for THIS run must have been created after the
+        // request started (small skew allowance) and within the configured
+        // window — it cannot predate the run.
+        return createdAt >= started - 5_000 && createdAt <= now + 5_000;
       });
       if (recent?._id) {
         setTimedOutLeadId(recent._id);
