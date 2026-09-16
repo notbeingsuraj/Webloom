@@ -7,6 +7,8 @@ import ScoreIndicator from '../components/ui/ScoreIndicator';
 import AuditRow from '../components/ui/AuditRow';
 import WebsitePreview from '../components/WebsitePreview';
 import ReputationPanel from '../components/ReputationPanel';
+import OpportunityInsights from '../components/OpportunityInsights';
+import MissingIntelligence from '../components/MissingIntelligence';
 import { IntentList, TriggerList, ObjectiveList, VisualDirectionPanel } from '../components/IntelligenceCards';
 import usePageMetadata from '../hooks/usePageMetadata';
 import { toIntentItems, toTriggerItems, toObjectiveItems, toVisualDirectionData } from '../utils/intelligenceRenderers';
@@ -315,7 +317,9 @@ export default function LeadDetail() {
       </header>
 
       {activeTab === 'Overview' && (
-        <div className="grid gap-6 xl:grid-cols-[1.03fr_0.97fr]">
+        <>
+          <OpportunityInsights lead={lead} />
+          <div className="grid gap-6 xl:grid-cols-[1.03fr_0.97fr]">
           <div className="space-y-6">
             {/* Business profile — color-coded evidence fields */}
             <div className="wl-card p-6">
@@ -580,7 +584,13 @@ export default function LeadDetail() {
               )}
             </div>
           </div>
-        </div>
+          </div>
+
+          <MissingIntelligence
+            lead={lead}
+            onRetry={() => generateDNAMutation.mutate()}
+          />
+        </>
       )}
 
       {activeTab === 'Analysis' && (
