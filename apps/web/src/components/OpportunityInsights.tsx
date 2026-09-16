@@ -45,7 +45,10 @@ export function deriveInsights(lead: Lead | undefined): Insight[] {
 
   const hasWebsite = !!lead.contact?.website;
   const websiteExists = lead.analysis?.audit?.websiteExists;
-  const auditCategories = lead.analysis?.audit?.categories ?? {};
+  const auditEntries = Object.entries(lead.analysis?.audit?.categories ?? {}).filter(([, c]) => c?.score != null);
+  const weakestCategory = auditEntries.length
+    ? auditEntries.reduce((worst, [k, c]) => ((c.score as number) < (worst[1].score as number) ? [k, c] : worst), auditEntries[0])
+    : null;
   const strengths = lead.analysis?.audit?.strengths ?? [];
   const weaknesses = lead.analysis?.audit?.weaknesses ?? [];
   const criticalIssues = lead.analysis?.audit?.criticalIssues ?? [];
@@ -92,6 +95,14 @@ export function deriveInsights(lead: Lead | undefined): Insight[] {
       key: 'conversion',
       title: 'Conversion opportunity',
       detail: criticalIssues[0] || weaknesses[0],
+      tone: 'ai',
+      icon: TrendingUp,
+    });
+  } else if (weakestCategory) {
+    insights.push({
+      key: 'conversion',
+      title: 'Conversion opportunity',
+      detail: `Weakest audited area is “${weakestCategory[0].replace(/([A-Z])/g, ' $1').toLowerCase()}” at ${weakestCategory[1].score}/10 — improving it should lift conversion.`,
       tone: 'ai',
       icon: TrendingUp,
     });
