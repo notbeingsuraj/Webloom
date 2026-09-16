@@ -7,10 +7,10 @@ updated: 2026-09-16
 
 ## Current Focus
 
-hypothesis: "Data flow appears CORRECT end-to-end (axios → response.data → envelope.data → lead). Suspect the page may actually be rendering but appears empty due to a runtime crash in a child component, OR data was verified with a stale/wrong ID. Need live-render verification."
-test: "Capture the actual hydrated DOM with a headless browser that waits for React to mount, and capture console errors."
-expecting: "Either the page renders fully (bug in environment/stale server) or a specific console error pinpoints the crash."
-next_action: "Run headless Firefox with a wait/harness to capture hydrated DOM + console errors for /leads/042e512c-aff9-4ff7-847a-084699c6272c"
+hypothesis: CONFIRMED — "LeadDetail crashes because analysis.metrics.trustSignals is an array of OBJECTS ({type,value,source,verified,...}) but the Overview 'Source confidence' block renders each entry directly as a React child ({signal}), throwing 'Objects are not valid as a React child'. No error boundary → entire tree unmounts → empty page."
+test: "Playwright (real Firefox) loaded /leads/:id, waited for hydration"
+expecting: "Console page errors showing the exact React child error with a <span> stack in LeadDetail"
+next_action: "Fix trustSignals rendering + envelope normalization in one place + loading/error/empty states + console diagnostics + regression test"
 
 ## Symptoms
 
@@ -21,6 +21,25 @@ reproduction: "Open http://localhost:5173/leads/042e512c-aff9-4ff7-847a-084699c6
 started: "current"
 
 ## Eliminated
+
+- hypothesis: "Backend returns empty/incomplete data (analysis: {} etc.)"
+  evidence: "Live curl shows full payload — businessName, location, contact, businessData.rating 4.2 / reviewCount 53110, opportunityScore.total 45, full brandDNA, audit categories."
+  timestamp: 2026-09-16
+- hypothesis: "Envelope unwrap mismatch (need response.data.data)"
+  evidence: "LeadDetail does `const lead = data?.data`; getLead returns axios response.data (envelope) → correct. Live proxy returns {success, data}."
+  timestamp: 2026-09-16
+- hypothesis: "Route param name mismatch"
+  evidence: "App.tsx route 'leads/:id' ↔ useParams<{id}>; Dashboard links /leads/${lead._id}; _id matches live payload."
+  timestamp: 2026-09-16
+- hypothesis: "Request URL / proxy broken"
+  evidence: "curl through :5173 proxy returns 200 with full envelope; direct :5001 also works; CORS configured for localhost:5173 dev."
+  timestamp: 2026-09-16
+- hypothesis: "TypeScript/compile errors"
+  evidence: "npx tsc --noEmit clean; vite build succeeds; runtime crash is a React render error, not compile error."
+  timestamp: 2026-09-16
+- hypothesis: "Any other data-shape render crash (facts/unknowns/brandDNA/audit)"
+  evidence: "facts = objects with .claim (handled via fact.claim); unknowns = strings (safe); brandDNA/audit all optional-chained. Only trustSignals renders raw entry as child."
+  timestamp: 2026-09-16
 
 ## Evidence
 
@@ -68,3 +87,11 @@ started: "current"
   checked: headless Firefox screenshot/dump of /leads/:id
   found: Screenshot 53KB produced but vision unavailable; --dump-dom returned only 72 bytes of headless noise (did not wait for hydration).
   implication: Need a hydrated DOM capture with wait + console error capture to confirm rendering.
+- timestamp: 2026-09-16
+  checked: Playwright (real headless Firefox) load of http://localhost:5173/leads/042e512c-aff9-4ff7-847a-084699c6272c
+  found: BODY TEXT LENGTH 0, innerHTML len 87 (whole app unmounted). Console page errors: "Error: Objects are not valid as a React child (found: object with keys {type, value, source, verified, verification, confidence})" ×5, stack shows <span> → ... → LeadDetail@LeadDetail.tsx:35. No failed/400+ requests (fetch succeeded).
+  implication: ROOT CAUSE — a render crash throws on an OBJECT rendered as a React child inside a <span>, 7 divs deep in LeadDetail. The object keys {type,value,source,verified,verification,confidence} EXACTLY match analysis.metrics.trustSignals entries from the live payload. The 'Source confidence' block maps trustSignals and renders `{signal}` directly. Crash → no error boundary → blank page.
+- timestamp: 2026-09-16
+  checked: live trustSignals/facts/unknowns shapes
+  found: trustSignals = [ {type:'rating',value:4.2,source:'google_maps_public',verified:false,verification:'discovered',confidence:0.6}, {type:'review_count',...} ]. facts = [ {claim,source,verified,verification}... ]; unknowns = ['email'].
+  implication: trustSignals must be rendered defensively (object → label from type/value), facts handled via .claim (already), unknowns strings (already).
