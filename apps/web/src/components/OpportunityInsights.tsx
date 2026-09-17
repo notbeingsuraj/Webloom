@@ -38,6 +38,36 @@ interface Insight {
   icon: LucideIcon;
 }
 
+/**
+ * Normalize an audit list entry to readable text.
+ *
+ * The digital audit historically returns list entries in two shapes:
+ *   - strings:          "No clear call to action"
+ *   - structured items: { area: 'Content', description: '...', severity: 'medium' }
+ * Rendering either shape raw as a React child is a crash bug ("Objects are not
+ * valid as a React child") that unmounts the whole results page. Always reduce
+ * to a plain string here — never return an object and never JSON.stringify.
+ */
+function auditEntryText(entry: unknown): string {
+  if (entry == null) return '';
+  if (typeof entry === 'string') return entry;
+  if (typeof entry === 'object') {
+    const e = entry as { area?: unknown; description?: unknown; recommendation?: unknown; category?: unknown };
+    const text =
+      typeof e.description === 'string' && e.description.trim()
+        ? e.description
+        : typeof e.area === 'string' && e.area.trim()
+          ? e.area
+          : typeof e.recommendation === 'string' && e.recommendation.trim()
+            ? e.recommendation
+            : typeof e.category === 'string' && e.category.trim()
+              ? e.category
+              : '';
+    return text;
+  }
+  return '';
+}
+
 /** Build insights strictly from present data. Exported for reuse/testing. */
 export function deriveInsights(lead: Lead | undefined): Insight[] {
   if (!lead) return [];
@@ -49,11 +79,11 @@ export function deriveInsights(lead: Lead | undefined): Insight[] {
   const weakestCategory = auditEntries.length
     ? auditEntries.reduce((worst, [k, c]) => ((c.score as number) < (worst[1].score as number) ? [k, c] : worst), auditEntries[0])
     : null;
-  const strengths = lead.analysis?.audit?.strengths ?? [];
-  const weaknesses = lead.analysis?.audit?.weaknesses ?? [];
-  const criticalIssues = lead.analysis?.audit?.criticalIssues ?? [];
-  const auditRecommendations = lead.analysis?.audit?.recommendations ?? [];
-  const repairs = auditRecommendations.filter(Boolean).length;
+  const strengthTexts = (lead.analysis?.audit?.strengths ?? []).map(auditEntryText).filter(Boolean);
+  const weaknessTexts = (lead.analysis?.audit?.weaknesses ?? []).map(auditEntryText).filter(Boolean);
+  const issueTexts = (lead.analysis?.audit?.criticalIssues ?? []).map(auditEntryText).filter(Boolean);
+  const auditRecommendations = (lead.analysis?.audit?.recommendations ?? []) as unknown[];
+  const repairs = auditRecommendations.filter((r) => auditEntryText(r).length > 0).length;
   const rating = lead.businessData?.reputation?.rating ?? lead.businessData?.rating ?? null;
   const reviewCount = lead.businessData?.reputation?.reviewCount ?? lead.businessData?.reviewCount ?? null;
 
@@ -72,8 +102,8 @@ export function deriveInsights(lead: Lead | undefined): Insight[] {
     insights.push({
       key: 'website',
       title: 'Website present',
-      detail: strengths.length
-        ? `Audit found strengths: ${strengths.slice(0, 2).join(', ')}.`
+      detail: strengthTexts.length
+        ? `Audit found strengths: ${strengthTexts.slice(0, 2).join(', ')}.`
         : 'A website exists — the opportunity is refinement rather than replacement.',
       tone: 'verified',
       icon: Globe,
@@ -90,11 +120,11 @@ export function deriveInsights(lead: Lead | undefined): Insight[] {
       tone: 'ai',
       icon: TrendingUp,
     });
-  } else if (criticalIssues.length || weaknesses.length) {
+  } else if (issueTexts.length || weaknessTexts.length) {
     insights.push({
       key: 'conversion',
       title: 'Conversion opportunity',
-      detail: criticalIssues[0] || weaknesses[0],
+      detail: (issueTexts[0] || weaknessTexts[0]) ?? 'A conversion gap was flagged in the audit.',
       tone: 'ai',
       icon: TrendingUp,
     });
@@ -158,11 +188,11 @@ export function deriveInsights(lead: Lead | undefined): Insight[] {
 
   // 6. Content opportunity
   const contentSignal = repairs ? `${repairs} audit recommendation${repairs === 1 ? '' : 's'} to act on.` : '';
-  if (contentSignal || weaknesses.length) {
+  if (contentSignal || weaknessTexts.length) {
     insights.push({
       key: 'content',
       title: 'Content opportunity',
-      detail: [contentSignal, weaknesses[0]].filter(Boolean).join(' '),
+      detail: [contentSignal, weaknessTexts[0]].filter(Boolean).join(' '),
       tone: 'primary',
       icon: FileText,
     });

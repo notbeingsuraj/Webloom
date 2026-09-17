@@ -74,9 +74,12 @@ export default function LeadDetail() {
         trustSignals: lead?.analysis?.metrics?.trustSignals,
         status: lead?.status,
       });
-      return lead;
-    },
-  });
+return lead;
+        },
+      });
+
+  const trustSignals = lead?.analysis?.metrics?.trustSignals;
+  const hasTrustSignals = Array.isArray(trustSignals) ? trustSignals.length > 0 : !!trustSignals;
 
   const deleteMutation = useMutation({
     mutationFn: () => leadService.deleteLead(id!),
@@ -444,7 +447,7 @@ export default function LeadDetail() {
           {/* Provenance / Source Information — evidence color language:
               verified = green, discovered = blue, AI-extracted = violet,
               uncertain = yellow. Never implies AI data is verified. */}
-            {(lead?.analysis?.metrics?.trustSignals || services.length > 0) && (
+            {(hasTrustSignals || services.length > 0 || !!lead?.businessData?.openingHours) && (
               <div className="wl-card p-6">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <h2 className="font-display text-xl font-bold tracking-[-0.04em] text-foreground">Business details & evidence</h2>
@@ -481,7 +484,7 @@ export default function LeadDetail() {
                       </div>
                     </div>
                   )}
-                  {lead?.analysis?.metrics?.trustSignals && (
+                  {hasTrustSignals && (
                     <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-verified/5 p-4">
                       <p className="wl-eyebrow">Source confidence</p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -540,14 +543,14 @@ export default function LeadDetail() {
                     <AuditRow
                       key={key}
                       label={key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())}
-                      value={cat.score != null ? `${cat.score}/10` : '—'}
-                      tone={cat.score != null ? (cat.score >= 7 ? 'good' : cat.score >= 4 ? 'neutral' : 'bad') : 'neutral'}
+                      value={cat.verified === false && cat.score === 0 ? '—' : cat.score != null ? `${cat.score}/10` : '—'}
+                      tone={cat.verified === false && cat.score === 0 ? 'neutral' : cat.score != null ? (cat.score >= 7 ? 'good' : cat.score >= 4 ? 'neutral' : 'bad') : 'neutral'}
                     />
                   ))
                 ) : (
                   <>
                     <AuditRow label="Website" value={lead?.analysis?.audit?.websiteExists ? 'Present' : 'Missing'} tone={lead?.analysis?.audit?.websiteExists ? 'good' : 'bad'} />
-                    <AuditRow label="Overall score" value={lead?.analysis?.audit?.overallScore != null ? `${lead.analysis.audit.overallScore}/10` : 'Not reviewed'} tone="neutral" />
+                    <AuditRow label="Overall score" value={lead?.analysis?.audit?.status === 'degraded' ? 'Not reviewed' : lead?.analysis?.audit?.overallScore != null ? `${lead.analysis.audit.overallScore}/10` : 'Not reviewed'} tone="neutral" />
                   </>
                 )}
               </div>

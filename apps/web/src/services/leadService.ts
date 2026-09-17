@@ -139,11 +139,14 @@ export interface Lead {
       overallScore?: number;
       status?: string;
       categories?: Record<string, { score?: number; notes?: string; verified?: boolean }>;
-      strengths?: string[];
-      weaknesses?: string[];
-      criticalIssues?: string[];
+      /** Audit list entries may be legacy strings OR structured objects
+       *  ({ area, description, severity }). Renderers must normalize —
+       *  never render entries raw as React children. */
+      strengths?: Array<string | { area?: string; description?: string; severity?: string }>;
+      weaknesses?: Array<string | { area?: string; description?: string; severity?: string }>;
+      criticalIssues?: Array<string | { area?: string; description?: string; severity?: string }>;
       recommendations?: string[];
-      opportunityGap?: string;
+      opportunityGap?: string | { description?: string; businessImpact?: string; competitivePosition?: string };
     };
     metrics?: {
       /** Trust signal entries may be legacy strings OR structured objects
