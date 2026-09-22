@@ -158,6 +158,39 @@ class BusinessDataExtractor {
   }
 
   /**
+   * Build a CID-based Google Maps fetch URL from a parsed place identifier.
+   *
+   * Google's /place/ HTML is a JavaScript shell — r.jina.ai renders almost no
+   * business data from it. The same place addressed as
+   * `maps.google.com/?cid=<decimal>` returns the full place page (address,
+   * phone, website, rating, hours) as static markdown.
+   *
+   * Supports:
+   *   - `0x<hex>:0x<cidHex>` (Google data-path CID pair) → cid = second half
+   *   - `cid:<decimal>` (explicit CID query value)
+   *
+   * @param {string|null} placeId - parsed place identifier
+   * @returns {string|null} `https://maps.google.com/?cid=<decimal>` or null
+   */
+  buildCidFetchUrl(placeId) {
+    if (!placeId || typeof placeId !== 'string') return null;
+    let cid = null;
+    const hexPair = /^0x[0-9a-fA-F]+:0x([0-9a-fA-F]+)$/.exec(placeId.trim());
+    if (hexPair) {
+      try {
+        cid = BigInt(`0x${hexPair[1]}`).toString();
+      } catch {
+        cid = null;
+      }
+    } else {
+      const explicitCid = /^cid:(\d+)$/.exec(placeId.trim());
+      if (explicitCid) cid = explicitCid[1];
+    }
+    if (!cid) return null;
+    return `https://maps.google.com/?cid=${cid}`;
+  }
+
+  /**
    * Fetch page content with retries using r.jina.ai proxy
    */
   async fetchPage(url, retryCount = 0) {
@@ -812,6 +845,16 @@ Rules:
     const identified = parsed.identified;
     const provenance = parsed.provenance;
 
+    // /place/ URLs render as a JS shell through r.jina.ai with no business
+    // data. When the URL carries a CID, fetch the equivalent
+    // maps.google.com/?cid=<decimal> page — the same place, statically
+    // rendered with address/phone/website/rating/hours. The original URL is
+    // preserved as the identity source; only the page fetch target changes.
+    const cidFetchUrl = this.buildCidFetchUrl(identified.placeId);
+    if (config.debugBusinessAnalysis && cidFetchUrl) {
+      console.log(`[BusinessDataExtractor] Using CID fetch URL: ${cidFetchUrl}`);
+    }
+
     if (config.debugBusinessAnalysis) {
       console.log('[BusinessDataExtractor] Parsed identifiers:', identified);
     }
@@ -830,7 +873,7 @@ Rules:
     let aiExtracted = false;
 
     try {
-      pageData = await this.fetchPage(googleMapsUrl);
+      pageData = await this.fetchPage(cidFetchUrl || googleMapsUrl);
       
       if (pageData.status >= 400) {
         throw new Error(`Failed to retrieve page: HTTP ${pageData.status}`);
@@ -844,8 +887,8 @@ Rules:
       let directMetadata = null;
       if (this.isEmptyAcquisitionPage(metadata, pageData.url)) {
         console.log('[BusinessDataExtractor] Jina AI returned empty page, attempting direct Google Maps HTML extraction...');
-        directMetadata = await this.extractFromDirectGoogleMapsHtml(googleMapsUrl);
-        if (directMetadata && !this.isEmptyAcquisitionPage(directMetadata, googleMapsUrl)) {
+        directMetadata = await this.extractFromDirectGoogleMapsHtml(cidFetchUrl || googleMapsUrl);
+        if (directMetadata && !this.isEmptyAcquisitionPage(directMetadata, cidFetchUrl || googleMapsUrl)) {
           console.log('[BusinessDataExtractor] Direct extraction succeeded, using direct metadata');
           metadata = directMetadata;
           acquisitionMethod = 'direct_google_maps';
