@@ -582,6 +582,56 @@ export function normalizeHoursString(str) {
 const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
 /**
+ * Strip legal-entity suffixes (Pvt. Ltd., Private Limited, LLP, LLC, Inc, …)
+ * from a raw business-name candidate. Used to build clean geocoding queries —
+ * never to mutate the canonical name.
+ * @param {string} name
+ * @returns {string} trimmed name without trailing legal designator
+ */
+export function stripLegalSuffix(name) {
+  if (!name || typeof name !== 'string') return '';
+  let n = name.trim();
+  // Common Indian/international legal designators, case-insensitive, optional dots.
+  const suffixRe =
+    /\s+(pvt\.?\s*ltd\.?|private\s+limited|ltd\.?|llp|llc|inc\.?|incorporated|corporation|corp\.?|co\.?|limited)$/i;
+  // Repeated strip to handle stacked forms like "Pvt. Ltd."
+  let prev = null;
+  while (n !== prev) {
+    prev = n;
+    n = n.replace(suffixRe, '').trim();
+  }
+  return n;
+}
+
+/**
+ * Build a clean search query from a raw Google Maps place-name slug.
+ *
+ * Google's /place/ URLs encode the listing's full marketing name, e.g.
+ *   "Sunrise Super Store Pvt. Ltd. - Best Super Market/Best Grocery Store/Best
+ *    Frozen Food/Daily Use Items Store"
+ * Text-search providers (Geoapify geocode) choke on that noise and return
+ * far-away wrong-country candidates. This derives the core business name for
+ * QUERYING only (identity/canonical names are never rewritten by this helper):
+ *   - truncates the Google marketing suffix after " - "
+ *   - drops legal-entity suffixes
+ * @param {string|null} raw
+ * @returns {string} clean query (may be empty when input is empty)
+ */
+export function cleanBusinessSearchName(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  let name = raw.trim();
+  // Google appends category/keyword marketing after " - ". The core listing
+  // name is everything before it. Only truncate when a well-separated suffix
+  // exists, to avoid mutating single-fragment names.
+  const dash = name.search(/\s-\s/);
+  if (dash > 0) {
+    name = name.slice(0, dash).trim();
+  }
+  name = stripLegalSuffix(name);
+  return name;
+}
+
+/**
  * Render hours map to a compact human-readable text for display.
  */
 export function hoursToText(hours) {
@@ -640,7 +690,9 @@ export default {
   normalizeCoordinates,
   normalizePhone,
   normalizeWebsite,
-  normalizeSocialLinks,
+normalizeSocialLinks,
+  cleanBusinessSearchName,
+  stripLegalSuffix,
   parseStringifiedStructure,
   stripObjectToString,
   hoursToText,

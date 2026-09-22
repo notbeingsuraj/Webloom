@@ -32,6 +32,7 @@ import {
   createAcquisitionResult,
   ACQUISITION_STATUS,
 } from '../AcquisitionResult.js';
+import { cleanBusinessSearchName } from '../FieldNormalizer.js';
 
 // Provider-status sentinels so callers can reason about WHY no result returned
 export const GEOAPIFY_STATUS = Object.freeze({
@@ -121,7 +122,13 @@ class GeoapifyProvider extends BusinessDataProvider {
       });
     }
 
-    const text = (hints && (hints.query || hints.name)) || null;
+    // Use a CLEAN search name. Google Maps /place/ slugs embed the listing's
+    // full marketing name ("… - Best Grocery Store/Best Frozen Food/…") which
+    // text-search providers mis-geocode to far-away wrong-country candidates.
+    // The core listing name ("Sunrise Super Store") resolves correctly. Only
+    // the QUERY text is cleaned — identity/canonical names are untouched.
+    const rawText = (hints && (hints.query || hints.name)) || null;
+    const text = rawText ? cleanBusinessSearchName(rawText) || rawText : null;
     const lat = hints?.latitude;
     const lng = hints?.longitude;
 

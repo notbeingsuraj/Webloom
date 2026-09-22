@@ -386,6 +386,114 @@ class BusinessDataExtractor {
   }
 
   /**
+   * Extract deterministic business fields from the r.jina.ai-rendered
+   * `maps.google.com/?cid=` markdown page.
+   *
+   * The CID page renders the same place as /place/ but as static markdown with
+   * clean, regex-friendly values: a `tel:` link, an address containing the
+   * postal code, a "Open · Closes …" summary and per-day "Day* HH:MM AM–PM"
+   * lines, and a "X.Y <Category>" rating line. These are UNVERIFIED,
+   * deterministic extractions — the same trust level as
+   * extractFieldsFromDirectHtml — and are merged only into gaps.
+   * @private
+   */
+  extractFieldsFromCidMarkdown(markdown) {
+    const fields = {
+      phone: null,
+      address: null,
+      city: null,
+      state: null,
+      postalCode: null,
+      country: null,
+      rating: null,
+      reviewCount: null,
+      category: null,
+      reviews: [],
+      hours: {},
+      website: null,
+    };
+    if (!markdown || typeof markdown !== 'string') return fields;
+
+    // Normalize: drop image markdown and maps tile blobs that embed noise.
+    const text = markdown
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+      .replace(/https?:\/\/maps\.google\.com\/maps[^\s)]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Phone: the CID page exposes a tel: link when a phone is present. Capture
+    // ONLY the digits/plus inside the tel: href — never trailing page noise.
+    const telMatch = text.match(/tel:\+?([\d\s()-]{7,})/);
+    if (telMatch && telMatch[1]) {
+      const digits = telMatch[1].replace(/[\s()-]/g, '');
+      if (digits.length >= 10) fields.phone = `+${digits}`;
+    }
+    if (!fields.phone) {
+      // Fallback: standalone "+<cc> <number>" with an explicit country code.
+      const phoneMatch = text.match(/\+(\d{1,3})[\s-]?(\d{4,}[\s-]?\d{4,})/);
+      if (phoneMatch) {
+        const digits = `${phoneMatch[1]}${phoneMatch[2].replace(/[\s-]/g, '')}`;
+        if (digits.length >= 10) fields.phone = `+${digits}`;
+      }
+    }
+
+    // Address: anchor on the "City, State POSTAL, Country" cluster that closes
+    // the Maps address block, then expand backward across the preceding
+    // comma-separated fields (street, area).
+    const regionRe = /([A-Z][A-Za-z. ]+?)\s*,\s*([A-Z][A-Za-z. ]+?)\s+(\d{6})\s*,\s*([A-Z][A-Za-z. ]+?)(?=[\s,)]|$)/;
+    const regionMatch = text.match(regionRe);
+    if (regionMatch) {
+      fields.city = regionMatch[1].trim();
+      fields.state = regionMatch[2].trim();
+      fields.postalCode = regionMatch[3];
+      fields.country = regionMatch[4].trim();
+      // Walk backward from the city to reconstruct the street/area prefix.
+      const beforeCity = text.slice(0, regionMatch.index);
+      const prefixParts = beforeCity
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean);
+      const keep = [];
+      const NOISE = new Set(['Share', 'Directions', 'Save', 'Nearby', 'Send to phone', 'See photos']);
+      for (let i = prefixParts.length - 1; i >= 0 && keep.length < 3; i--) {
+        const part = prefixParts[i];
+        if (NOISE.has(part)) break;
+        keep.unshift(part);
+      }
+      if (keep.length > 0) {
+        fields.address = [...keep, regionMatch[0]].join(', ');
+      }
+    } else {
+      const pinMatch = text.match(/\b(\d{6})\b/);
+      if (pinMatch) fields.postalCode = pinMatch[1];
+    }
+
+    // Rating + category: "<X.Y> <Category>" — require a coherent category word
+    // (2 chars+) and reject UI tokens like "Directions".
+    const ratingMatch = text.match(/\s(\d\.\d)\s([A-Z][A-Za-z]{2,})(?:\s|$)/);
+    if (ratingMatch && !['Directions', 'Nearby', 'Transit', 'Search', 'Traffic', 'Close'].includes(ratingMatch[2])) {
+      const rating = parseFloat(ratingMatch[1]);
+      if (rating >= 0 && rating <= 5) {
+        fields.rating = rating;
+        fields.category = ratingMatch[2];
+      }
+    }
+
+    // Hours: "Open · Closes 10 PM" plus per-day "Tuesday* 8:30 AM–10 PM".
+    const dayMap = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const dayTokens = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    for (let i = 0; i < dayTokens.length; i++) {
+      const re = new RegExp(`${dayTokens[i]}\\*?\\s+([0-9]{1,2}(?::[0-9]{2})?)\\s*(AM|PM)\\s*[\\u2013\\u2014-]\\s*([0-9]{1,2}(?::[0-9]{2})?)\\s*(AM|PM)`, 'i');
+      const m = text.match(re);
+      if (m) {
+        fields.hours[dayMap[i]] = `${m[1]} ${m[2]}-${m[3]} ${m[4]}`;
+      }
+    }
+
+    return fields;
+  }
+
+  /**
    * Extract phone, address, rating, reviews from direct HTML and embedded data
    * @private
    */
@@ -883,6 +991,14 @@ Rules:
       metadata = this.extractMetadata(pageData.html);
       metadata.sourceUrl = pageData.url;
 
+      // When fetching via the CID page (r.jina.ai-rendered markdown), extract
+      // deterministic fields directly — the page is static, so phone/address/
+      // rating/hours are recoverable without an AI call.
+      if (cidFetchUrl) {
+        const cidFields = this.extractFieldsFromCidMarkdown(pageData.html);
+        metadata.extractedFields = cidFields;
+      }
+
       // If Jina AI didn't return enough business evidence, try direct HTML extraction
       let directMetadata = null;
       if (this.isEmptyAcquisitionPage(metadata, pageData.url)) {
@@ -910,7 +1026,11 @@ Rules:
       } else {
         // Use AI to extract structured profile from page content
         extractedProfile = await this.extractWithAI(metadata, pageData.url);
-        aiExtracted = true;
+        // P1.2: aiExtracted must reflect whether the AI call actually
+        // produced the profile. When extractWithAI fails it returns a
+        // providerError sentinel — everything in that case comes from
+        // deterministic parsing below, not from the model.
+        aiExtracted = !extractedProfile?.providerError;
 
         // Validate and clean
         extractedProfile = this.validateProfile(extractedProfile);
@@ -944,15 +1064,24 @@ Rules:
         extractedProfile.contact = extractedProfile.contact || {};
         extractedProfile.location = extractedProfile.location || {};
         extractedProfile.ratings = extractedProfile.ratings || {};
+        extractedProfile.ratings.review_count = extractedProfile.ratings.review_count ?? null;
         if (!extractedProfile.business.name && directFields.name) extractedProfile.business.name = directFields.name;
+        if (!extractedProfile.business.category && directFields.category) extractedProfile.business.category = directFields.category;
         if (!extractedProfile.contact.phone && directFields.phone) extractedProfile.contact.phone = directFields.phone;
         if (!extractedProfile.location.full_address && directFields.address) extractedProfile.location.full_address = directFields.address;
         if (!extractedProfile.location.city && directFields.city) extractedProfile.location.city = directFields.city;
         if (!extractedProfile.location.state && directFields.state) extractedProfile.location.state = directFields.state;
         if (!extractedProfile.location.postal_code && directFields.postalCode) extractedProfile.location.postal_code = directFields.postalCode;
+        if (!extractedProfile.location.country && directFields.country) extractedProfile.location.country = directFields.country;
         if (extractedProfile.ratings.rating == null && directFields.rating != null) extractedProfile.ratings.rating = directFields.rating;
         if (extractedProfile.ratings.review_count == null && directFields.reviewCount != null) extractedProfile.ratings.review_count = directFields.reviewCount;
         if ((!Array.isArray(extractedProfile.reviews) || extractedProfile.reviews.length === 0) && directFields.reviews?.length) extractedProfile.reviews = directFields.reviews;
+        if (directFields.hours && Object.keys(directFields.hours).length) {
+          extractedProfile.hours = extractedProfile.hours || {};
+          for (const [day, value] of Object.entries(directFields.hours)) {
+            if (value && !extractedProfile.hours[day]) extractedProfile.hours[day] = value;
+          }
+        }
         extractedProfile = this.validateProfile(extractedProfile);
       }
       
@@ -1009,21 +1138,101 @@ Rules:
     // deterministic URL/provider identity. Values remain available as
     // evidence/candidate data but cannot overwrite authoritative fields.
     const extractedProvenance = aiExtracted ? 'ai_generated' : 'discovered';
-    
-    // Route extracted fields through CandidatePipeline for validation/selection
-    if (extractedProfile && (extractedProfile.business || extractedProfile.contact || 
+
+    // Route extracted fields through CandidatePipeline for validation/selection.
+    //
+    // The deterministic CID/direct fields (metadata.extractedFields) are passed
+    // as their OWN record with provenance 'discovered'. Without this, when the
+    // AI call succeeds the gap-merged direct fields inherit 'ai_generated' and
+    // are rejected by validateEvidence (identity-critical fields — phone,
+    // address, rating — require an evidence snippet under ai_generated). A
+    // separate discovered record carries them through as deterministic data.
+    if (extractedProfile && (extractedProfile.business || extractedProfile.contact ||
         extractedProfile.location || extractedProfile.ratings || extractedProfile.hours ||
         extractedProfile.reviews || extractedProfile.social_links || extractedProfile.services)) {
+      const records = [{
+        record: extractedProfile,
+        provenance: extractedProvenance,
+        sourceInfo: {
+          sourceUrl: pageData?.url || googleMapsUrl,
+          provider: 'web_extraction',
+          extractionMethod: aiExtracted ? 'ai' : 'dom',
+        },
+      }];
+
+      // Deterministic CID/direct fields as a separate discovered record so
+      // they are never subject to the ai_generated evidence gate.
+      const directFields = metadata?.extractedFields;
+      if (directFields && typeof directFields === 'object') {
+        const hasDirectData =
+          directFields.phone ||
+          directFields.address ||
+          directFields.city ||
+          directFields.rating != null ||
+          directFields.category ||
+          (directFields.hours && Object.keys(directFields.hours).length > 0);
+        if (hasDirectData) {
+          records.push({
+            record: {
+              business: {
+                name: null,
+                category: directFields.category || null,
+                categories: [],
+                description: null,
+                business_type: null,
+              },
+              contact: {
+                phone: directFields.phone || null,
+                email: null,
+                website: directFields.website || null,
+              },
+              location: {
+                full_address: directFields.address || null,
+                street: null,
+                city: directFields.city || null,
+                state: directFields.state || null,
+                country: directFields.country || null,
+                postal_code: directFields.postalCode || null,
+                latitude: null,
+                longitude: null,
+              },
+              ratings: {
+                rating: typeof directFields.rating === 'number' ? directFields.rating : null,
+                review_count: typeof directFields.reviewCount === 'number' ? directFields.reviewCount : null,
+              },
+              hours: directFields.hours && Object.keys(directFields.hours).length
+                ? directFields.hours
+                : {},
+              reviews: [],
+              services: [],
+              products: [],
+              amenities: [],
+              social_links: [],
+              pricing: null,
+              booking_url: null,
+              source_urls: [],
+              confidence: {
+                overall: 0.8,
+                name: 0,
+                category: 0.7,
+                phone: 0.9,
+                website: 0,
+                address: 0.9,
+                rating: 0.8,
+              },
+            },
+            provenance: 'discovered',
+            sourceInfo: {
+              sourceUrl: pageData?.url || googleMapsUrl,
+              provider: 'web_extraction',
+              extractionMethod: 'dom',
+            },
+          });
+        }
+      }
+
       const pipelineResult = await runCandidatePipeline({
-        records: [{
-          record: extractedProfile,
-          provenance: extractedProvenance,
-          sourceInfo: {
-            sourceUrl: pageData?.url || googleMapsUrl,
-            provider: 'web_extraction',
-            extractionMethod: aiExtracted ? 'ai' : 'dom',
-          },
-        }],
+        records,
         profileContext: profile.toObject ? profile.toObject() : profile,
         options: { onlyIfMissing: false },
       });
