@@ -100,8 +100,8 @@ router.post('/analyze', async (req, res, next) => {
         error: 'provider_unavailable',
         message: providerError.safeMessage,
         provider: {
-          gateway: config.omniroute.baseUrl,
-          model: config.omniroute.models.reasoning,
+          gateway: config.opencode.baseUrl,
+          model: config.opencode.models.reasoning,
           category: providerError.category || 'PROVIDER_UNAVAILABLE',
           httpStatus: providerError.httpStatus || null,
           retryCount: 0,

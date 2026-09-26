@@ -188,13 +188,17 @@ export function createCandidatesFromRecord(record, provenance = 'discovered', so
 
   const add = (fieldPath, rawValue, conf) => {
     if (rawValue == null || rawValue === '') return;
+    // Dotted-path confidence wins over the legacy short-key form. Records that
+    // carry per-field AI confidence (see runAIEnrichmentPipeline) key it by the
+    // exact field path so widened field sets are not silently defaulted.
+    const resolvedConfidence = record?.confidence?.[fieldPath] ?? conf;
     // Support evidence at record level (for AI candidates)
     const recordEvidence = record?.evidence?.[fieldPath] || record?.evidence?.[fieldPath.split('.').pop()];
     candidates.push(createFieldCandidate({
       fieldPath,
       rawValue,
       provenance,
-      confidence: conf ?? null,
+      confidence: resolvedConfidence ?? null,
       sourceInfo,
       source: {
         provider: sourceInfo?.provider || record?.provider?.name || null,
@@ -244,6 +248,17 @@ export function createCandidatesFromRecord(record, provenance = 'discovered', so
   const socialLinks = record?.social_links ?? record?.socialLinks;
   if (Array.isArray(socialLinks) && socialLinks.length) {
     add('social_links', socialLinks);
+  }
+
+  // Products/amenities sit under identity.* alongside services: BusinessProfile
+  // has no `business` branch, so a business.* path cannot be written at all.
+  const products = record?.products ?? record?.business?.products;
+  if (Array.isArray(products) && products.length) {
+    add('identity.products', products);
+  }
+  const amenities = record?.amenities ?? record?.business?.amenities;
+  if (Array.isArray(amenities) && amenities.length) {
+    add('identity.amenities', amenities);
   }
 
   return candidates;

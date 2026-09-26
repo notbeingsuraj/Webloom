@@ -584,6 +584,151 @@ checkAsync('48. AI enrichment pipeline only fills gaps', async () => {
   assert.equal(services.length, 1);
 });
 
+checkAsync('48a. AI enrichment writes widened factual fields as ai_generated', async () => {
+  const profile = new BusinessProfile();
+  profile.set('identity.name', 'Northside Dental', 'identified', 0.95, { sourceUrl: 'https://maps.google.com/test' });
+
+  const aiResult = {
+    email: { value: 'hello@northsidedental.com', confidence: 0.8, evidence: 'Listed on their site' },
+    phone: { value: '+1 555 010 9999', confidence: 0.85, evidence: 'Known practice line' },
+    full_address: { value: '12 Bridge St, Springfield', confidence: 0.7, evidence: 'Practice address' },
+    hours: { value: { monday: '09:00-17:00', sunday: 'closed' }, confidence: 0.75, evidence: 'Office hours' },
+    social_links: { value: ['https://instagram.com/northsidedental'], confidence: 0.6, evidence: 'Link in bio' },
+  };
+
+  const result = await runAIEnrichmentPipeline(profile, aiResult, 'https://maps.google.com/test');
+  const acceptedPaths = result.accepted.map(c => c.fieldPath);
+
+  assert.ok(acceptedPaths.includes('contact.email'), 'email should be filled');
+  assert.ok(acceptedPaths.includes('contact.phone'), 'phone should be filled');
+  assert.ok(acceptedPaths.includes('location.full_address'), 'address should be filled');
+  assert.ok(acceptedPaths.includes('hours'), 'hours should be filled');
+  assert.ok(acceptedPaths.includes('social_links'), 'social links should be filled');
+
+  // Factual AI output must be quarantined, never recorded as provider-verified.
+  // The candidate carries a structured provenance object; the stored profile
+  // field carries the bare Webloom provenance string.
+  const emailCandidate = result.accepted.find(c => c.fieldPath === 'contact.email');
+  assert.equal(emailCandidate.provenance.webloom, 'ai_generated', 'factual AI field must be ai_generated');
+  assert.equal(profile.get('contact.email'), 'hello@northsidedental.com');
+  assert.equal(profile.getField('contact.email').provenance, 'ai_generated');
+});
+
+checkAsync('48b. Descriptive AI fields stay inferred and reach new paths', async () => {
+  const profile = new BusinessProfile();
+  profile.set('identity.name', 'Northside Dental', 'identified', 0.95, { sourceUrl: 'https://maps.google.com/test' });
+
+  const aiResult = {
+    category: 'Dentist',
+    business_type: 'Dental practice',
+    description: 'A general dental practice.',
+    services: ['teeth cleaning', 'fillings'],
+    products: { value: ['toothbrush'], confidence: 0.5, evidence: 'typical of a dental practice' },
+    amenities: { value: ['wheelchair accessible'], confidence: 0.5, evidence: 'typical' },
+  };
+
+  const result = await runAIEnrichmentPipeline(profile, aiResult, 'https://maps.google.com/test');
+  const acceptedPaths = result.accepted.map(c => c.fieldPath);
+
+  assert.ok(acceptedPaths.includes('identity.business_type'), 'business_type should be filled');
+  assert.ok(acceptedPaths.includes('identity.products'), 'products should be filled');
+  assert.ok(acceptedPaths.includes('identity.amenities'), 'amenities should be filled');
+
+  const categoryCandidate = result.accepted.find(c => c.fieldPath === 'identity.category');
+  assert.equal(categoryCandidate.provenance.webloom, 'inferred', 'descriptive AI field must stay inferred');
+  assert.equal(profile.get('identity.business_type'), 'Dental practice');
+  assert.deepEqual(profile.get('identity.products'), ['toothbrush']);
+});
+
+checkAsync('48c. High-confidence existing values survive widened enrichment', async () => {
+  const profile = new BusinessProfile();
+  profile.set('contact.email', 'real@northsidedental.com', 'discovered', 0.92, { sourceUrl: 'https://maps.google.com/test' });
+  profile.set('identity.name', 'Northside Dental', 'identified', 0.95, { sourceUrl: 'https://maps.google.com/test' });
+
+  const aiResult = {
+    email: { value: 'guessed@northsidedental.com', confidence: 0.99, evidence: 'guess' },
+  };
+
+  const result = await runAIEnrichmentPipeline(profile, aiResult, 'https://maps.google.com/test', {
+    overwriteBelowConfidence: 0.5,
+    minIncomingConfidence: 0.75,
+  });
+
+  assert.equal(profile.get('contact.email'), 'real@northsidedental.com', 'healthy value must not be replaced');
+  assert.equal(result.accepted.filter(c => c.fieldPath === 'contact.email').length, 0);
+});
+
+checkAsync('48d. Weak existing values ARE replaced when both gates pass', async () => {
+  const profile = new BusinessProfile();
+  profile.set('contact.email', 'stale@example.com', 'discovered', 0.2, { sourceUrl: 'https://maps.google.com/test' });
+  profile.set('identity.name', 'Northside Dental', 'identified', 0.95, { sourceUrl: 'https://maps.google.com/test' });
+
+  const aiResult = {
+    email: { value: 'hello@northsidedental.com', confidence: 0.8, evidence: 'Listed on their site' },
+  };
+
+  await runAIEnrichmentPipeline(profile, aiResult, 'https://maps.google.com/test', {
+    overwriteBelowConfidence: 0.5,
+    minIncomingConfidence: 0.75,
+  });
+
+  assert.equal(profile.get('contact.email'), 'hello@northsidedental.com', 'weak value should be replaced');
+});
+
+checkAsync('48e. Weak existing value is NOT replaced by a low-confidence AI value', async () => {
+  const profile = new BusinessProfile();
+  profile.set('contact.email', 'stale@example.com', 'discovered', 0.2, { sourceUrl: 'https://maps.google.com/test' });
+  profile.set('identity.name', 'Northside Dental', 'identified', 0.95, { sourceUrl: 'https://maps.google.com/test' });
+
+  const aiResult = {
+    email: { value: 'maybe@northsidedental.com', confidence: 0.3, evidence: 'not sure' },
+  };
+
+  const result = await runAIEnrichmentPipeline(profile, aiResult, 'https://maps.google.com/test', {
+    overwriteBelowConfidence: 0.5,
+    minIncomingConfidence: 0.75,
+  });
+
+  assert.equal(profile.get('contact.email'), 'stale@example.com', 'low-confidence AI must not win');
+  assert.equal(result.conflicts.length, 0, 'contact.email is not identity-sensitive, so it is a skip not a conflict');
+});
+
+checkAsync('48f. Identity fields demand a higher bar to replace a weak value', async () => {
+  const profile = new BusinessProfile();
+  profile.set('contact.phone', '555-000-0000', 'discovered', 0.2, { sourceUrl: 'https://maps.google.com/test' });
+  profile.set('identity.name', 'Northside Dental', 'identified', 0.95, { sourceUrl: 'https://maps.google.com/test' });
+
+  // 0.75 clears the descriptive bar but not the 0.8 identity bar.
+  const aiResult = {
+    phone: { value: '555-111-2222', confidence: 0.75, evidence: 'maybe' },
+  };
+
+  const result = await runAIEnrichmentPipeline(profile, aiResult, 'https://maps.google.com/test', {
+    overwriteBelowConfidence: 0.5,
+    minIncomingConfidence: 0.75,
+  });
+
+  assert.equal(profile.get('contact.phone'), '555-000-0000', 'identity field must not be replaced below the 0.8 bar');
+  // The candidate never reaches selection, so it is discarded rather than
+  // conflicting — there is no second live claim on the field.
+  assert.equal(result.accepted.filter(c => c.fieldPath === 'contact.phone').length, 0);
+  assert.equal(result.conflicts.length, 0, 'below-bar identity candidate is rejected, not conflicted');
+});
+
+checkAsync('48g. Overwrite is fully disabled without an explicit floor', async () => {
+  const profile = new BusinessProfile();
+  profile.set('contact.email', 'stale@example.com', 'discovered', 0.01, { sourceUrl: 'https://maps.google.com/test' });
+  profile.set('identity.name', 'Northside Dental', 'identified', 0.95, { sourceUrl: 'https://maps.google.com/test' });
+
+  const aiResult = {
+    email: { value: 'hello@northsidedental.com', confidence: 0.95, evidence: 'sure' },
+  };
+
+  await runAIEnrichmentPipeline(profile, aiResult, 'https://maps.google.com/test');
+
+  assert.equal(profile.get('contact.email'), 'stale@example.com', 'no floor means gap-fill only');
+});
+
 /* ================================================================== *
  * 49-55. INTEGRATION WITH BUSINESSPROFILE
  * ================================================================== */

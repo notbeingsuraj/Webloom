@@ -153,10 +153,54 @@ async function areValuesEquivalent(fieldPath, val1, val2) {
 }
 
 /**
+ * Is a profile value actually populated?
+ *
+ * BusinessProfile pre-initialises several fields with empty containers
+ * (`hours: {}`, `social_links: []`, `identity.categories: []`). A plain
+ * `!= null` check treats those as real values, so `onlyIfMissing` would skip
+ * them forever and they could never be enriched.
+ */
+function isPopulated(value) {
+  if (value == null || value === '') return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (value instanceof Map || value instanceof Set) return value.size > 0;
+  if (typeof value === 'object') return Object.keys(value).length > 0;
+  return true;
+}
+
+/**
+ * Decide whether an AI-origin candidate may replace a populated-but-weak value.
+ *
+ * The default posture is "no": a populated field is protected unless the caller
+ * supplies an explicit `overwriteBelowConfidence` floor AND the existing value
+ * actually sits below it AND the incoming candidate clears a confidence bar.
+ * Identity-sensitive fields demand a higher bar than descriptive ones.
+ *
+ * @returns {boolean} true when the replacement is allowed
+ */
+function canReplaceWeakValue({ isIdentity, existingConfidence, incomingConfidence, overwriteBelowConfidence, minIncomingConfidence }) {
+  if (overwriteBelowConfidence == null) return false;
+  if (existingConfidence == null) return false;
+  if (!(existingConfidence < overwriteBelowConfidence)) return false;
+
+  const bar = isIdentity
+    ? Math.max(minIncomingConfidence ?? 0, 0.8)
+    : (minIncomingConfidence ?? 0.7);
+
+  return (incomingConfidence ?? 0) >= bar;
+}
+
+/**
  * Select the best candidate for a field.
  * Returns { accepted, rejected[], conflicts[] }.
  */
-async function selectBestForField(fieldPath, candidates, profileContext = {}) {
+async function selectBestForField(fieldPath, candidates, profileContext = {}, options = {}) {
+  const {
+    overwriteBelowConfidence = null,
+    minIncomingConfidence = 0.7,
+    existingConfidenceByField = null,
+  } = options;
+
   const accepted = [];
   const rejected = [];
   const conflicts = [];
@@ -196,18 +240,31 @@ async function selectBestForField(fieldPath, candidates, profileContext = {}) {
     // Check equivalence with existing
     const equiv = await areValuesEquivalent(fieldPath, existingValue, top.normalizedValue);
     if (!equiv) {
-      // Conflict! Both are identity-sensitive and disagree.
-      const conflict = {
-        fieldPath,
-        existing: { value: existingValue },
-        incoming: { value: top.normalizedValue, candidate: top },
-        status: 'conflicted',
-        detectedAt: new Date().toISOString(),
-      };
-      conflicts.push(conflict);
-      top.status = CANDIDATE_STATUS.CONFLICT;
-      // Do NOT accept — preserve the conflict for existing resolution logic
-      return { accepted, rejected, conflicts };
+      // Conflict! Both are identity-sensitive and disagree. An AI candidate may
+      // still take over when the existing value is demonstrably weak and the
+      // incoming one is strong — otherwise the conflict is preserved for the
+      // existing resolution logic and nothing is written.
+      const allowed = canReplaceWeakValue({
+        isIdentity,
+        existingConfidence: existingConfidenceByField?.[fieldPath] ?? null,
+        incomingConfidence: top.confidence ?? null,
+        overwriteBelowConfidence,
+        minIncomingConfidence,
+      });
+
+      if (!allowed) {
+        const conflict = {
+          fieldPath,
+          existing: { value: existingValue },
+          incoming: { value: top.normalizedValue, candidate: top },
+          status: 'conflicted',
+          detectedAt: new Date().toISOString(),
+        };
+        conflicts.push(conflict);
+        top.status = CANDIDATE_STATUS.CONFLICT;
+        // Do NOT accept — preserve the conflict for existing resolution logic
+        return { accepted, rejected, conflicts };
+      }
     }
     // Equivalent — accept top (may be same value with better provenance)
   }
@@ -231,7 +288,9 @@ async function selectBestForField(fieldPath, candidates, profileContext = {}) {
  * @param {Object} opts
  * @param {Array} opts.records - array of { record, provenance, sourceInfo }
  * @param {Object} opts.profileContext - current BusinessProfile or flat profile
- * @param {Object} opts.options - { onlyIfMissing?, isConservativeMerge?, resolutionInfo? }
+ * @param {Object} opts.options - { onlyIfMissing?, isConservativeMerge?, resolutionInfo?,
+ *                                   overwriteBelowConfidence?, minIncomingConfidence?,
+ *                                   existingConfidenceByField? }
  * @returns {Promise<Object>} pipeline result
  */
 export async function runCandidatePipeline({
@@ -239,7 +298,14 @@ export async function runCandidatePipeline({
   profileContext = {},
   options = {},
 } = {}) {
-  const { onlyIfMissing = false, isConservativeMerge = false, resolutionInfo = null } = options;
+  const {
+    onlyIfMissing = false,
+    isConservativeMerge = false,
+    resolutionInfo = null,
+    overwriteBelowConfidence = null,
+    minIncomingConfidence = 0.7,
+    existingConfidenceByField = null,
+  } = options;
 
   const pipeline = createPipeline();
 
@@ -256,14 +322,39 @@ export async function runCandidatePipeline({
 
   // 4. Select best per field
   for (const [fieldPath, fieldCandidates] of groups) {
-    // Skip fields already present if onlyIfMissing
-    if (onlyIfMissing && profileContext[fieldPath] != null && profileContext[fieldPath] !== '') {
-      // Mark existing as "skipped" - they don't become candidates
-      for (const c of fieldCandidates) {
-        rejectCandidate(c, 'onlyIfMissing: field already populated');
-        pipeline.rejected.push(c);
+    // Skip fields already populated if onlyIfMissing — unless the caller supplied
+    // a confidence floor, the existing value sits below it, AND the incoming
+    // candidate is confident enough to earn the replacement. A populated field
+    // with an unknown confidence is always treated as protected.
+    if (onlyIfMissing && isPopulated(profileContext[fieldPath])) {
+      const existingConfidence = existingConfidenceByField?.[fieldPath] ?? null;
+      const isWeak = overwriteBelowConfidence != null
+        && existingConfidence != null
+        && existingConfidence < overwriteBelowConfidence;
+
+      if (!isWeak) {
+        // Mark existing as "skipped" - they don't become candidates
+        for (const c of fieldCandidates) {
+          rejectCandidate(c, 'onlyIfMissing: field already populated');
+          pipeline.rejected.push(c);
+        }
+        continue;
       }
-      continue;
+
+      // The field is weak enough to replace, so the incoming candidate still has
+      // to clear the bar. Identity-sensitive fields demand the higher bar.
+      const bar = isIdentitySensitive(fieldPath)
+        ? Math.max(minIncomingConfidence, 0.8)
+        : minIncomingConfidence;
+      const qualified = fieldCandidates.filter((c) => (c.confidence ?? 0) >= bar);
+
+      if (qualified.length === 0) {
+        for (const c of fieldCandidates) {
+          rejectCandidate(c, `weak_value_below_confidence_floor: ${bar}`);
+          pipeline.rejected.push(c);
+        }
+        continue;
+      }
     }
 
     // For conservative merge (different_entity), skip identity fields entirely
@@ -278,7 +369,8 @@ export async function runCandidatePipeline({
     const { accepted, rejected, conflicts } = await selectBestForField(
       fieldPath,
       fieldCandidates,
-      profileContext
+      profileContext,
+      { overwriteBelowConfidence, minIncomingConfidence, existingConfidenceByField }
     );
 
     pipeline.accepted.push(...accepted);
@@ -312,7 +404,28 @@ export async function runCandidatePipeline({
         // Use the original Webloom provenance string for profile.set()
         const provenance = c.provenance.webloom;
         const confidence = c.confidence ?? 0.6;
-        profile.set(c.fieldPath, c.normalizedValue, provenance, confidence, sourceInfo);
+
+        // BusinessProfile.set enforces its own source-tier rule and will refuse
+        // an AI write over provider data (the P1.2 quarantine). A candidate only
+        // reaches `accepted` here via the weak-value path when a floor was
+        // supplied, so carry that authorisation explicitly — the model layer
+        // re-checks the floor itself rather than trusting this flag.
+        let effectiveSourceInfo = sourceInfo;
+        if (overwriteBelowConfidence != null && typeof profile?.getField === 'function') {
+          const current = profile.getField(c.fieldPath);
+          const currentConfidence = typeof current?.confidence === 'number' ? current.confidence : null;
+          if (current?.value != null
+              && currentConfidence != null
+              && currentConfidence < overwriteBelowConfidence) {
+            effectiveSourceInfo = {
+              ...sourceInfo,
+              overwriteAuthorized: true,
+              overwriteBelowConfidence,
+            };
+          }
+        }
+
+        profile.set(c.fieldPath, c.normalizedValue, provenance, confidence, effectiveSourceInfo);
         applied.push({ fieldPath: c.fieldPath, value: c.normalizedValue, provenance });
       }
       return applied;
@@ -442,24 +555,181 @@ export async function runReputationPipeline(profile, reputation, result, options
   return pipelineResult;
 }
 
+// Fields AI enrichment is allowed to write. Kept as one list so the confidence
+// sweep below and the record mapping above cannot drift apart.
+const AI_ENRICHMENT_FIELD_PATHS = Object.freeze([
+  'identity.category',
+  'identity.categories',
+  'identity.business_type',
+  'identity.description',
+  'identity.services',
+  'identity.products',
+  'identity.amenities',
+  'contact.phone',
+  'contact.email',
+  'contact.website',
+  'location.full_address',
+  'location.city',
+  'location.state',
+  'location.postal_code',
+  'hours',
+  'social_links',
+]);
+
 /**
- * Convenience: run pipeline for AI enrichment
+ * Read a flat { fieldPath: confidence } map from a BusinessProfile.
+ * Used by AI enrichment to decide which populated values are weak enough to
+ * replace. Falls back to an empty map for plain objects.
+ */
+function collectFieldConfidences(profile) {
+  const out = {};
+  if (!profile || typeof profile.getField !== 'function') return out;
+  for (const path of AI_ENRICHMENT_FIELD_PATHS) {
+    const field = profile.getField(path);
+    if (field && typeof field.confidence === 'number') {
+      out[path] = field.confidence;
+    }
+  }
+  return out;
+}
+
+/**
+ * Unwrap an AI field envelope.
+ *
+ * The enrichment prompt asks for `{ value, confidence, evidence }` per field
+ * (same shape GoogleMapsFallbackExtractor uses) so a widened field set stays
+ * auditable. A bare value is still accepted for backwards compatibility with
+ * callers that pass plain strings/arrays.
+ *
+ * @returns {{value:*, confidence:?number, evidence:?string}|null}
+ */
+function unwrapAiField(raw) {
+  if (raw == null) return null;
+
+  const isEnvelope = typeof raw === 'object' && !Array.isArray(raw) && 'value' in raw;
+  const value = isEnvelope ? raw.value : raw;
+
+  if (value == null || value === '') return null;
+  if (Array.isArray(value) && value.length === 0) return null;
+
+  const confidence = isEnvelope && typeof raw.confidence === 'number'
+    ? Math.min(Math.max(raw.confidence, 0), 1)
+    : null;
+  const evidence = isEnvelope && typeof raw.evidence === 'string' && raw.evidence.trim()
+    ? raw.evidence.trim().slice(0, 400)
+    : null;
+
+  return { value, confidence, evidence };
+}
+
+/**
+ * Convenience: run pipeline for AI enrichment.
+ *
+ * Factual fields (contact/location/hours/socials) are recorded as
+ * `ai_generated` — the model produced them, and downstream consumers must be
+ * able to see that. Descriptive fields (category/description/services/products/
+ * amenities) are `inferred`, matching the existing semantic that they are
+ * derived from the business type rather than observed.
+ *
+ * @param {BusinessProfile} profile
+ * @param {Object} aiResult - widened AI payload, envelopes or bare values
+ * @param {string} sourceUrl
+ * @param {Object} [options] - { overwriteBelowConfidence, minIncomingConfidence }
  */
 export async function runAIEnrichmentPipeline(profile, aiResult, sourceUrl, options = {}) {
   if (!aiResult || typeof aiResult !== 'object') {
     return { accepted: [], rejected: [], conflicts: [], diagnostics: {} };
   }
-  // Map AI result fields to BusinessProfile field paths
-  const record = { business: {}, contact: {}, location: {}, identity: {} };
-  if (aiResult.category) record.identity.category = aiResult.category;
-  if (aiResult.description) record.identity.description = aiResult.description;
-  if (Array.isArray(aiResult.services) && aiResult.services.length) record.identity.services = aiResult.services;
+
+  const {
+    // Existing values at or above this confidence are never replaced. Null
+    // keeps the historical gap-fill-only behaviour.
+    overwriteBelowConfidence = null,
+    minIncomingConfidence = 0.7,
+  } = options;
+
+  const base = { business: {}, contact: {}, location: {}, identity: {}, confidence: {}, evidence: {} };
+  const factual = { business: {}, contact: {}, location: {}, identity: {}, confidence: {}, evidence: {} };
+
+  // put(record, fieldPath, raw, section, key) — section/key land under
+  // record[section][key], which is what createCandidatesFromRecord reads.
+  const put = (record, fieldPath, raw, section, key) => {
+    const field = unwrapAiField(raw);
+    if (!field) return;
+    record[section][key] = field.value;
+    if (field.confidence != null) record.confidence[fieldPath] = field.confidence;
+    if (field.evidence) record.evidence[fieldPath] = field.evidence;
+  };
+
+  // putRoot(record, fieldPath, raw) — for fields createCandidatesFromRecord
+  // reads off the record root (hours, social_links).
+  const putRoot = (record, fieldPath, raw) => {
+    const field = unwrapAiField(raw);
+    if (!field) return;
+    record[fieldPath] = field.value;
+    if (field.confidence != null) record.confidence[fieldPath] = field.confidence;
+    if (field.evidence) record.evidence[fieldPath] = field.evidence;
+  };
+
+  // Descriptive — inferred from the business type.
+  //
+  // All of these go under `business`, not `identity`: createCandidatesFromRecord
+  // resolves a single shape-agnostic "business carrier" (preferring `business`
+  // whenever it is non-empty) and reads name/category/description/business_type/
+  // categories/services off it. Splitting them across both sections would make
+  // whichever section lost the carrier election invisible. The canonical field
+  // paths stay `identity.*` regardless — only the record layout differs.
+  put(base, 'identity.category', aiResult.category, 'business', 'category');
+  put(base, 'identity.categories', aiResult.categories, 'business', 'categories');
+  put(base, 'identity.business_type', aiResult.business_type ?? aiResult.businessType, 'business', 'business_type');
+  put(base, 'identity.description', aiResult.description, 'business', 'description');
+  put(base, 'identity.services', aiResult.services, 'business', 'services');
+  put(base, 'identity.products', aiResult.products, 'business', 'products');
+  put(base, 'identity.amenities', aiResult.amenities, 'business', 'amenities');
+
+  // Factual — the model asserts these, so they stay quarantined as ai_generated.
+  put(factual, 'contact.phone', aiResult.phone, 'contact', 'phone');
+  put(factual, 'contact.email', aiResult.email, 'contact', 'email');
+  put(factual, 'contact.website', aiResult.website, 'contact', 'website');
+  put(factual, 'location.full_address', aiResult.full_address ?? aiResult.address, 'location', 'full_address');
+  put(factual, 'location.city', aiResult.city, 'location', 'city');
+  put(factual, 'location.state', aiResult.state, 'location', 'state');
+  put(factual, 'location.postal_code', aiResult.postal_code, 'location', 'postal_code');
+  putRoot(factual, 'hours', aiResult.hours);
+  putRoot(factual, 'social_links', aiResult.social_links ?? aiResult.socialLinks);
+
+  const records = [];
+  if (Object.keys(base.business).length || Object.keys(base.identity).length) {
+    records.push({
+      record: base,
+      provenance: 'inferred',
+      sourceInfo: { sourceUrl, provider: 'ai_enrichment', extractionMethod: 'ai' },
+    });
+  }
+  if (Object.keys(factual.contact).length || Object.keys(factual.location).length
+      || factual.hours || factual.social_links) {
+    records.push({
+      record: factual,
+      provenance: 'ai_generated',
+      sourceInfo: { sourceUrl, provider: 'ai_enrichment', extractionMethod: 'ai' },
+    });
+  }
+
+  if (records.length === 0) {
+    return { accepted: [], rejected: [], conflicts: [], diagnostics: {} };
+  }
 
   const pipelineResult = await runCandidatePipeline({
-    records: [{ record, provenance: 'inferred', sourceInfo: { sourceUrl, provider: 'ai_enrichment' } }],
+    records,
     profileContext: profile?.toObject ? profile.toObject() : profile,
-    options: { onlyIfMissing: true }, // AI enrichment always only fills gaps
+    options: {
+      onlyIfMissing: true,
+      overwriteBelowConfidence,
+      minIncomingConfidence,
+      existingConfidenceByField: collectFieldConfidences(profile),
+    },
   });
+
   if (profile && typeof profile.set === 'function') {
     pipelineResult.applyToProfile(profile, { sourceUrl, provider: 'ai_enrichment' });
   }
@@ -477,6 +747,10 @@ export default {
   collectCandidate,
   validate,
   selectBestForField,
+  canReplaceWeakValue,
+  collectFieldConfidences,
+  unwrapAiField,
+  AI_ENRICHMENT_FIELD_PATHS,
   CANDIDATE_STATUS,
   SELECTION_PRIORITY,
   IDENTITY_SENSITIVE,

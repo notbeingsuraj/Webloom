@@ -43,7 +43,9 @@ const FIELD_CLASSIFICATION = {
     'ratings.review_count',
     'hours',
     'identity.services',
-    'identity.categories'
+    'identity.categories',
+    'identity.products',
+    'identity.amenities'
   ]
 };
 

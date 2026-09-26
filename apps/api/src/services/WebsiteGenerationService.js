@@ -588,8 +588,24 @@ class WebsiteGenerationService {
       url: m?.url ?? null,
       status: m?.status ?? 'unknown',
       startedAt: m?.startedAt ?? null,
+      pid: m?.pid ?? null,
       path: GeneratedSiteManager.siteDir(slug),
     }));
+
+    // Reconcile manifest status with reality: an entry claiming 'running' is
+    // only reported live if its tracked pid is still alive AND its port answers
+    // HTTP 200. Dead entries degrade to 'stopped' (details preserved) so the UI
+    // never shows phantom running sites after API restarts or crashes.
+    await Promise.all(entries.map(async (entry) => {
+      if (entry.status !== 'running') return;
+      let pidAlive = false;
+      if (entry.pid) {
+        try { process.kill(entry.pid, 0); pidAlive = true; } catch { pidAlive = false; }
+      }
+      const up = pidAlive && await GeneratedSiteManager.isUp(entry.slug).catch(() => false);
+      if (!up) entry.status = 'stopped';
+    }));
+
     entries.sort((a, b) => a.slug.localeCompare(b.slug));
     return entries;
   }

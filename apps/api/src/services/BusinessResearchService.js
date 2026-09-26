@@ -13,13 +13,173 @@ import GoogleMapsUrlParserProvider from './GoogleMapsUrlParserProvider.js';
 import { extractDeterministicHints } from './providers/ProviderAdapter.js';
 import { validateBusinessProfile, sanitizeFieldValue } from './BusinessProfileValidator.js';
 import { config } from '../config/env.js';
-import { calculateMatchScore } from './EntityResolution.js';
+import { calculateMatchScore, fuzzySimilarity, normalizePhone } from './EntityResolution.js';
 import { initializeDatabase, getDb } from '../db/client.js';
 import { IdentityRepository, NotFoundError, DuplicateError, ValidationError } from '../db/IdentityRepository.js';
 import { CanonicalizationService } from './CanonicalizationService.js';
 import { analyzeEntityRelocation, TEMPORAL_VERDICT } from './TemporalRelocationAnalyzer.js';
 import { looksLikeStreetAddress } from '../utils/streetAddressDetector.js';
 import { mergeRecordThroughPipeline, runFallbackPipeline, runReputationPipeline, runAIEnrichmentPipeline } from './CandidatePipeline.js';
+import OfficialWebsiteProvider from './OfficialWebsiteProvider.js';
+
+/**
+ * Field keys the enrichment prompt asks for, in the order they are requested.
+ * The JSON schema and the record mapping in runAIEnrichmentPipeline are both
+ * derived from this list so they cannot drift apart.
+ */
+const AI_ENRICHMENT_FIELD_KEYS = Object.freeze([
+  'category',
+  'categories',
+  'business_type',
+  'description',
+  'services',
+  'products',
+  'amenities',
+  'phone',
+  'email',
+  'website',
+  'full_address',
+  'city',
+  'state',
+  'postal_code',
+  'hours',
+  'social_links',
+]);
+
+const OPENING_HOURS_DAYS = Object.freeze([
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+]);
+
+/**
+ * Value shape per enrichment key. Anything not listed defaults to a string.
+ */
+const AI_ENRICHMENT_VALUE_SHAPES = Object.freeze({  categories: 'stringArray',
+  services: 'stringArray',
+  products: 'stringArray',
+  amenities: 'stringArray',
+  social_links: 'stringArray',
+  hours: 'hours',
+});
+
+function buildEnvelopeValueSchema(shape) {
+  switch (shape) {
+    case 'stringArray':
+      return { type: ['array', 'null'], items: { type: 'string' } };
+    case 'hours':
+      // Map form ({ monday: "09:00-17:00" }) — the shape BusinessDataExtractor
+      // already produces and FieldValidation expects. An array form is rejected
+      // by the type check even though normalizeHours can parse one.
+      return {
+        type: ['object', 'null'],
+        properties: Object.fromEntries(
+          OPENING_HOURS_DAYS.map((day) => [day, { type: ['string', 'null'] }])
+        ),
+        required: [...OPENING_HOURS_DAYS],
+        additionalProperties: false,
+      };
+    default:
+      return { type: ['string', 'null'] };
+  }
+}
+
+/**
+ * Build the enrichment JSON schema.
+ *
+ * Every key is required (nullable envelope) so this is valid under OpenAI
+ * strict structured-output mode, which the AI gateway enforces.
+ */
+function buildEnrichmentSchema() {
+  const properties = {};
+  for (const key of AI_ENRICHMENT_FIELD_KEYS) {
+    properties[key] = {
+      type: ['object', 'null'],
+      properties: {
+        value: buildEnvelopeValueSchema(AI_ENRICHMENT_VALUE_SHAPES[key]),
+        confidence: { type: ['number', 'null'] },
+        evidence: { type: ['string', 'null'] },
+      },
+      required: ['value', 'confidence', 'evidence'],
+      additionalProperties: false,
+    };
+  }
+  return {
+    type: 'object',
+    properties,
+    required: [...AI_ENRICHMENT_FIELD_KEYS],
+    additionalProperties: false,
+  };
+}
+
+/**
+ * Fields an official-website crawl is allowed to contribute. Deliberately
+ * excludes identity.name and ratings — a scraped page is not evidence about
+ * which business this is, nor a trustworthy source for review counts.
+ */
+const OFFICIAL_WEBSITE_ALLOWED_PATHS = Object.freeze([
+  'contact.email',
+  'contact.website',
+  'location.full_address',
+  'location.city',
+  'location.state',
+  'location.postal_code',
+  'location.coordinates',
+  'identity.description',
+  'social_links',
+]);
+
+/**
+ * Reduce a crawled page down to the record shape the candidate pipeline wants,
+ * dropping anything we did not ask for.
+ */
+function pickOfficialWebsiteFields(crawled) {
+  const record = { business: {}, contact: {}, location: {}, social_links: [] };
+
+  if (crawled?.contact?.email) record.contact.email = crawled.contact.email;
+  if (crawled?.contact?.website) record.contact.website = crawled.contact.website;
+  if (crawled?.business?.description) record.business.description = crawled.business.description;
+
+  if (crawled?.location) {
+    for (const key of ['full_address', 'city', 'state', 'country', 'postal_code', 'coordinates']) {
+      if (crawled.location[key]) record.location[key] = crawled.location[key];
+    }
+  }
+
+  const links = Array.isArray(crawled?.social_links) ? crawled.social_links : [];
+  if (links.length) record.social_links = links;
+
+  return record;
+}
+
+/**
+ * Decide whether a crawled page actually belongs to the business we researched.
+ *
+ * A model-proposed domain is a guess, so the guess is verified against the page
+ * itself before any of its content is allowed into the profile. A phone match is
+ * conclusive; otherwise the page's own business name must be close enough to the
+ * name we already hold.
+ */
+function officialWebsiteMatches({ knownName, knownPhone, crawled }) {
+  const crawledName = crawled?.business?.name || null;
+  const crawledPhone = crawled?.contact?.phone || null;
+
+  if (knownPhone && crawledPhone) {
+    const a = normalizePhone(knownPhone);
+    const b = normalizePhone(crawledPhone);
+    if (a && b && a === b) return { matched: true, reason: 'phone_exact' };
+  }
+
+  if (knownName && crawledName) {
+    const threshold = config?.ai?.officialWebsiteNameMatch ?? 0.75;
+    const similarity = fuzzySimilarity(knownName, crawledName);
+    if (similarity >= threshold) {
+      return { matched: true, reason: `name_similarity_${similarity.toFixed(2)}` };
+    }
+    return { matched: false, reason: `name_similarity_${similarity.toFixed(2)}` };
+  }
+
+  // Nothing to corroborate against — refuse rather than trust an unverified guess.
+  return { matched: false, reason: 'no_corroborating_signal' };
+}
 
 class BusinessResearchService {
   /**
@@ -404,7 +564,7 @@ class BusinessResearchService {
     const { forceRefresh = false, ...restInput } = input;
     const hints = await this._buildHints(restInput);
     const profile = new BusinessProfile();
-    const providerTrace = { geoapify: null, webExtraction: null, aiEnrichment: false };
+    const providerTrace = { geoapify: null, webExtraction: null, officialWebsite: null, aiEnrichment: false };
     const sourceUrl = input.googleMapsUrl || input.sourceUrl || null;
 
     // --- LEVEL 1: deterministic data from input (IDENTIFIED provenance) ---
@@ -686,6 +846,11 @@ class BusinessResearchService {
       }
     }
 
+    // --- LEVEL 3.8: go get the business's own website and read it ---
+    // Runs before AI enrichment so the model only has to fill what a real
+    // source could not supply.
+    providerTrace.officialWebsite = await this._enrichFromOfficialWebsite(profile, sourceUrl);
+
     // --- LEVEL 4: AI enrichment of gaps (does not overwrite high-confidence data) ---
     if (this._hasGaps(profile)) {
       await this._enrichMissingWithAI(profile, sourceUrl);
@@ -721,6 +886,15 @@ class BusinessResearchService {
       : {
           geoapify: providerTrace.geoapify,
           webExtraction: providerTrace.webExtraction,
+          // Status only — never the probed/attempted URLs, which are model
+          // guesses and internal crawl detail.
+          officialWebsite: providerTrace.officialWebsite
+            ? {
+                status: providerTrace.officialWebsite.status,
+                matched: providerTrace.officialWebsite.matched,
+                fieldsFilled: (providerTrace.officialWebsite.acceptedFields || []).length,
+              }
+            : null,
           aiEnrichment: providerTrace.aiEnrichment,
         };
 
@@ -1421,7 +1595,209 @@ class BusinessResearchService {
   }
 
   /**
-   * Enrich missing profile fields without overwriting provider facts.
+   * Go get the business's own website and read it.
+   *
+   * Two situations are handled:
+   *  1. We already have a website but the profile is still thin (no email, no
+   *     address, no description) — crawl the known URL and extract.
+   *  2. We have no website at all — ask the AI to propose candidate domains,
+   *     then probe each one and keep only a page that corroborates the business
+   *     we already have a record for.
+   *
+   * The AI proposes; deterministic extraction reads. A crawled page is merged as
+   * `discovered` (not `verified`) because a scrape is an observation, not a
+   * confirmation, and it must not outrank provider data we already hold.
+   *
+   * Best-effort: any failure returns a trace and never breaks the pipeline.
+   *
+   * @param {BusinessProfile} profile
+   * @param {string} [sourceUrl]
+   * @returns {Promise<Object>} providerTrace fragment
+   */
+  async _enrichFromOfficialWebsite(profile, sourceUrl = null) {
+    const trace = {
+      status: 'skipped',
+      sourceUrl: null,
+      matched: false,
+      matchReason: null,
+      attemptedUrls: [],
+      acceptedFields: [],
+    };
+
+    if (!config?.ai?.officialWebsiteEnrichment) {
+      trace.status = 'disabled';
+      return trace;
+    }
+
+    const knownName = profile.get('identity.name');
+    if (!knownName) {
+      trace.status = 'no_identity';
+      return trace;
+    }
+
+    // Only worth doing when something meaningful is still missing.
+    const wanted = OFFICIAL_WEBSITE_ALLOWED_PATHS.filter((p) => {
+      const v = profile.get(p);
+      if (v == null || v === '') return true;
+      if (Array.isArray(v)) return v.length === 0;
+      return false;
+    });
+    if (wanted.length === 0) {
+      trace.status = 'nothing_missing';
+      return trace;
+    }
+
+    const knownPhone = profile.get('contact.phone');
+    const candidates = [];
+
+    const knownWebsite = profile.get('contact.website');
+    if (knownWebsite) {
+      candidates.push(knownWebsite);
+    } else {
+      // No website yet — let the model suggest domains to probe.
+      const proposed = await this._proposeOfficialWebsiteUrls(knownName, {
+        city: profile.get('location.city'),
+        state: profile.get('location.state'),
+        country: profile.get('location.country'),
+        category: profile.get('identity.category'),
+      });
+      candidates.push(...proposed);
+      trace.proposedByAi = proposed.length;
+    }
+
+    if (candidates.length === 0) {
+      trace.status = 'no_candidates';
+      return trace;
+    }
+
+    const provider = new OfficialWebsiteProvider();
+    const maxProbes = config?.ai?.officialWebsiteMaxCandidates || 3;
+
+    for (const url of candidates.slice(0, maxProbes)) {
+      trace.attemptedUrls.push(url);
+      let crawled;
+      try {
+        crawled = await provider.extract(url);
+      } catch (error) {
+        if (config?.debugBusinessAnalysis) {
+          console.log('[BusinessResearchService] official website fetch failed:', url, error?.message);
+        }
+        continue;
+      }
+
+      // A proposed domain is only a guess until the page proves otherwise.
+      const verdict = officialWebsiteMatches({ knownName, knownPhone, crawled });
+      if (!verdict.matched) {
+        trace.rejected = trace.rejected || [];
+        trace.rejected.push({ url, reason: verdict.reason });
+        if (config?.debugBusinessAnalysis) {
+          console.log(`[BusinessResearchService] official website rejected: ${url} (${verdict.reason})`);
+        }
+        continue;
+      }
+
+      const record = pickOfficialWebsiteFields(crawled);
+      if (Object.keys(record.contact).length === 0
+          && Object.keys(record.location).length === 0
+          && Object.keys(record.business).length === 0
+          && record.social_links.length === 0) {
+        continue;
+      }
+
+      const sourceInfo = {
+        sourceUrl: crawled?.metadata?.sourceUrl || url,
+        provider: 'official_website',
+        extractionMethod: 'dom',
+      };
+
+      const pipelineResult = await mergeRecordThroughPipeline(
+        profile,
+        record,
+        'discovered',
+        sourceInfo,
+        { onlyIfMissing: true }
+      );
+
+      trace.status = 'ok';
+      trace.matched = true;
+      trace.matchReason = verdict.reason;
+      trace.sourceUrl = sourceInfo.sourceUrl;
+      trace.acceptedFields = (pipelineResult.accepted || []).map((c) => c.fieldPath);
+
+      if (config?.debugBusinessAnalysis) {
+        console.log(`[QualityBoundary] official_website: accepted=${trace.acceptedFields.length} (${verdict.reason})`);
+      }
+      return trace;
+    }
+
+    trace.status = trace.rejected?.length ? 'unverified' : 'unreachable';
+    return trace;
+  }
+
+  /**
+   * Ask the AI which domains might belong to this business.
+   *
+   * This is a guess generator, not a resolver: every proposal is SSRF-validated
+   * and then verified against the fetched page before use, so a wrong answer
+   * costs a request rather than polluting the profile.
+   */
+  async _proposeOfficialWebsiteUrls(knownName, context = {}) {
+    try {
+      const { default: AIService } = await import('./AIService.js');
+
+      const result = await AIService.generate({
+        prompt: [
+          'Which website domains most likely belong to this business?',
+          '',
+          'BUSINESS NAME: ' + knownName,
+          'CATEGORY: ' + (context.category || 'unknown'),
+          'LOCATION: ' + [context.city, context.state, context.country].filter(Boolean).join(', '),
+          '',
+          'Rules:',
+          '- Suggest at most 3 domains, most likely first.',
+          '- Only suggest a domain if you have genuine knowledge that this business operates it. A large national or well-known brand may have an obvious domain; a small local business usually will not.',
+          '- If you do not know, return an empty array. An empty array is the correct and expected answer for most local businesses.',
+          '- Return bare https URLs only, no paths, no trailing slashes.',
+          '- Return ONLY valid JSON. No markdown, no extra text.',
+        ].join('\n'),
+        model: 'fast',
+        schema: {
+          type: 'object',
+          properties: {
+            urls: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['urls'],
+          additionalProperties: false,
+        },
+        temperature: 0,
+        maxTokens: 300,
+        systemPrompt: 'You return JSON only. You never invent domain names. Returning an empty array is correct and preferred over guessing.',
+      });
+
+      const urls = Array.isArray(result?.urls) ? result.urls : [];
+      return urls
+        .filter((u) => typeof u === 'string')
+        .map((u) => u.trim())
+        // Only https, no embedded credentials, no path — the provider fetches
+        // the site root and SSRF-validates every redirect from there.
+        .filter((u) => /^https:\/\/[a-z0-9.-]+$/i.test(u) && !u.includes('@'))
+        .slice(0, config?.ai?.officialWebsiteMaxCandidates || 3);
+    } catch (error) {
+      if (config?.debugBusinessAnalysis) {
+        console.log('[BusinessResearchService] website proposal failed:', error?.safeMessage || error?.message);
+      }
+      return [];
+    }
+  }
+
+  /**
+   * Ask the AI to fill unresolved profile fields.
+   *
+   * The AI never sees raw HTML — it only sees verified structured facts plus the
+   * field paths that are still open, and it must return a confidence and an
+   * evidence snippet for anything factual it asserts. Factual output is recorded
+   * as `ai_generated` by runAIEnrichmentPipeline so downstream consumers can
+   * always tell a model-produced phone number from an observed one.
    */
   async _enrichMissingWithAI(profile, sourceUrl) {
     try {
@@ -1431,68 +1807,89 @@ class BusinessResearchService {
       const known = {
         name: profile.get('identity.name'),
         phone: profile.get('contact.phone'),
+        email: profile.get('contact.email'),
         website: profile.get('contact.website'),
         address: profile.get('location.full_address'),
+        city: profile.get('location.city'),
+        state: profile.get('location.state'),
+        postal_code: profile.get('location.postal_code'),
         coordinates: profile.get('location.coordinates'),
         rating: profile.get('ratings.rating'),
         review_count: profile.get('ratings.review_count'),
         category: profile.get('identity.category'),
+        business_type: profile.get('identity.business_type'),
       };
 
-      // Unresolved fields AI may attempt to fill / normalize
-      const unresolved = {
+      // Everything the AI is allowed to write, with whatever we already hold.
+      const open = {
+        category: profile.get('identity.category'),
+        categories: profile.get('identity.categories'),
+        business_type: known.business_type,
         description: profile.get('identity.description'),
-        services: (profile.get('identity.services') || []).slice(0, 20),
-        category: known.category,
+        services: profile.get('identity.services'),
+        products: profile.get('business.products'),
+        amenities: profile.get('business.amenities'),
+        phone: known.phone,
+        email: known.email,
+        website: known.website,
+        full_address: known.address,
+        city: known.city,
+        state: known.state,
+        postal_code: known.postal_code,
+        hours: profile.get('hours'),
+        social_links: profile.get('social_links'),
       };
 
-      // If nothing meaningful is unresolved, skip AI to save calls
-      const hasSomethingToEnrich =
-        !known.category ||
-        !known.description ||
-        (unresolved.services && unresolved.services.length === 0);
+      // Only ask for fields that are genuinely open. A field we already hold
+      // with healthy confidence is dropped from the ask entirely, which both
+      // saves tokens and removes any chance of the model "correcting" it.
+      const gaps = Object.entries(open).filter(([, value]) => {
+        if (value == null || value === '') return true;
+        if (Array.isArray(value)) return value.length === 0;
+        if (typeof value === 'object') return Object.keys(value).length === 0;
+        return false;
+      }).map(([key]) => key);
 
-      if (!hasSomethingToEnrich) return;
+      if (gaps.length === 0) return;
 
       const prompt = [
         'You are a business-data enrichment assistant. You are given KNOWN verified structured facts for a business and a list of UNRESOLVED fields.',
         '',
-        'KNOWN STRUCTURED DATA (do not contradict or overwrite these):',
+        'KNOWN STRUCTURED DATA (treat as ground truth; never contradict it):',
         JSON.stringify(known, null, 2),
         '',
-        'UNRESOLVED FIELDS TO FILL (return existing values if already set):',
-        JSON.stringify(unresolved, null, 2),
+        `UNRESOLVED FIELDS TO FILL (${gaps.join(', ')}):`,
+        JSON.stringify(gaps, null, 2),
+        '',
+        'Return an object with exactly these keys: ' + Object.keys(open).join(', ') + '.',
+        '',
+        'Each value must be an envelope: { "value": <the value or null>, "confidence": <0.0-1.0 or null>, "evidence": <short snippet or null> }.',
         '',
         'Rules:',
-        '- Only fill fields that are currently null/empty; never change provided KNOWN values.',
-        '- category must be a short concrete business type/category label.',
-        '- description must be 1-3 concise sentences about the business (not a hallucination of facts).',
-        '- services must be an array of concrete service strings derived from the business category/known facts. Leave empty if you cannot infer any.',
+        '- Only populate the fields listed as UNRESOLVED. For every other key return { "value": null, "confidence": null, "evidence": null }.',
+        '- Factual fields (phone, email, website, full_address, city, state, postal_code, hours, social_links) are HIGH RISK: you are inferring from a business name and category, not reading a source. If you do not genuinely know the value, return null. A null is always better than a plausible guess.',
+        '- If you do populate a factual field, set confidence to your real certainty (below 0.5 if you are guessing) and put the reasoning in evidence.',
+        '- category: short concrete business type label. categories: array of alternative labels. business_type: industry or legal structure.',
+        '- description: 1-3 concise factual sentences. services / products / amenities: arrays of short concrete strings. Derive these from the category; leave empty if nothing sensible follows.',
+        '- hours: an object keyed by lowercase day name, e.g. { "monday": "09:00-17:00", "sunday": "closed" }. Use 24h time, "closed" for a closed day, and null for a day you do not know.',
+        '- social_links: array of full URLs. Leave empty if unknown.',
         '- Return ONLY valid JSON matching the schema. No markdown, no extra text.',
       ].join('\n');
-
-      const schema = {
-        type: 'object',
-        properties: {
-          category: { type: ['string', 'null'] },
-          description: { type: ['string', 'null'] },
-          services: { type: 'array', items: { type: 'string' } },
-        },
-        required: ['category', 'description', 'services'],
-      };
 
       const result = await AIService.generate({
         prompt,
         model: 'reasoning',
-        schema,
-        temperature: 0.3,
-        maxTokens: 1500,
-        systemPrompt: 'You enrich only the missing business fields using the provided known data. Never invent factual fields like phone/address/website that were not verified.',
+        schema: buildEnrichmentSchema(),
+        temperature: 0.2,
+        maxTokens: 3000,
+        systemPrompt: 'You enrich business profiles from verified structured facts. You return JSON only. You never fabricate contact details, addresses, or URLs — an honest null is always preferred over an invented value.',
       });
 
       if (result && typeof result === 'object') {
-        const aiResult = { ...result };
-        const pipelineResult = await runAIEnrichmentPipeline(profile, aiResult, sourceUrl);
+        const pipelineResult = await runAIEnrichmentPipeline(profile, result, sourceUrl, {
+          overwriteBelowConfidence: config?.ai?.enrichmentOverwriteBelowConfidence ?? null,
+          minIncomingConfidence: config?.ai?.enrichmentMinIncomingConfidence ?? 0.75,
+        });
 
         if (config?.debugBusinessAnalysis && pipelineResult.diagnostics) {
           console.log(`[QualityBoundary] ai_enrichment: candidates=${pipelineResult.diagnostics.totalCandidates}, accepted=${pipelineResult.diagnostics.byStatus?.accepted}, rejected=${pipelineResult.diagnostics.byStatus?.rejected}`);
@@ -1505,15 +1902,29 @@ class BusinessResearchService {
   }
 
   _hasGaps(profile) {
+    // Must cover every field _enrichMissingWithAI is allowed to write, or the
+    // widened enrichment becomes unreachable whenever only a secondary field
+    // (email, hours, socials) is missing.
     const fields = [
       'identity.name',
       'identity.category',
       'identity.description',
+      'identity.business_type',
       'contact.phone',
+      'contact.email',
       'contact.website',
       'location.full_address',
+      'location.city',
+      'hours',
+      'social_links',
     ];
-    return fields.some((f) => profile.get(f) == null);
+    return fields.some((f) => {
+      const v = profile.get(f);
+      if (v == null || v === '') return true;
+      if (Array.isArray(v)) return v.length === 0;
+      if (typeof v === 'object') return Object.keys(v).length === 0;
+      return false;
+    });
   }
 
   /**

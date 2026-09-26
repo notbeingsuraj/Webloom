@@ -7,11 +7,95 @@ import BrandStrategyService from '../services/BrandStrategyService.js';
 import DigitalAuditService from '../services/DigitalAuditService.js';
 import CanonicalBusinessProfileService from '../services/CanonicalBusinessProfileService.js';
 import LeadWebsiteSpecService from '../services/LeadWebsiteSpecService.js';
+import { initializeDatabase, getRawDb } from '../db/client.js';
 
 const router = express.Router();
 
-// In-memory lead cache (in production, use database)
+// Lead cache backed by the SQLite `lead` table (purely as a write-through
+// persistence layer for what remains an in-memory cache in this module).
 const leadCache = new Map();
+
+let storeReady = false;
+let storeDbError = null;
+
+/**
+ * Hydrate the in-memory cache from the SQLite `lead` table once. Runs lazily
+ * on first use so it is independent of boot ordering. Any DB failure degrades
+ * to in-memory-only behavior (routes never fail on persistence concerns).
+ */
+async function ensureLeadStore() {
+  if (storeReady) return;
+  storeReady = true;
+  try {
+    await initializeDatabase();
+    const db = getRawDb();
+    const rows = db.prepare('SELECT id, payload FROM lead').all();
+    for (const row of rows) {
+      try {
+        leadCache.set(row.id, JSON.parse(row.payload));
+      } catch (e) {
+        console.warn('[leads] Skipping unreadable lead row:', row.id);
+      }
+    }
+    console.log(`[leads] Hydrated ${leadCache.size} lead(s) from SQLite`);
+  } catch (e) {
+    storeDbError = e;
+    console.error('[leads] SQLite unavailable — running in-memory only:', e?.message || String(e));
+  }
+}
+
+/**
+ * Write-through: upsert the lead row so it survives an API restart.
+ */
+function persistLead(lead) {
+  if (storeDbError) return;
+  try {
+    const db = getRawDb();
+    db.prepare(`
+      INSERT INTO lead (id, payload, created_at, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        payload = excluded.payload,
+        updated_at = excluded.updated_at
+    `).run(
+      lead._id,
+      JSON.stringify(lead),
+      lead.createdAt || new Date().toISOString(),
+      lead.updatedAt || new Date().toISOString()
+    );
+  } catch (e) {
+    console.warn('[leads] Persist failed (in-memory fallback):', e?.message || String(e));
+  }
+}
+
+/**
+ * Write-through: drop the lead row.
+ */
+function removeLead(id) {
+  if (storeDbError) return;
+  try {
+    getRawDb().prepare('DELETE FROM lead WHERE id = ?').run(id);
+  } catch (e) {
+    console.warn('[leads] Delete failed (in-memory fallback):', e?.message || String(e));
+  }
+}
+
+/**
+ * GET /:id fallback → read straight from SQLite when the Map misses (covers
+ * cross-process consistency / cache eviction).
+ */
+function fetchLeadFromStore(id) {
+  if (storeDbError) return null;
+  try {
+    const row = getRawDb().prepare('SELECT payload FROM lead WHERE id = ?').get(id);
+    return row ? JSON.parse(row.payload) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Hydrate the cache at load time; DB errors degrade to in-memory-only.
+await ensureLeadStore();
 
 /**
  * POST /api/leads
@@ -249,6 +333,7 @@ router.post('/', async (req, res, next) => {
     };
 
     leadCache.set(leadId, lead);
+    persistLead(lead);
 
     const elapsedMs = Date.now() - requestStartTime;
     console.log('[leads] analysis complete', {
@@ -379,7 +464,7 @@ router.get('/', (req, res, next) => {
 router.get('/:id', (req, res, next) => {
   try {
     const { id } = req.params;
-    const lead = leadCache.get(id);
+    const lead = leadCache.get(id) || fetchLeadFromStore(id);
     
     if (!lead) {
       return res.status(404).json({ 
@@ -421,6 +506,7 @@ router.put('/:id', (req, res, next) => {
 
     const updatedLead = { ...lead, ...updates, updatedAt: new Date().toISOString() };
     leadCache.set(id, updatedLead);
+    persistLead(updatedLead);
 
     res.json({
       success: true,
@@ -446,6 +532,7 @@ router.delete('/:id', (req, res, next) => {
     }
 
     leadCache.delete(id);
+    removeLead(id);
 
     res.json({
       success: true,
@@ -611,6 +698,7 @@ router.post('/:id/website-spec', async (req, res, next) => {
     lead.generatedWebsite = result;
     lead.updatedAt = new Date().toISOString();
     leadCache.set(id, lead);
+    persistLead(lead);
 
     res.json({ success: true, data: result });
   } catch (error) {

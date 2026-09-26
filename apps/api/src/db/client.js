@@ -464,6 +464,20 @@ function createTables(db) {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_review_item_status ON review_item(status)
   `);
+
+  // Lead table (persistent store for the in-memory lead cache in routes/leads.js).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS lead (
+      id TEXT PRIMARY KEY,
+      payload TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_lead_created_at ON lead(created_at)
+  `);
 }
 
 /**

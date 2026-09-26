@@ -170,10 +170,12 @@ const SERVICES_SOURCES = [
 const PRODUCTS_SOURCES = [
   (r) => r?.business?.products,
   (r) => r?.products,
+  (r) => unwrapValue(r?.identity?.products),
 ];
 const AMENITIES_SOURCES = [
   (r) => r?.business?.amenities,
   (r) => r?.amenities,
+  (r) => unwrapValue(r?.identity?.amenities),
 ];
 const HOURS_SOURCES = [
   (r) => r?.business?.hours,

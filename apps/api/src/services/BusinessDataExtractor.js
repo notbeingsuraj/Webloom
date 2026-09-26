@@ -846,7 +846,7 @@ Rules:
         safeMessage: error?.message || 'AI provider request failed.',
         retryAttempted: false,
         retryCount: 0,
-        provider: 'omniroute',
+        provider: 'opencode',
         model: 'reasoning',
         success: false,
       };
@@ -1020,7 +1020,7 @@ Rules:
           safeMessage: 'The source responded, but no business evidence was available.',
           httpStatus: pageData.status,
           provider: 'web_extraction',
-          model: config.omniroute.models.reasoning,
+          model: config.opencode.models.reasoning,
           success: false,
         });
       } else {
@@ -1280,8 +1280,8 @@ Rules:
           completeness: 0,
           providerError: acquisition.errors?.[0] || null,
           providerUnavailable: acquisition.status === ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
-          gateway: config.omniroute.baseUrl,
-          model: config.omniroute.models.reasoning,
+          gateway: config.opencode.baseUrl,
+          model: config.opencode.models.reasoning,
         },
         cached: false,
       };
@@ -1355,8 +1355,8 @@ Rules:
         completeness: profile.getCompleteness(),
         providerError: extractedProfile?.providerError || null,
         providerUnavailable: Boolean(extractedProfile?.providerUnavailable),
-        gateway: config.omniroute.baseUrl,
-        model: config.omniroute.models.reasoning,
+        gateway: config.opencode.baseUrl,
+        model: config.opencode.models.reasoning,
         // P1.8: retain the retrieved page text as recoverable evidence for the
         // source-grounded fallback extractor. This is the SAME text the AI
         // extraction prompt already consumes — carrying it forward lets the

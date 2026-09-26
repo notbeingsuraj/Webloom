@@ -154,8 +154,20 @@ class BusinessProfile {
     // treat a legitimate source-tier win as a problem (push-audit §7).
     // Equal tier + equal/lower confidence with different values = a real tie:
     // recorded unresolved (no winner).
+    //
+    // `overwriteAuthorized` is the one narrow escape from the P1.2 quarantine
+    // above. It is set only by CandidatePipeline after that pipeline has already
+    // verified the existing value sits below an explicit confidence floor, and
+    // it re-checks that floor here rather than trusting the caller. Absent this
+    // flag the quarantine is absolute and unchanged.
+    const authorizedWeakOverwrite = sourceInfo?.overwriteAuthorized === true
+      && typeof sourceInfo?.overwriteBelowConfidence === 'number'
+      && hasExistingValue
+      && (current?.confidence ?? 0) < sourceInfo.overwriteBelowConfidence;
+
     if (isNewValue && hasExistingValue && current?.value !== value) {
-      const newWins = sourceInfo.canonical === true || newPriority > currentPriority ||
+      const newWins = sourceInfo.canonical === true || authorizedWeakOverwrite
+        || newPriority > currentPriority ||
         (newPriority === currentPriority && confidence > (current?.confidence || 0));
       const existingWins = !newWins && newPriority < currentPriority;
       const hasCleanWinner = newWins || existingWins;
@@ -181,6 +193,7 @@ class BusinessProfile {
     }
     
     const shouldUpdate = sourceInfo.canonical === true
+      || authorizedWeakOverwrite
       || newPriority > currentPriority
       || (newPriority === currentPriority && confidence > (current?.confidence || 0));
 

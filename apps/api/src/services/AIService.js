@@ -11,23 +11,28 @@ export const PROVIDER_ERROR_CATEGORIES = Object.freeze({
 });
 
 /**
- * AI Service - Unified interface for AI model interactions via OmniRoute
+ * AI Service - Unified interface for AI model interactions via OpenCode Zen
  *
  * This service provides a single abstraction layer for all AI calls,
  * allowing easy model switching and routing.
  */
 
 class AIService {
+  // Cached result of the most recent probeGateway() call, shared by all
+  // instances. Lets /health/detailed report verified status without issuing a
+  // billable request on every health check.
+  static lastProbe = null;
+
   constructor() {
     this.client = axios.create({
-      baseURL: config.omniroute.baseUrl,
+      baseURL: config.opencode.baseUrl,
       // AI calls (brand DNA, digital audit, re-research) are long-running
       // reasoning tasks — they need a much larger budget than the 15s
       // extraction timeout. Coupling them previously forced every enrichment
       // to degrade on slow (but healthy) gateway routes.
       timeout: config.ai.timeout,
       headers: {
-        'Authorization': `Bearer ${config.omniroute.apiKey}`,
+        'Authorization': `Bearer ${config.opencode.apiKey}`,
         'Content-Type': 'application/json',
       },
     });
@@ -93,7 +98,7 @@ class AIService {
     return PROVIDER_ERROR_CATEGORIES.PROVIDER_UNAVAILABLE;
   }
 
-  normalizeProviderError({ status = null, message = '', model = null, provider = 'omniroute', retryAttempted = false, retryCount = 0, latencyMs = null, errorCode = null } = {}) {
+  normalizeProviderError({ status = null, message = '', model = null, provider = 'opencode', retryAttempted = false, retryCount = 0, latencyMs = null, errorCode = null } = {}) {
     const safeMessage = this.sanitizeSecretText(message || 'AI provider request failed.');
     const category = this.classifyProviderError({ status, message: safeMessage, errorCode });
 
@@ -136,7 +141,7 @@ class AIService {
       status: primaryError?.status ?? null,
       message: primaryError?.message || 'Primary provider request failed.',
       model: primaryModel,
-      provider: 'omniroute',
+      provider: 'opencode',
       retryAttempted: Boolean(primaryError?.retryAttempted),
       retryCount,
       latencyMs: primaryError?.latencyMs ?? null,
@@ -146,7 +151,7 @@ class AIService {
       status: fallbackError?.status ?? null,
       message: fallbackError?.message || 'Fallback provider request failed.',
       model: fallbackModel,
-      provider: 'omniroute',
+      provider: 'opencode',
       retryAttempted: Boolean(fallbackError?.retryAttempted),
       retryCount,
       latencyMs: fallbackError?.latencyMs ?? null,
@@ -164,7 +169,7 @@ class AIService {
     const aggregate = new Error(safeMessage);
     aggregate.providerError = {
       category: fallbackFailure.category || primaryFailure.category || PROVIDER_ERROR_CATEGORIES.PROVIDER_UNAVAILABLE,
-      provider: 'omniroute',
+      provider: 'opencode',
       model: primaryModel,
       fallbackModel: fallbackModel || null,
       primaryModel,
@@ -188,10 +193,10 @@ class AIService {
     return aggregate;
   }
 
-  getProviderDiagnostics({ gateway = config.omniroute.baseUrl, model = null, providerError = null, retryCount = 0, latencyMs = null, success = false } = {}) {
+  getProviderDiagnostics({ gateway = config.opencode.baseUrl, model = null, providerError = null, retryCount = 0, latencyMs = null, success = false } = {}) {
     return {
       gateway,
-      model: model || config.omniroute.models.fast,
+      model: model || config.opencode.models.fast,
       providerErrorCategory: providerError?.category || null,
       httpStatus: providerError?.httpStatus ?? null,
       retryCount,
@@ -257,7 +262,7 @@ class AIService {
         status: null,
         message: invalidResponseError.message,
         model,
-        provider: 'omniroute',
+        provider: 'opencode',
         retryAttempted: false,
         retryCount: 0,
         latencyMs: null,
@@ -277,7 +282,7 @@ class AIService {
           status: null,
           message: malformedError.message,
           model,
-          provider: 'omniroute',
+          provider: 'opencode',
           retryAttempted: false,
           retryCount: 0,
           latencyMs: null,
@@ -292,7 +297,7 @@ class AIService {
   }
 
   async generate({ prompt, model = 'fast', schema = null, temperature = 0.7, maxTokens = 4000, systemPrompt = null }) {
-    if (!config.omniroute.apiKey) throw new Error('Missing OMNIROUTE_API_KEY');
+    if (!config.opencode.apiKey) throw new Error('Missing OPENCODE_API_KEY');
 
     const primaryModel = this.selectModel(model);
     const fallbackModel = this.getFallbackModel(primaryModel);
@@ -305,7 +310,7 @@ class AIService {
         const startedAt = Date.now();
         try {
           if (config.debugBusinessAnalysis) {
-            console.log('[AI] Provider: OmniRoute');
+            console.log('[AI] Provider: OpenCode');
             console.log('[AI] Model:', modelName);
             console.log('[AI] Prompt Data Size:', prompt.length);
           }
@@ -327,7 +332,7 @@ class AIService {
             status,
             message: sanitizedMessage,
             model: modelName,
-            provider: 'omniroute',
+            provider: 'opencode',
             retryAttempted: attempt > 1,
             retryCount: Math.max(0, attempt - 1),
             latencyMs: Date.now() - startedAt,
@@ -382,7 +387,7 @@ class AIService {
         status: null,
         message: 'AI generation failed.',
         model: modelName,
-        provider: 'omniroute',
+        provider: 'opencode',
         retryAttempted: false,
         retryCount: 0,
         latencyMs: null,
@@ -419,7 +424,7 @@ class AIService {
     if (config.ai?.primaryModel) {
       return config.ai.primaryModel;
     }
-    return config.omniroute.models[taskType] || config.omniroute.models.fast;
+    return config.opencode.models[taskType] || config.opencode.models.fast;
   }
 
   getFallbackModel(primaryModel) {
@@ -427,30 +432,95 @@ class AIService {
       return config.ai.fallbackModel;
     }
     // Robust default: if the primary is a heavy reasoning model, fall back to
-    // the fast combo (always present in the OmniRoute catalog). If the primary
+    // the fast model (always present in the OpenCode catalog). If the primary
     // is already fast, there is no meaningful fallback.
     if (primaryModel && primaryModel.includes('fast')) return null;
-    return config.omniroute.models.fast || 'auto/best-fast';
+    return config.opencode.models.fast || 'gemini-3.8-flash';
   }
 
   /**
-   * Probe the OmniRoute gateway at startup (non-fatal).
+   * Probe the OpenCode gateway at startup (non-fatal).
    * Verifies the gateway is reachable and the configured API key is accepted,
    * so config drift (rotated key, wrong port, gateway down) is visible
    * immediately instead of surfacing as slow per-request timeouts.
-   * @returns {Promise<{ok: boolean, statusCode: number|null, message: string, modelCount: number}>}
+   *
+   * `GET /models` is NOT an auth check — the OpenCode Zen gateway serves the
+   * model catalog without credentials, so a wrong or mismatched key still
+   * returns 200 with the full list. Reporting that as "reachable" is what let
+   * a dead key pass boot and surface much later as an opaque per-feature
+   * failure. So the probe now also spends one max_tokens:1 completion to prove
+   * the key authenticates AND that the configured model resolves on the
+   * /chat/completions route this client actually uses.
+   *
+   * @returns {Promise<{ok: boolean, authVerified: boolean, statusCode: number|null,
+   *                    message: string, modelCount: number, category?: string}>}
    */
-  async probeGateway() {
-    const gateway = config.omniroute.baseUrl;
+  async probeGateway({ verifyAuth = config?.ai?.probeVerifyAuth !== false } = {}) {
+    const gateway = config.opencode.baseUrl;
+    const record = (result) => {
+      AIService.lastProbe = { ...result, checkedAt: new Date().toISOString() };
+      return AIService.lastProbe;
+    };
+
+    let reachable = false;
+    let modelCount = 0;
+    let statusCode = null;
+
     try {
       const resp = await this.client.get('/models', { timeout: 5000 });
-      const models = resp.data?.data || [];
-      return {
+      reachable = true;
+      statusCode = resp.status;
+      modelCount = resp.data?.data?.length || 0;
+    } catch (error) {
+      const status = error?.response?.status ?? error?.status ?? null;
+      return record({
+        ok: false,
+        reachable: false,
+        authVerified: false,
+        statusCode: status,
+        message: status === 401 || status === 403
+          ? `AI gateway rejected the API key (HTTP ${status}) — check OPENCODE_API_KEY`
+          : `AI gateway unreachable at ${gateway}: ${error?.message || 'unknown error'}`,
+        modelCount: 0,
+        category: this.classifyProviderError({
+          status,
+          message: error?.message || '',
+          errorCode: error?.code || null,
+        }),
+      });
+    }
+
+    if (!verifyAuth) {
+      return record({
         ok: true,
-        statusCode: resp.status,
-        message: `OmniRoute gateway reachable (${models.length} models available)`,
-        modelCount: models.length,
-      };
+        reachable: true,
+        authVerified: false,
+        statusCode,
+        message: `AI gateway reachable (${modelCount} models) — auth NOT verified`,
+        modelCount,
+      });
+    }
+
+    // Cheapest possible authenticated call. Proves the key works and that the
+    // model we would actually send is routable on /chat/completions — a model
+    // the gateway only serves on a provider-native route (/messages,
+    // /responses) fails here instead of on every feature.
+    const model = this.selectModel('fast');
+    try {
+      await this.client.post('/chat/completions', {
+        model,
+        messages: [{ role: 'user', content: 'ping' }],
+        max_tokens: 1,
+      }, { timeout: Math.min(config.ai.timeout, 20000) });
+
+      return record({
+        ok: true,
+        reachable: true,
+        authVerified: true,
+        statusCode,
+        message: `AI gateway reachable (${modelCount} models), auth verified on ${model}`,
+        modelCount,
+      });
     } catch (error) {
       const status = error?.response?.status ?? error?.status ?? null;
       const category = this.classifyProviderError({
@@ -458,16 +528,39 @@ class AIService {
         message: error?.message || '',
         errorCode: error?.code || null,
       });
-      return {
+      const detail = this.sanitizeSecretText(
+        error?.response?.data?.error?.message || error?.message || 'unknown error'
+      );
+
+      let hint;
+      if (status === 401 || status === 403) {
+        hint = 'the key was rejected — it does not belong to this gateway';
+      } else if (status === 400 || /not supported|unknown model/i.test(detail)) {
+        hint = `model "${model}" is not routable on /chat/completions — pick a model Zen serves on that route (see opencode.ai/docs/zen)`;
+      } else if (status === 402) {
+        hint = 'the Zen account has no balance — Zen is pay-as-you-go';
+      } else {
+        hint = detail;
+      }
+
+      return record({
         ok: false,
+        reachable: true,
+        authVerified: false,
         statusCode: status,
-        message: status === 401 || status === 403
-          ? `OmniRoute gateway rejected the API key (HTTP ${status}) — check OMNIROUTE_API_KEY`
-          : `OmniRoute gateway unreachable at ${gateway}: ${error?.message || 'unknown error'}`,
-        modelCount: 0,
+        message: `AI gateway reachable but unusable: ${hint}`,
+        modelCount,
         category,
-      };
+      });
     }
+  }
+
+  /**
+   * Last gateway probe result, cached in memory. Lets /health/detailed report
+   * verified truth without spending a token on every health check.
+   */
+  getLastProbe() {
+    return AIService.lastProbe || null;
   }
 
   /**

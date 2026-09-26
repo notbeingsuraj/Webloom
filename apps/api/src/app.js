@@ -26,7 +26,7 @@ app.use(
   cors({
     origin: (origin, callback) => {
       const isDevelopmentOrigin = config.nodeEnv === 'development'
-        && (!origin || /^https?:\/\/localhost:\d+$/.test(origin));
+        && (!origin || /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin));
       const isConfiguredOrigin = !origin || origin === config.frontendUrl;
 
       callback(null, isConfiguredOrigin || isDevelopmentOrigin);
