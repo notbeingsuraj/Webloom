@@ -293,7 +293,7 @@ The generator is intentionally downstream of the research pipeline.
            ┌─────────────────┐  ┌──────────────────┐
            │ Research Layer  │  │    AI Layer      │
            │                 │  │                  │
-           │ Geoapify        │  │ OmniRoute        │
+           │ Geoapify        │  │ OpenRouter       │
            │ Web Extraction  │  │ AI Enrichment    │
            │ Provider Logic  │  │ Brand DNA        │
            └────────┬────────┘  │ Design Intel.    │
@@ -348,7 +348,7 @@ Current integrations include:
 
 - **Geoapify** — structured business and location data
 - **r.jina.ai** — web content extraction
-- **OmniRoute** — model routing and AI inference
+- **AI provider chain** — OpenRouter (primary) -> Gemini (secondary) -> local/OpenAI-compatible (fallback), with bounded retries, timeouts, and structured-output validation
 
 Provider-specific logic is isolated so that individual data sources can be replaced or extended without redesigning the complete pipeline.
 
@@ -400,7 +400,7 @@ Astro provides a lightweight rendering layer suitable for business websites, whi
 |---|---|---|
 | Frontend | React + Vite | Webloom application interface |
 | Backend | Node.js + Express | API and system orchestration |
-| AI Routing | OmniRoute | Model routing and inference |
+| AI Routing | OpenRouter + Gemini + local | Provider chain with fallback, retries, and validation |
 | Business Data | Geoapify | Structured business/location data |
 | Web Extraction | r.jina.ai | External website/content extraction |
 | Generated Sites | Astro + Vite | Website generation and rendering |

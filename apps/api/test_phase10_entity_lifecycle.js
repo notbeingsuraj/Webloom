@@ -119,7 +119,7 @@ async function runProcessB() {
 function runChild(mode) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
-      env: { ...process.env, PHASE10_MODE: mode, SQLITE_DATABASE_PATH: databasePath, OMNIROUTE_API_KEY: 'phase10-test' },
+      env: { ...process.env, PHASE10_MODE: mode, SQLITE_DATABASE_PATH: databasePath, OPENROUTER_API_KEY: '', GEMINI_API_KEY: '', LOCAL_AI_API_KEY: '', OPENROUTER_MODEL: '', GEMINI_MODEL: '', LOCAL_AI_MODEL: '' },
       stdio: 'inherit',
     });
     child.once('error', reject);

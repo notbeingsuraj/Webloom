@@ -2,7 +2,7 @@ import express from 'express';
 import BusinessResearchService from '../services/BusinessResearchService.js';
 import BusinessDataExtractor from '../services/BusinessDataExtractor.js';
 import CanonicalBusinessProfileService from '../services/CanonicalBusinessProfileService.js';
-import { config } from '../config/env.js';
+import AIService from '../services/AIService.js';
 
 const router = express.Router();
 
@@ -100,8 +100,10 @@ router.post('/analyze', async (req, res, next) => {
         error: 'provider_unavailable',
         message: providerError.safeMessage,
         provider: {
-          gateway: config.opencode.baseUrl,
-          model: config.opencode.models.reasoning,
+          // `gateway` is kept for response-shape compatibility and is always
+          // null — Webloom calls providers directly.
+          gateway: null,
+          aiProviders: AIService.getChainSummary(),
           category: providerError.category || 'PROVIDER_UNAVAILABLE',
           httpStatus: providerError.httpStatus || null,
           retryCount: 0,
@@ -163,6 +165,12 @@ router.post('/analyze', async (req, res, next) => {
       metadata: {
         source: 'geoapify_and_web_extraction',
         providers: result.provider,
+        // Which provider+model produced the AI-derived fields, so a consumer can
+        // tell model output apart from provider-observed fact. Null when the
+        // result came purely from deterministic extraction.
+        aiProvenance: rawIntelligence?.metadata?.aiProvenance
+          ?? result?.aiProvenance
+          ?? null,
         confidence: canonical.confidence?.entity || rawIntelligence?.confidence?.overall || 0,
         extractedAt: new Date().toISOString(),
         cached: false,

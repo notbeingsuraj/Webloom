@@ -114,7 +114,7 @@ async function main() {
 
   const child = (childMode) => new Promise((resolve, reject) => {
     const childProcess = spawn(process.execPath, [fileURLToPath(import.meta.url)], {
-      env: { ...process.env, PHASE8_MODE: childMode, SQLITE_DATABASE_PATH: databasePath, OMNIROUTE_API_KEY: 'phase8-test' },
+      env: { ...process.env, PHASE8_MODE: childMode, SQLITE_DATABASE_PATH: databasePath, OPENROUTER_API_KEY: '', GEMINI_API_KEY: '', LOCAL_AI_API_KEY: '', OPENROUTER_MODEL: '', GEMINI_MODEL: '', LOCAL_AI_MODEL: '' },
       stdio: 'inherit',
     });
     childProcess.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`Phase 8 process ${childMode} exited with ${code}`)));

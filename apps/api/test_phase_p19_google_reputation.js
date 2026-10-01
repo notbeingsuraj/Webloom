@@ -317,7 +317,7 @@ checkAsync('15. AI cannot estimate rating', async () => {
     reviewSummary: { value: null, evidence: null, confidence: 0, status: 'missing' },
   });
   // No evidence snippet → rejected; rating must stay null
-  const result = await extractReputationWithAI({ evidenceText: 'Manan Furnitures has nice sofas', sourceUrl: MANAN_MAPS_URL, ai });
+  const result = await extractReputationWithAI({ evidenceText: 'Manan Furnitures has nice sofas and a friendly staff. Customers often mention the showroom layout and the helpful team.', sourceUrl: MANAN_MAPS_URL, ai });
   assert.equal(result.fields.rating, null);
   assert.equal(result.aiExtracted, false);
 });
@@ -330,7 +330,7 @@ checkAsync('16. AI cannot estimate review count', async () => {
     reviews: [],
     reviewSummary: { value: null, evidence: null, confidence: 0, status: 'missing' },
   });
-  const result = await extractReputationWithAI({ evidenceText: 'Manan Furnitures is a popular store', sourceUrl: MANAN_MAPS_URL, ai });
+  const result = await extractReputationWithAI({ evidenceText: 'Manan Furnitures is a popular store in the city. The location is easy to find and the store carries a wide range of furniture.', sourceUrl: MANAN_MAPS_URL, ai });
   assert.equal(result.fields.reviewCount, null);
 });
 
@@ -345,7 +345,7 @@ checkAsync('17. AI cannot invent review text', async () => {
     reviewSummary: { value: null, evidence: null, confidence: 0, status: 'missing' },
   });
   // Review has NO evidence → must be rejected entirely
-  const result = await extractReputationWithAI({ evidenceText: 'Manan Furnitures sells furniture', sourceUrl: MANAN_MAPS_URL, ai });
+  const result = await extractReputationWithAI({ evidenceText: 'Manan Furnitures sells furniture including sofas, beds and dining tables. The showroom is open throughout the week.', sourceUrl: MANAN_MAPS_URL, ai });
   assert.equal(result.fields.reviews.length, 0);
   assert.equal(result.aiExtracted, false);
 });
@@ -360,7 +360,7 @@ checkAsync('18. AI cannot invent review author', async () => {
     ],
     reviewSummary: { value: null, evidence: null, confidence: 0, status: 'missing' },
   });
-  const result = await extractReputationWithAI({ evidenceText: 'Manan Furnitures sells furniture', sourceUrl: MANAN_MAPS_URL, ai });
+  const result = await extractReputationWithAI({ evidenceText: 'Manan Furnitures sells furniture including sofas, beds and dining tables. The showroom is open throughout the week.', sourceUrl: MANAN_MAPS_URL, ai });
   // No text, no rating, no evidence → rejected
   assert.equal(result.fields.reviews.length, 0);
 });
@@ -375,7 +375,7 @@ checkAsync('19. AI cannot invent review date', async () => {
     ],
     reviewSummary: { value: null, evidence: null, confidence: 0, status: 'missing' },
   });
-  const result = await extractReputationWithAI({ evidenceText: 'Manan Furnitures sells furniture', sourceUrl: MANAN_MAPS_URL, ai });
+  const result = await extractReputationWithAI({ evidenceText: 'Manan Furnitures sells furniture including sofas, beds and dining tables. The showroom is open throughout the week.', sourceUrl: MANAN_MAPS_URL, ai });
   assert.equal(result.fields.reviews.length, 1);
   assert.equal(result.fields.reviews[0].publishedAt, 'Last Christmas');
 });

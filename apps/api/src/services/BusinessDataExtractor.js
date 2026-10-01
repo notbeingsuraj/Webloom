@@ -27,6 +27,7 @@ import OfficialWebsiteProvider from './OfficialWebsiteProvider.js';
 import UserProvidedDataProvider from './UserProvidedDataProvider.js';
 import BusinessProfile from './BusinessProfile.js';
 import { config } from '../config/env.js';
+import { resolveProviderOrder } from './ai/AIProviderFactory.js';
 import {
   createAcquisitionResult,
   classifyEmptyAcquisition,
@@ -44,6 +45,17 @@ import { validateFetchUrl } from '../utils/ssrfValidator.js';
 // separate from provider record identity and business entity identity (#17).
 // _sourceCache is lazily initialized to keep 'source-cache.db' out of the
 // way for tests that call getCacheKey/normalizeUrl without touching the cache.
+
+// Non-secret description of the AI chain, attached to extraction responses.
+// `gateway` is retained (always null) so the response shape is unchanged;
+// Webloom talks to providers directly and has no gateway.
+const AI_CHAIN_SUMMARY = Object.freeze({
+  gateway: null,
+  primary: config.ai?.primaryProvider || null,
+  secondary: config.ai?.secondaryProvider || null,
+  fallback: config.ai?.fallbackProvider || null,
+  order: resolveProviderOrder(config.ai || {}),
+});
 
 class BusinessDataExtractor {
   constructor() {
@@ -731,9 +743,13 @@ Rules:
   async extractWithAI(metadata, sourceUrl) {
     // Dynamic import to avoid circular deps
     const { default: AIService } = await import('./AIService.js');
-    
+
     const prompt = this.buildExtractionPrompt(metadata, sourceUrl);
-    
+
+    // Set by the success path below; read by the caller to stamp provenance on
+    // every AI-derived field. Null when the model was not involved at all.
+    let extractedProfileAiProvenance = null;
+
     const schema = {
       type: 'object',
       properties: {
@@ -838,6 +854,31 @@ Rules:
         maxTokens: 6000,
         systemPrompt: `You are a business information extractor. Analyze the following data retrieved from a Google Maps page and extract structured business information. Return ONLY valid JSON matching the exact schema provided. No markdown, no explanations, no extra text.`,
       });
+
+      // Provenance is attached to the result as a non-enumerable __ai property,
+      // so it survives validation/merging without ever being mistaken for a
+      // business fact. Copy it into a durable, enumerable field here — this is
+      // the only place the model that produced these fields can be named, and
+      // without it an AI-derived value is indistinguishable from a verified one
+      // once it has been merged.
+      const ai = result?.__ai;
+      if (ai) {
+        extractedProfileAiProvenance = {
+          provider: ai.provider,
+          model: ai.model,
+          operation: ai.operation,
+          generatedAt: new Date().toISOString(),
+          latencyMs: ai.latencyMs ?? null,
+          usage: ai.usage ?? null,
+          attempts: ai.attempts ?? null,
+          fallbackUsed: ai.fallbackCount ?? 0,
+        };
+        // Carried on the returned object purely so the caller can lift it into
+        // the final metadata block. validateProfile() drops unknown keys, so it
+        // can never be mistaken for an extracted business value.
+        return { ...result, aiProvenance: extractedProfileAiProvenance };
+      }
+
       return result;
     } catch (error) {
       const providerError = error?.providerError || {
@@ -846,8 +887,8 @@ Rules:
         safeMessage: error?.message || 'AI provider request failed.',
         retryAttempted: false,
         retryCount: 0,
-        provider: 'opencode',
-        model: 'reasoning',
+        provider: config.ai?.primaryProvider || 'ai',
+        model: config.ai?.providers?.[config.ai?.primaryProvider]?.model || null,
         success: false,
       };
 
@@ -979,6 +1020,7 @@ Rules:
     // identified/discovered/verified identity (BusinessProfile provenance
     // priority: ai_generated (0.5) < identified (2)).
     let aiExtracted = false;
+    let aiProvenance = null;
 
     try {
       pageData = await this.fetchPage(cidFetchUrl || googleMapsUrl);
@@ -1020,12 +1062,16 @@ Rules:
           safeMessage: 'The source responded, but no business evidence was available.',
           httpStatus: pageData.status,
           provider: 'web_extraction',
-          model: config.opencode.models.reasoning,
+          model: config.ai?.providers?.[config.ai?.primaryProvider]?.model || null,
           success: false,
         });
       } else {
         // Use AI to extract structured profile from page content
         extractedProfile = await this.extractWithAI(metadata, pageData.url);
+        // Lift the model attribution before validation strips unknown keys, so
+        // every AI-derived field can be traced to the provider+model that made
+        // it. Without this, AI output and verified data look identical later.
+        aiProvenance = extractedProfile?.aiProvenance || null;
         // P1.2: aiExtracted must reflect whether the AI call actually
         // produced the profile. When extractWithAI fails it returns a
         // providerError sentinel — everything in that case comes from
@@ -1279,10 +1325,10 @@ Rules:
           provenanceBreakdown: { verified: 0, discovered: 0, identified: 0, user_provided: 0, inferred: 0, ai_generated: 0 },
           completeness: 0,
           providerError: acquisition.errors?.[0] || null,
-          providerUnavailable: acquisition.status === ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
-          gateway: config.opencode.baseUrl,
-          model: config.opencode.models.reasoning,
-        },
+        providerUnavailable: acquisition.status === ACQUISITION_STATUS.PROVIDER_UNAVAILABLE,
+        gateway: null,
+        aiProviders: AI_CHAIN_SUMMARY,
+      },
         cached: false,
       };
     }
@@ -1351,12 +1397,16 @@ Rules:
         // by AI so downstream merge/persistence boundaries can distinguish
         // AI-derived identity from provider-observed facts.
         aiExtracted,
+        // Which provider+model actually produced the AI-derived fields, and
+        // whether the chain had to fall back. `null` means no model was
+        // involved (pure deterministic extraction).
+        aiProvenance,
         provenanceBreakdown: profile.getProvenanceBreakdown(),
         completeness: profile.getCompleteness(),
         providerError: extractedProfile?.providerError || null,
         providerUnavailable: Boolean(extractedProfile?.providerUnavailable),
-        gateway: config.opencode.baseUrl,
-        model: config.opencode.models.reasoning,
+        gateway: null,
+        aiProviders: AI_CHAIN_SUMMARY,
         // P1.8: retain the retrieved page text as recoverable evidence for the
         // source-grounded fallback extractor. This is the SAME text the AI
         // extraction prompt already consumes — carrying it forward lets the

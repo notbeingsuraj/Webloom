@@ -2,14 +2,18 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Either name satisfies the requirement — OPENCODE_API_KEY is current,
-// OMNIROUTE_API_KEY is the legacy name still honoured above.
-if (!process.env.OPENCODE_API_KEY && !process.env.OMNIROUTE_API_KEY) {
-  console.error('\n❌ Missing required environment variable: OPENCODE_API_KEY');
-  console.error('   Create a key at https://opencode.ai/auth and set it in apps/api/.env');
-  console.error('   (OMNIROUTE_API_KEY is still accepted as a legacy alias.)\n');
-  process.exit(1);
-}
+/**
+ * No AI key is hard-required at boot.
+ *
+ * The previous design exited the process when the single gateway key was
+ * absent, which made the API unusable for every non-AI feature (caching, DB,
+ * providers) whenever AI happened to be misconfigured. AI is now one of three
+ * independent providers: at least one usable provider is required for AI
+ * features, and /health/ai reports exactly which are available.
+ */
+const hasAnyAIProviderKey = Boolean(
+  process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY || process.env.LOCAL_AI_BASE_URL,
+);
 
 export const config = {
   port: process.env.PORT || 5001,
@@ -19,17 +23,106 @@ export const config = {
     sqlitePath: process.env.SQLITE_DATABASE_PATH || './webloom.db',
   },
   ai: {
+    // ---- Chain definition (single source of truth) ----
+    // Provider names are declared ONLY here. No other module names a vendor.
+    primaryProvider: process.env.AI_PRIMARY_PROVIDER || 'openrouter',
+    secondaryProvider: process.env.AI_SECONDARY_PROVIDER || 'gemini',
+    fallbackProvider: process.env.AI_FALLBACK_PROVIDER || 'local',
+
+    // Hard ceiling on any single AI request. Brand DNA and digital audit are
+    // long-running, so this is separate from the (much shorter) extraction
+    // timeout, but it is still a hard timeout: nothing may hang indefinitely.
+    timeoutMs: parseInt(process.env.AI_TIMEOUT_MS) || 30000,
+
+    // Bounded retries per provider, applied only to retryable categories
+    // (timeout / 429 / 5xx / connection). 1 => at most 2 attempts per provider.
+    maxRetries: process.env.AI_MAX_RETRIES != null
+      ? Math.max(0, parseInt(process.env.AI_MAX_RETRIES))
+      : 1,
+
+    // Ceiling for one generate() call across EVERY provider and every retry.
+    // Without this, three providers x two attempts x timeoutMs can hold a user
+    // request open for minutes. Each attempt is additionally clamped to what is
+    // left of this budget, so a slow provider cannot starve the chain.
+    maxTotalMs: parseInt(process.env.AI_MAX_TOTAL_MS) || 90000,
+
+    // How many times one provider may re-dispatch a request at a smaller
+    // max_tokens after a credit pre-flight rejection (HTTP 402). Providers
+    // bill actual usage, not the requested ceiling, so shrinking the request
+    // is free; it just has to fit the remaining balance. 1 is enough: a second
+    // clamp on the same shrinking balance is not a different outcome.
+    maxTokenDowngrades: process.env.AI_MAX_TOKEN_DOWNGRADES != null
+      ? Math.max(0, parseInt(process.env.AI_MAX_TOKEN_DOWNGRADES))
+      : 1,
+
+    // Completion ceiling used by the /health probes. This is the single most
+    // important number in this file for diagnosis: a probe asking for 1 token
+    // passes on an account that cannot fund any real request, which is how the
+    // gateway reported "ok" while every call failed with HTTP 402. Sized to the
+    // heaviest real operation (brand DNA, 6000) so `usable: true` means "this
+    // provider can serve our heaviest operation" — the reading an operator
+    // assumes. Free either way: providers bill generated tokens, and the probe
+    // stops after one token regardless of the ceiling it is offered.
+    probeMaxTokens: parseInt(process.env.AI_PROBE_MAX_TOKENS) || 6000,
+
+    // Legacy single-model overrides, retained so existing deployments that set
+    // AI_PRIMARY_MODEL / AI_FALLBACK_MODEL keep a single consistent model.
     primaryModel: process.env.AI_PRIMARY_MODEL || null,
-    // Fallback model used when the primary model fails or times out.
-    // Defaults to the OpenCode fast model — a resilient, low-latency model
-    // that is present in the OpenCode catalog.
     fallbackModel: process.env.AI_FALLBACK_MODEL || null,
-    // AI generation timeout — distinct from the extraction timeout. Heavy
-    // reasoning calls (brand DNA, digital audit) routinely exceed the 15s
-    // extraction budget, so coupling them forced every enrichment to degrade.
-    // 90s gives long-running reasoning models room while still failing fast
-    // on a dead gateway.
-    timeout: parseInt(process.env.AI_TIMEOUT_MS) || 90000,
+
+    // ---- Provider definitions ----
+    providers: {
+      openrouter: {
+        enabled: process.env.OPENROUTER_API_KEY ? true : false,
+        apiKey: process.env.OPENROUTER_API_KEY || null,
+        baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+        model: process.env.OPENROUTER_MODEL || null,
+        timeoutMs: parseInt(process.env.OPENROUTER_TIMEOUT_MS) || null,
+        appUrl: process.env.OPENROUTER_APP_URL || 'https://webloom.dev',
+        appName: process.env.OPENROUTER_APP_NAME || 'Webloom',
+        requiresApiKey: true,
+        // Per-operation model overrides (brand/audit/extraction). Absent by
+        // default so the common case stays one model per provider.
+        operationModels: {
+          extraction: process.env.OPENROUTER_EXTRACTION_MODEL || null,
+          brand: process.env.OPENROUTER_BRAND_MODEL || null,
+          audit: process.env.OPENROUTER_AUDIT_MODEL || null,
+        },
+      },
+      gemini: {
+        enabled: process.env.GEMINI_API_KEY ? true : false,
+        apiKey: process.env.GEMINI_API_KEY || null,
+        baseUrl: process.env.GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com',
+        model: process.env.GEMINI_MODEL || null,
+        timeoutMs: parseInt(process.env.GEMINI_TIMEOUT_MS) || null,
+        operationModels: {
+          extraction: process.env.GEMINI_EXTRACTION_MODEL || null,
+          brand: process.env.GEMINI_BRAND_MODEL || null,
+          audit: process.env.GEMINI_AUDIT_MODEL || null,
+        },
+      },
+      local: {
+        // Opt-in. A local server is a bonus, never a dependency, so this stays
+        // enabled-by-configured rather than required.
+        enabled: process.env.LOCAL_AI_BASE_URL ? true : false,
+        apiKey: process.env.LOCAL_AI_API_KEY || null,
+        baseUrl: process.env.LOCAL_AI_BASE_URL || 'http://localhost:11434/v1',
+        model: process.env.LOCAL_AI_MODEL || null,
+        timeoutMs: parseInt(process.env.LOCAL_AI_TIMEOUT_MS) || null,
+        label: 'Local AI',
+        // Ollama/LM Studio/llama.cpp usually need no key; set
+        // LOCAL_AI_REQUIRES_API_KEY=true for servers that do.
+        requiresApiKey: process.env.LOCAL_AI_REQUIRES_API_KEY === 'true',
+      },
+    },
+
+    // At boot, spend one max_tokens:1 call per provider to confirm the key is
+    // accepted and the model is routable. A model catalog listing proves
+    // neither, which is how a dead key previously looked healthy at boot.
+    // Costs one token per provider per boot.
+    probeVerifyAuth: process.env.AI_PROBE_VERIFY_AUTH !== 'false',
+    hasAnyProviderKey: hasAnyAIProviderKey,
+
     // AI enrichment may replace an already-populated value only when that
     // value's confidence sits below this floor. Defaults to 0.5 — high enough
     // that healthy provider data is never second-guessed. Set to 0 to restore
@@ -50,40 +143,6 @@ export const config = {
     officialWebsiteNameMatch: parseFloat(process.env.AI_OFFICIAL_WEBSITE_NAME_MATCH) || 0.75,
     // How many AI-proposed domains to probe when no website is known.
     officialWebsiteMaxCandidates: parseInt(process.env.AI_OFFICIAL_WEBSITE_MAX_CANDIDATES) || 3,
-    // At boot, spend one max_tokens:1 completion to confirm the AI key actually
-    // authenticates and that the configured model is routable on
-    // /chat/completions. The model catalog endpoint is served unauthenticated,
-    // so without this the server reports "reachable" while every real AI call
-    // 401s. Costs one token per boot; set to false to skip the check.
-    probeVerifyAuth: process.env.AI_PROBE_VERIFY_AUTH !== 'false',
-  },
-  opencode: {
-    // OPENCODE_* is the current name. OMNIROUTE_* is accepted as a legacy
-    // fallback so existing .env files and deploys keep working. OPENCODE_* is
-    // deliberately checked FIRST: dotenv never overrides a variable that is
-    // already exported, so a stale exported OMNIROUTE_API_KEY would otherwise
-    // shadow a good key in .env and silently 401 every AI call.
-    apiKey: process.env.OPENCODE_API_KEY || process.env.OMNIROUTE_API_KEY,
-    baseUrl: process.env.OPENCODE_BASE_URL
-      || process.env.OMNIROUTE_BASE_URL
-      || 'https://opencode.ai/zen/v1',
-    models: {
-      fast: process.env.OPENCODE_FAST_MODEL
-        || process.env.OMNIROUTE_FAST_MODEL
-        || 'gemini-3.8-flash',
-      reasoning: process.env.OPENCODE_REASONING_MODEL
-        || process.env.OMNIROUTE_REASONING_MODEL
-        || 'claude-sonnet-5',
-      coding: process.env.OPENCODE_CODING_MODEL
-        || process.env.OMNIROUTE_CODING_MODEL
-        || 'claude-sonnet-5',
-      copywriting: process.env.OPENCODE_COPYWRITING_MODEL
-        || process.env.OMNIROUTE_COPYWRITING_MODEL
-        || 'gemini-3.8-flash',
-      vision: process.env.OPENCODE_VISION_MODEL
-        || process.env.OMNIROUTE_VISION_MODEL
-        || 'gemini-3.8-flash',
-    },
   },
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
@@ -116,9 +175,4 @@ export const config = {
   },
 };
 
-// Deprecated alias, kept so existing callers and tests that read
-// `config.omniroute` keep working. This MUST be the same object reference (not
-// a spread copy) — callers mutate it, e.g.
-// `config.omniroute.models = {...}` in test_provider_router.js, and a copied
-// object would silently detach those overrides from config.opencode.
-config.omniroute = config.opencode;
+export default config;

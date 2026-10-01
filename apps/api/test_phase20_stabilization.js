@@ -185,7 +185,7 @@ test('AcquisitionResult — error preserves structured fields', () => {
     category: ACQUISITION_STATUS.RATE_LIMITED,
     safeMessage: 'API key sk-abcdef1234567890 rate limited',
     httpStatus: 429,
-    provider: 'omniroute',
+    provider: 'openrouter',
     model: 'reasoning',
     retryCount: 2,
     latencyMs: 100,

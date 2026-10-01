@@ -56,8 +56,15 @@ class BrandStrategyService {
         },
       };
     } catch (error) {
-      console.error('Brand strategy generation error:', error);
-      
+      // Never log the raw error: axios errors carry `config.headers`, so this
+      // line used to print the provider API key into the log on every failure.
+      // The AIError taxonomy already summarizes the failure without secrets.
+      const category = error?.category || error?.providerError?.category || 'UNKNOWN';
+      console.error(
+        `Brand strategy generation error [${category}]:`,
+        error?.safeMessage || error?.message || 'unknown error',
+      );
+
       await AIService.logAICall({
         requestId: options.requestId || null,
         businessId: options.businessId || null,
@@ -65,10 +72,23 @@ class BrandStrategyService {
         promptVersion: 'brand-strategy-v1',
         tokens: null,
         latency: null,
-        error: error.message,
+        error: error?.message,
       });
 
-      throw new Error(`Failed to generate brand strategy: ${error.message}`);
+      // Preserve the diagnosis. Flattening to a bare Error discarded the
+      // category, the HTTP status and the per-provider attempt trail, which is
+      // why "brand DNA is broken" could not be told apart from "the account is
+      // out of credit" anywhere downstream.
+      const failure = new Error(`Failed to generate brand strategy: ${error?.message || 'unknown error'}`);
+      failure.name = error?.name || 'Error';
+      failure.category = category;
+      failure.provider = error?.provider || null;
+      failure.model = error?.model || null;
+      failure.httpStatus = error?.httpStatus ?? null;
+      failure.operation = 'brand';
+      if (error?.attempts) failure.attempts = error.attempts;
+      if (error?.cause) failure.cause = error.cause;
+      throw failure;
     }
   }
 
