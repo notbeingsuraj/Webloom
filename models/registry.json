@@ -79,6 +79,61 @@
           "notes": "Baseline benchmark. Contract-compliant 0/15; raw consumer-ready 0/15. Artifacts in baseline/. See docs/ai/baseline-benchmark.md."
         }
       ]
+    },
+    {
+      "foundationModel": "Qwen/Qwen2.5-7B-Instruct",
+      "provider": "local",
+      "servingModel": "qwen2.5-7b-webloom-v0.1",
+      "quantization": "nf4-qlora",
+      "license": "Apache-2.0",
+      "promptVersion": "webloom-tasks-v1",
+      "datasetVersions": {
+        "extraction": "v0.1.0",
+        "business-dna": "v0.1.0",
+        "website-analysis": "v0.1.0",
+        "strategy": "v0.1.0",
+        "evaluation-validation": "v0.1.0"
+      },
+      "trainingConfig": {
+        "baseModel": "Qwen/Qwen2.5-7B-Instruct",
+        "experimentId": "webloom-v0.1",
+        "configFile": "finetune/configs/webloom-v0.1.json",
+        "learningRate": 0.0002,
+        "scheduler": "cosine",
+        "warmupRatio": 0.06,
+        "epochs": 8,
+        "batchPerDevice": 2,
+        "gradAccum": 2,
+        "seed": 17,
+        "maxSeqLength": 8192,
+        "optimizer": "paged_adamw_8bit",
+        "dtype": "bf16",
+        "quantized4bit": true
+      },
+      "loraConfig": {
+        "r": 8,
+        "alpha": 16,
+        "dropout": 0.05,
+        "targetModules": [
+          "q_proj",
+          "k_proj",
+          "v_proj",
+          "o_proj",
+          "gate_proj",
+          "up_proj",
+          "down_proj"
+        ],
+        "bias": "none"
+      },
+      "knownWeaknesses": [
+        "Not yet trained — awaiting an authorized GPU run. Status moves to candidate only after validation; no improvement is claimed until baseline vs v0.1 comparison on the untouched holdout.",
+        "Candidate is opt-in only (eval/run.js --backend webloom --model webloom-ai-v0.1.0); production default remains the baseline."
+      ],
+      "benchmarks": [],
+      "status": "configured",
+      "registeredAt": "2026-10-06T15:43:45.654Z",
+      "id": "webloom-ai-v0.1.0",
+      "type": "webloom"
     }
   ]
 }

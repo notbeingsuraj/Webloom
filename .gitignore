@@ -44,3 +44,9 @@ generated-sites/
 # Misc
 *.pem
 .cache/
+
+# Python / training artifacts
+__pycache__/
+*.pyc
+finetune/.venv/
+finetune/runs/

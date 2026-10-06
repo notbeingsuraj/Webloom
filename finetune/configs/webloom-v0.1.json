@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "experiment": {
+    "id": "webloom-v0.1",
+    "status": "configured",
+    "purpose": "First controlled fine-tune: LoRA/QLoRA adapter on the registered baseline foundation model so any improvement claim is a clean comparison against the preserved baseline on the untouched holdout split.",
+    "foundationModel": "Qwen/Qwen2.5-7B-Instruct",
+    "modelRevision": "main",
+    "registryModelId": "webloom-ai-v0.1.0",
+    "adapterSuffix": "webloom-v0.1.0"
+  },
+  "data": {
+    "formatRoot": "finetune/format",
+    "trainSplits": ["train", "validation"],
+    "holdoutNeverTrained": true,
+    "maxSeqLength": 8192
+  },
+  "lora": {
+    "enabled": true,
+    "r": 8,
+    "loraAlpha": 16,
+    "loraDropout": 0.05,
+    "targetModules": ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+    "bias": "none",
+    "taskType": "CAUSAL_LM"
+  },
+  "quantization": {
+    "enabled": true,
+    "bits": 4,
+    "bnb4bitQuantType": "nf4",
+    "bnb4bitComputeDtype": "bf16",
+    "bnb4bitUseDoubleQuant": true,
+    "fallbackIfUnavailable": "none"
+  },
+  "training": {
+    "perDeviceTrainBatchSize": 2,
+    "perDeviceEvalBatchSize": 2,
+    "gradientAccumulationSteps": 2,
+    "learningRate": 0.0002,
+    "lrSchedulerType": "cosine",
+    "warmupRatio": 0.06,
+    "numTrainEpochs": 8,
+    "optimizer": "paged_adamw_8bit",
+    "preferredDtype": "bf16",
+    "packing": false,
+    "seed": 17,
+    "gradientCheckpointing": true,
+    "evalStrategy": "steps",
+    "evalSteps": 4,
+    "saveStrategy": "steps",
+    "saveSteps": 4,
+    "loggingSteps": 2,
+    "loadBestModelAtEnd": true,
+    "metricForBestModel": "eval_loss",
+    "reportTo": ["none"],
+    "outputDir": "finetune/runs/webloom-v0.1"
+  },
+  "tokenizer": {
+    "source": "Qwen/Qwen2.5-7B-Instruct",
+    "paddingSide": "right",
+    "truncationSide": "left",
+    "addEosToken": true,
+    "chatTemplate": "qwen2.5"
+  },
+  "checkpointSelection": {
+    "on": "validation",
+    "metric": "eval_loss",
+    "composite": {
+      "jsonValidity": 0.4,
+      "fieldCoverage": 0.3,
+      "abstentionAccuracy": 0.2,
+      "hallucinationPenalty": 0.1
+    }
+  },
+  "inference": {
+    "backend": "openai-compatible (vLLM or llama.cpp) serving base+adapter merged",
+    "benchmark": "node eval/run.js --backend webloom --dataset holdout",
+    "productionStatus": "opt-in candidate only; baseline remains default until proven better"
+  },
+  "environment": {
+    "minPython": "3.10",
+    "recommendedPython": "3.10-3.12",
+    "pypi": ["torch", "transformers", "accelerate", "peft", "datasets", "sentencepiece"],
+    "gpuOnly": ["bitsandbytes", "paged_adamw_8bit"],
+    "notes": "On CPU/MPS (Apple Silicon) QLoRA is disabled automatically and the optimizer degrades to adamw_torch; a deviation is recorded in the experiment manifest."
+  }
+}

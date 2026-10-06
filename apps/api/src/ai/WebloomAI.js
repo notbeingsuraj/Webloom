@@ -54,6 +54,7 @@ export class WebloomAI {
       provider = 'auto',
       onFail = 'throw',
       evidenceText = null,
+      modelId = null,
     } = options;
 
     const groundingMode = options.grounding ?? (task.grounded ? 'enforce' : 'off');
@@ -61,7 +62,7 @@ export class WebloomAI {
     const resolvedEvidence = evidenceText ?? deriveEvidenceText(input);
 
     const providers = this._providers
-      ?? resolveProviders(provider, this.providerDeps, onFail === 'unknown');
+      ?? resolveProviders(provider, { ...this.providerDeps, modelId }, onFail === 'unknown');
 
     const attempts = [];
     let lastError = null;

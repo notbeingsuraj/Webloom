@@ -9,12 +9,16 @@ a frontier model for every business.
 
 **Do**
 
-- Train on `split: "train"` examples only, using the pinned prompt builders so
-  train-time prompts match serving prompts byte-for-byte.
+- Train on `split: "train"` + `split: "validation"` examples only (validation
+  breads development/checkpoint selection; holdout stays untouched), using the
+  pinned prompt builders so train-time prompts match serving prompts
+  byte-for-byte.
 - Ground the fine-tune dataset in `evidence[]`; the model must learn to cite
   before it learns to answer.
 - Keep the envelope discipline in labels: an unsupported fact must be labeled
   UNKNOWN, not guessed.
+- Run the automated holdout guard (`ai:finetune:validate`) before every
+  training start; the guard and the trainer both fail loud on any leak.
 - Re-benchmark the identical holdout after tuning and compare against the
   baseline via `compareModels`.
 
@@ -25,33 +29,49 @@ a frontier model for every business.
   enforces this; keep it in CI).
 - Don't add factual domain knowledge absent from training inputs — that is how
   small models fabricate plausibly.
+- Don't run training, or spend on cloud GPUs, without an explicit decision:
+  `ai:finetune` is a deliberate command that never runs in the test suite and
+  never executes without user authorization when it involves paid hardware.
 
 ## Steps
 
-1. **Format dataset** → `npm run ai:data:format`
-   Produces `finetune/format/<dataset>@<version>/train.jsonl`, chat-format rows
-   with pinned prompts and assistant labels.
-2. **Review formatted rows** — human/CI spot-check; the format is the interface.
-3. **Configure** — edit `finetune/configs/{lora,train,tokenizer}.json`.
-   Defaults are conservative: `r=8`, `alpha=16`, dropout 0.05, LR 2e-4 cosine,
-   10 epochs, `max_seq_length=8192`, QLoRA-capable optimizer.
-4. **Train** (example, using `transformers` + `peft` + `trl`):
+1. **Format dataset** → `npm run ai:dataset:format`
+   Produces `finetune/format/<dataset>@<version>/{train,validation}.jsonl`,
+   chat-format rows with pinned prompts, assistant labels, and a `meta` block
+   carrying evidence / provenanceSources / baseline failureCategories.
+2. **Verify + review formatted rows** → `npm run ai:finetune:validate` runs
+   the holdout guard (fail-loud) and rebuilds the format. Human/CI spot-check
+   the rows; the format is the interface.
+3. **Configure** — `finetune/configs/webloom-v0.1.json` is the single pinned
+   experiment config (experiment metadata, data, LoRA, quantization, training,
+   tokenizer, checkpoint selection, environment). Defaults are conservative:
+   `r=8`, `alpha=16`, dropout 0.05, LR 2e-4 cosine, 8 epochs, seed 17,
+   `maxSeqLength=8192`, QLoRA 4-bit with graceful 16-bit LoRA fallback.
+4. **Train** (explicit command, never part of tests):
 
    ```
-   python finetune/train.py \
-     --model Qwen/Qwen2.5-7B-Instruct \
-     --data finetune/format \
-     --config finetune/configs/lora.json \
-     --train-config finetune/configs/train.json \
-     --output finetune/runs/webloom-v0.1.0
+   npm run ai:finetune            # trains finetune/configs/webloom-v0.1.json
+   bash finetune/scripts/train_runner.sh --dry-run --model Qwen/Qwen2.5-0.5B-Instruct  # plumbing check
    ```
-5. **Register** the produced adapter in `models/registry.json`:
+   Writes checkpoints + `metrics.jsonl` + an experiment `manifest.json`
+   (commit, config hash, hardware, device, dtype, deviations) into
+   `finetune/runs/webloom-v0.1/`. Requires a Python ML venv per
+   `finetune/requirements.txt` and a CUDA GPU for the real 7B run.
+5. **Select checkpoint** → `npm run ai:finetune:evaluate` scores checkpoints
+   on the validation split (json validity, field coverage, abstention,
+   hallucination penalty) and records the ranking in `evaluation.json`. This
+   is development ranking; the decisive numbers come from the holdout.
+6. **Register** the produced adapter in `models/registry.json`:
    `type: "webloom"`, `foundationModel`, `trainingConfig`, `loraConfig`,
-   `datasetVersions` pinned. `registerModel()` validates the shape.
-6. **Benchmark** the holdout with `--backend baseline` (before) and
-   `--backend webloom`/`live` (after), then `recordBenchmark` both. Promote
-   only if the model-spec gate passes (F1, hallucination rate, ECE,
-   beat-baseline, no-fabrication ablation).
+   `datasetVersions` pinned; status `candidate` (never `production` on day one).
+   `registerModel()` validates the shape. `npm run ai:model:load` is the
+   serving health-check.
+7. **Benchmark** the holdout: `eval/run.js --backend baseline` (before) and
+   `--backend webloom --model webloom-ai-v0.1.0` (after, opt-in candidate),
+   then `recordBenchmark` both and `compareModels`. Promote to
+   `active-production` only if the model-spec gate passes (F1, hallucination
+   rate, ECE, beat-baseline, no-fabrication ablation). Baseline stays the
+   default until the candidate provably wins.
 
 ## What a fine-tune is (and isn't) allowed to change
 
@@ -80,7 +100,14 @@ baseline benchmark ──┐
 
 - Training happens outside this repo (data + config live here; weights never
   get committed). The registry entry is the contract describing what was
-  trained and on what.
-- Pin the tokenizer/foundation to the same version recorded in
-  `finetune/configs/tokenizer.json` and the registry, or results shift with
+  trained and on what. `finetune/runs/` and `finetune/.venv/` are gitignored
+  (checkpoints, logs, and manifests never go in the repo).
+- Pin the tokenizer/foundation to the foundation model recorded in
+  `finetune/configs/webloom-v0.1.json` and the registry, or results shift with
   unrelated upstream changes.
+- Hardware reality: `Qwen/Qwen2.5-7B-Instruct` QLoRA 4-bit needs a CUDA GPU
+  with ≥16 GB VRAM (~4–6 GB model + LoRA + activations at batch 2 / seq 8192).
+  On CPU-only machines the pipeline is fully verifiable (`ai:finetune:validate`,
+  dry-run with a small model) but the real run must happen on authorized cloud
+  hardware; the trainer reports the exact limitation rather than forcing an
+  unusable run.

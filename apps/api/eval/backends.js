@@ -10,6 +10,8 @@
  *   baseline — runs the registered baseline foundation model (default
  *              config.baselineProvider 'local'), e.g. Ollama qwen2.5:7b.
  *              Requires a running model server.
+ *   webloom  — runs a fine-tuned Webloom registry model (opt-in via --model
+ *              <registryId>). Target a candidate without promoting it.
  *   live     — runs the production provider chain via WebloomAI 'auto'
  *              (webloom fine-tuned if configured, else external chain).
  *              Requires API keys / endpoints.
@@ -116,6 +118,40 @@ export function makeBaselineRunner(webloomAI, { grounding = null } = {}) {
   };
 }
 
+export function makeWebloomRunner(webloomAI, { grounding = null, modelId = null } = {}) {
+  return async (example) => {
+    const task = getTask(example.task);
+    const mode = groundingMode(task, { override: grounding });
+    try {
+      const result = await webloomAI.run(example.task, example.input, {
+        provider: 'webloom',
+        modelId,
+        onFail: 'throw',
+        grounding: mode,
+      });
+      return { result };
+    } catch (error) {
+      let failure = { parsed: null, raw: null };
+      try {
+        const { WebloomFineTunedModelProvider } = await import('../src/ai/providers/WebloomFineTunedModelProvider.js');
+        const wp = new WebloomFineTunedModelProvider({ modelId });
+        const r = await wp.run({
+          prompt: task.buildPrompt(example.input),
+          systemPrompt: null,
+          schema: task.contract,
+          temperature: task.options.temperature,
+          maxTokens: task.options.maxTokens,
+          operation: task.category,
+        });
+        failure = { parsed: r.value && typeof r.value === 'object' ? r.value : null, raw: r.raw, shape: r.shape ?? null };
+      } catch {
+        // shape-provider failure: keep only the error message
+      }
+      return { error: error?.message ?? String(error), failure };
+    }
+  };
+}
+
 export function makeLiveRunner(webloomAI, { grounding = null } = {}) {
   return async (example) => {
     const task = getTask(example.task);
@@ -132,7 +168,7 @@ export function makeLiveRunner(webloomAI, { grounding = null } = {}) {
   };
 }
 
-export function createBackend(backend, { webloomAI = null, grounding = null } = {}) {
+export function createBackend(backend, { webloomAI = null, grounding = null, modelId = null } = {}) {
   switch (backend) {
     case 'echo':
       return { name: 'echo', runner: echoRunner };
@@ -142,11 +178,15 @@ export function createBackend(backend, { webloomAI = null, grounding = null } = 
     case 'baseline':
       if (!webloomAI) throw new Error('baseline backend requires webloomAI');
       return { name: 'baseline', runner: makeBaselineRunner(webloomAI, { grounding }) };
+    case 'webloom':
+      if (!webloomAI) throw new Error('webloom backend requires webloomAI');
+      if (!modelId) throw new Error('webloom backend requires --model <registryId> (opt-in candidate evaluation)');
+      return { name: 'webloom', runner: makeWebloomRunner(webloomAI, { grounding, modelId }) };
     case 'live':
       if (!webloomAI) throw new Error('live backend requires webloomAI');
       return { name: 'live', runner: makeLiveRunner(webloomAI, { grounding }) };
     default:
-      throw new Error(`Unknown backend "${backend}". Use echo|fallback|baseline|live`);
+      throw new Error(`Unknown backend "${backend}". Use echo|fallback|baseline|webloom|live`);
   }
 }
 

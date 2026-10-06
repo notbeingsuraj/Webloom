@@ -1,0 +1,17 @@
+# Webloom AI v0.1 fine-tuning environment (GPU recommended).
+#
+# Install:
+#   python3 -m venv finetune/.venv
+#   finetune/.venv/bin/pip install -U pip
+#   finetune/.venv/bin/pip install -r finetune/requirements.txt
+#
+# bitsandbytes (UKN) enables QLoRA 4-bit + paged_adamw_8bit on CUDA. It has no
+# macOS wheel; the trainer auto-degrades to 16-bit LoRA + adamw_torch there.
+
+torch>=2.3
+transformers>=4.44
+peft>=0.12
+accelerate>=0.34
+datasets>=2.20
+sentencepiece>=0.2.0
+numpy<2.3

@@ -7,10 +7,10 @@
  * confidence calibration.
  *
  * Usage:
- *   node eval/run.js --backend echo|fallback|baseline|live
+ *   node eval/run.js --backend echo|fallback|baseline|webloom|live
  *                    [--dataset holdout|train] [--task <taskId>]
  *                    [--max <n>] [--out <report.json>] [--grounding enforce|raw]
- *                    [--verbose]
+ *                    [--model <registryId>] [--verbose]
  *
  * Backends:
  *   echo     — returns expected outputs verbatim. Validates the harness; a
@@ -19,11 +19,14 @@
  *              network; proves the runner works without a model.
  *   baseline — registered baseline foundation model (local/Ollama preferred).
  *              Requires a running model server. Explicit opt-in.
+ *   webloom  — a fine-tuned Webloom registry model. Opt-in: pass --model
+ *              <registryId> (e.g. webloom-ai-v0.1.0) to evaluate a candidate
+ *              WITHOUT promoting it to production. Requires a serving backend.
  *   live     — production provider chain ('auto': fine-tuned → external).
  *              Requires API keys. Explicit opt-in.
  *
- * Only ever use baseline/live numbers when deciding to promote or tune a
- * model. echo/fallback numbers are harness tests.
+ * Only ever use baseline/live/webloom numbers when deciding to promote or
+ * tune a model. echo/fallback numbers are harness tests.
  */
 
 import fs from 'node:fs';
@@ -127,7 +130,7 @@ async function main() {
   if (max) examples = examples.slice(0, max);
   if (examples.length === 0) throw new Error(`No examples for backend ${backend}, dataset ${dataset}, task ${taskFilter || 'all'}`);
 
-  const backendImpl = createBackend(backend, { webloomAI, grounding });
+  const backendImpl = createBackend(backend, { webloomAI, grounding, modelId: args.model ?? null });
   if (!['echo', 'fallback'].includes(backend)) {
     console.log(`[run] backend=${backend} grounding=${grounding} — this is a real-model run, not a harness sanity check.`);
   }

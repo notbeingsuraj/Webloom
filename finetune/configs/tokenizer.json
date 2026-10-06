@@ -1,9 +1,0 @@
-{
-  "base_model": "Qwen/Qwen2.5-7B-Instruct",
-  "tokenizer_source": "Qwen/Qwen2.5-7B-Instruct",
-  "padding_side": "right",
-  "truncation_side": "left",
-  "add_eos_token": true,
-  "chat_template": "qwen2.5",
-  "notes": "Tokenizer must match the baseline foundation model registered in models/registry.json (webloom-ai-baseline-0.1.0)."
-}

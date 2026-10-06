@@ -152,7 +152,7 @@ export const AI_MODEL_METADATA_SCHEMA = Object.freeze({
     datasetVersions: { type: 'object' },
     trainingConfig: { type: ['object', 'null'] },
     loraConfig: { type: ['object', 'null'] },
-    status: { type: 'string', enum: ['configured', 'evaluated', 'active-baseline', 'active-production', 'archived'] },
+    status: { type: 'string', enum: ['configured', 'candidate', 'evaluated', 'active-baseline', 'active-production', 'archived'] },
     registeredAt: { type: 'string' },
     knownWeaknesses: { type: 'array', items: { type: 'string' } },
     benchmarks: { type: 'array' },

@@ -33,11 +33,12 @@ needed because the registry is authored by scripts/CI, not by request handlers.
 ## Lifecycle
 
 ```
-configured                # registered, not yet benchmarked
-   → evaluated            # after a real benchmark exists in benchmarks[]
-      → active-baseline   # the model we compare against (promoted once)
-      → active-production # serving the webloom provider (only one)
-      → archived          # superseded; kept for comparison/reproducibility
+configured                # registered; package ready, not yet trained
+   → candidate            # trained + validated on the dev/validation split
+      → evaluated         # after a benchmark exists in benchmarks[] (holdout)
+         → active-baseline   # the model we compare against (promoted once)
+         → active-production # serving the webloom provider (only one)
+         → archived          # superseded; kept for comparison/reproducibility
 ```
 
 Rules:
@@ -48,6 +49,10 @@ Rules:
   the *production* role only).
 - At most one `active-baseline`; used by benchmarks to know the comparison
   reference (`getActiveModel('baseline')`).
+- A `candidate` is opt-in only: it can be benchmarked via
+  `eval/run.js --backend webloom --model <id>` (provider accepts `candidate`
+  or `active-production` records when explicitly targeted) but is **never**
+  the default; `auto` still resolves the production role.
 - A model may not go `active-production` without ≥ 1 recorded benchmark and a
   passing evaluation gate (see model-spec).
 

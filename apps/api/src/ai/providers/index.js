@@ -28,7 +28,11 @@ export function createProvider(name, deps = {}) {
     case 'local-foundation':
       return new LocalFoundationModelProvider({ model: deps.model ?? null, timeoutMs: deps.timeoutMs ?? null });
     case 'webloom':
-      return new WebloomFineTunedModelProvider({ model: deps.model ?? null, timeoutMs: deps.timeoutMs ?? null });
+      return new WebloomFineTunedModelProvider({
+        model: deps.model ?? null,
+        timeoutMs: deps.timeoutMs ?? null,
+        modelId: deps.modelId ?? null,
+      });
     case 'baseline':
       return new BaselineProvider({ model: deps.model ?? null, timeoutMs: deps.timeoutMs ?? null });
     case 'fallback':
