@@ -1,0 +1,52 @@
+{
+  "analysedAt": "2026-10-06T14:54:19.139Z",
+  "examples": {
+    "total": 15,
+    "ok": 10,
+    "failed": 5,
+    "pctOk": 66.67,
+    "avgLatencyMs": 7805
+  },
+  "schemaCompliance": {
+    "total": 15,
+    "schemaCompliant": 0,
+    "schemaCompliancePct": 0,
+    "rawConsumable": 0,
+    "rawConsumablePct": 0
+  },
+  "grounding": {
+    "tasks": 5,
+    "grounded": 63,
+    "unsupported": 0,
+    "unverifiable": 37
+  },
+  "envelopeByTask": {
+    "extraction.business_profile": {
+      "examples": 5,
+      "ok": 5,
+      "fields": 100,
+      "expectedValued": 73,
+      "tp": 54,
+      "fp": 9,
+      "fn": 12,
+      "tn": 25,
+      "precision": 0.8571,
+      "recall": 0.8182,
+      "f1": 0.8372
+    }
+  },
+  "calibration": {
+    "count": 63,
+    "accuracy": 0.8571,
+    "ece": 0.1333,
+    "brier": 0.1314,
+    "meanConfidence": 0.9905,
+    "falseConfidenceRate": 0.127
+  },
+  "categoryCounts": {
+    "EXTRACTION_ERROR": 5,
+    "SCHEMA_ERROR": 15,
+    "CONFIDENCE_ERROR": 4,
+    "HALLUCINATION": 2
+  }
+}

@@ -42,6 +42,8 @@
 
 import { normalizePhone, normalizeWebsite, normalizeCoordinates } from './FieldNormalizer.js';
 import GoogleMapsUrlParserProvider from './GoogleMapsUrlParserProvider.js';
+import { snippetVerdict } from '../ai/grounding.js';
+import { config } from '../config/env.js';
 
 // Minimum confidence an AI-extracted value must carry before it may be merged.
 // Values below this are rejected outright (contract §6).
@@ -764,6 +766,13 @@ export async function extractWithAIFallback({ evidenceText = null, sourceUrl = n
       return;
     }
     if (!rawEvidence || typeof rawEvidence !== 'string' || rawEvidence.trim().length === 0) {
+      unresolvedFields.push(field);
+      return;
+    }
+    // Evidence grounding (hallucination guard): the model claims an exact
+    // quote — verify it actually occurs in the evidence we supplied before
+    // trusting the claim. Snippets too short to check are accepted as-is.
+    if (config.ai.groundingEnforce && snippetVerdict(rawEvidence, evidenceText) === 'unsupported') {
       unresolvedFields.push(field);
       return;
     }

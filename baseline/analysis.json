@@ -1,0 +1,23 @@
+{
+  "categoryCounts": {
+    "EXTRACTION_ERROR": 5,
+    "SCHEMA_ERROR": 15,
+    "CONFIDENCE_ERROR": 4,
+    "HALLUCINATION": 2
+  },
+  "envelopeByTask": {
+    "extraction.business_profile": {
+      "examples": 5,
+      "ok": 5,
+      "fields": 100,
+      "expectedValued": 73,
+      "tp": 54,
+      "fp": 9,
+      "fn": 12,
+      "tn": 25,
+      "precision": 0.8571,
+      "recall": 0.8182,
+      "f1": 0.8372
+    }
+  }
+}

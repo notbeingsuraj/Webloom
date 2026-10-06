@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "active": {
+    "baseline": "webloom-ai-baseline-0.1.0",
+    "production": null
+  },
+  "models": [
+    {
+      "id": "webloom-ai-baseline-0.1.0",
+      "type": "baseline",
+      "foundationModel": "Qwen/Qwen2.5-7B-Instruct",
+      "provider": "openrouter",
+      "servingModel": "qwen/qwen-2.5-7b-instruct",
+      "quantization": null,
+      "license": "Apache-2.0",
+      "promptVersion": "webloom-tasks-v1",
+      "datasetVersions": {
+        "extraction": "v0.1.0",
+        "business-dna": "v0.1.0",
+        "website-analysis": "v0.1.0",
+        "strategy": "v0.1.0",
+        "evaluation-holdout": "v0.1.0",
+        "evaluation-validation": "v0.1.0"
+      },
+      "trainingConfig": null,
+      "loraConfig": null,
+      "status": "evaluated",
+      "registeredAt": "2026-10-06T00:00:00.000Z",
+      "knownWeaknesses": [
+        "Contract compliance 0/15 (0%): generative brand.dna/strategy outputs are envelope-wrapped instead of nested (audience.primary etc.) and fail post-validation.",
+        "Raw consumer-ready 0/15 (0%): every row needed the repair layer; provenance/status enum drift and fenced JSON are the common rough edges.",
+        "Severely over-confident: mean confidence 0.9905 vs accuracy 0.8571, ECE 0.133, false-confidence rate 0.127.",
+        "Under-extraction of identity.categories, identity.business_type, identity.description, contact.website; mild hallucination (2 rows)."
+      ],
+      "benchmarks": [
+        {
+          "runAt": "2026-10-06T14:54:19.139Z",
+          "runId": "baseline-holdout-train-enforce-2026-10-06",
+          "datasetVersion": "v0.1.0",
+          "split": [
+            "holdout",
+            "train"
+          ],
+          "tasks": [
+            "extraction.business_profile",
+            "brand.dna",
+            "website.analysis",
+            "strategy.website",
+            "strategy.landing_page"
+          ],
+          "backend": "baseline",
+          "provider": "openrouter",
+          "metrics": {
+            "examples": 15,
+            "ok": 10,
+            "pctOk": 66.67,
+            "extractionF1": 0.8372,
+            "precision": 0.8571,
+            "recall": 0.8182,
+            "grounding": {
+              "grounded": 63,
+              "unsupported": 0,
+              "unverifiable": 37
+            },
+            "calibration": {
+              "accuracy": 0.8571,
+              "ece": 0.1333,
+              "brier": 0.1314,
+              "meanConfidence": 0.9905,
+              "falseConfidenceRate": 0.127
+            },
+            "categories": {
+              "SCHEMA_ERROR": 15,
+              "EXTRACTION_ERROR": 5,
+              "CONFIDENCE_ERROR": 4,
+              "HALLUCINATION": 2
+            }
+          },
+          "notes": "Baseline benchmark. Contract-compliant 0/15; raw consumer-ready 0/15. Artifacts in baseline/. See docs/ai/baseline-benchmark.md."
+        }
+      ]
+    }
+  ]
+}

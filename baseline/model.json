@@ -1,0 +1,10 @@
+{
+  "modelId": "webloom-ai-baseline-0.1.0",
+  "backend": "local",
+  "servingModel": "active-baseline-serving-model",
+  "format": "none",
+  "sourceReports": [
+    "baseline_holdout_enforce.json",
+    "baseline_train_enforce.json"
+  ]
+}

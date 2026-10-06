@@ -1,0 +1,353 @@
+[
+  {
+    "exampleId": "ext-skyline-001",
+    "task": "extraction.business_profile",
+    "ok": true,
+    "severity": "HIGH",
+    "categories": [
+      "EXTRACTION_ERROR",
+      "SCHEMA_ERROR",
+      "CONFIDENCE_ERROR"
+    ],
+    "fieldDetail": [
+      "missed identity.categories (expected Dentist)",
+      "missed identity.business_type (expected family dentistry)",
+      "wrong identity.description: got Skyline Dental Studio provides gentle family dentistry in Portland. New patient … expected Skyline Dental Studio provides gentle family dentistry in Portland.",
+      "wrong identity.services: got New patient exams,Whitening,Invisalign expected New patient exams,whitening,Invisalign",
+      "missed contact.website (expected https://skylinedental.example)",
+      "$.identity.name.provenance: value not in enum"
+    ],
+    "schemaCompliant": false,
+    "grounding": {
+      "grounded": 11,
+      "unsupported": 0,
+      "unverifiable": 9
+    }
+  },
+  {
+    "exampleId": "ext-bella-001",
+    "task": "extraction.business_profile",
+    "ok": true,
+    "severity": "CRITICAL",
+    "categories": [
+      "HALLUCINATION",
+      "EXTRACTION_ERROR",
+      "SCHEMA_ERROR",
+      "CONFIDENCE_ERROR"
+    ],
+    "fieldDetail": [
+      "missed identity.business_type (expected Italian restaurant)",
+      "missed identity.services (expected handmade pasta)",
+      "hallucinated identity.products = handmade pasta",
+      "wrong hours: got [object Object] expected Tue-Sun 5pm-10pm",
+      "$.identity.name.status: value not in enum"
+    ],
+    "schemaCompliant": false,
+    "grounding": {
+      "grounded": 15,
+      "unsupported": 0,
+      "unverifiable": 5
+    }
+  },
+  {
+    "exampleId": "dna-skyline-001",
+    "task": "brand.dna",
+    "ok": false,
+    "severity": "HIGH",
+    "categories": [
+      "SCHEMA_ERROR"
+    ],
+    "description": "audience.primary is required; services.core must be a non-empty array; conversionStrategy.primaryCTA.text is required",
+    "error": "Task \"brand.dna\" failed post-validation: audience.primary is required; services.core must be a non-empty array; conversionStrategy.primaryCTA.text is required",
+    "schemaErrors": [],
+    "shape": {
+      "consumed": false,
+      "rawConsumable": false,
+      "repaired": true,
+      "method": "flat-renest",
+      "rawError": "missing required property \"primary\"",
+      "repairedError": "missing required property \"primary\""
+    },
+    "capturedKeys": [
+      "businessIdentity",
+      "audience",
+      "customerIntent",
+      "painPoints",
+      "services",
+      "trustSignals",
+      "brandPersonality",
+      "positioning",
+      "conversionStrategy"
+    ]
+  },
+  {
+    "exampleId": "web-skyline-001",
+    "task": "website.analysis",
+    "ok": true,
+    "severity": "HIGH",
+    "categories": [
+      "SCHEMA_ERROR"
+    ],
+    "fieldDetail": [
+      "$: missing required property \"websiteExists\""
+    ],
+    "schemaCompliant": false,
+    "grounding": null
+  },
+  {
+    "exampleId": "strat-skyline-website-001",
+    "task": "strategy.website",
+    "ok": false,
+    "severity": "HIGH",
+    "categories": [
+      "SCHEMA_ERROR"
+    ],
+    "description": "pages must be a non-empty array; homepageSections must be a non-empty array; primaryCTA requires text and action",
+    "error": "Task \"strategy.website\" failed post-validation: pages must be a non-empty array; homepageSections must be a non-empty array; primaryCTA requires text and action",
+    "schemaErrors": [],
+    "shape": {
+      "consumed": false,
+      "rawConsumable": false,
+      "repaired": true,
+      "method": "flat-renest",
+      "rawError": "missing required property \"text\"",
+      "repairedError": "missing required property \"text\""
+    },
+    "capturedKeys": [
+      "websiteGoal",
+      "targetAudience",
+      "primaryCTA",
+      "secondaryCTA",
+      "pages",
+      "homepageSections",
+      "trustStrategy",
+      "conversionStrategy",
+      "seoStrategy",
+      "visualDirection",
+      "contentStrategy"
+    ]
+  },
+  {
+    "exampleId": "strat-bella-landing-001",
+    "task": "strategy.landing_page",
+    "ok": true,
+    "severity": "HIGH",
+    "categories": [
+      "SCHEMA_ERROR"
+    ],
+    "fieldDetail": [
+      "$.pageTitle: expected type string, got object"
+    ],
+    "schemaCompliant": false,
+    "grounding": null
+  },
+  {
+    "exampleId": "ext-tartine-001",
+    "task": "extraction.business_profile",
+    "ok": true,
+    "severity": "CRITICAL",
+    "categories": [
+      "HALLUCINATION",
+      "EXTRACTION_ERROR",
+      "SCHEMA_ERROR",
+      "CONFIDENCE_ERROR"
+    ],
+    "fieldDetail": [
+      "wrong identity.categories: got Bakery expected Breakfast,Bakery,Cafe",
+      "missed identity.business_type (expected artisan bakery)",
+      "wrong identity.description: got Tartine Bakery is an artisan bakery in San Francisco. We bake country bread and … expected Artisan bakery known for country bread and morning buns",
+      "wrong hours: got [object Object] expected Monday to Sunday, 7:30am to 4pm",
+      "hallucinated social_links = [object Object]",
+      "$.identity.name.provenance: value not in enum"
+    ],
+    "schemaCompliant": false,
+    "grounding": {
+      "grounded": 16,
+      "unsupported": 0,
+      "unverifiable": 4
+    }
+  },
+  {
+    "exampleId": "ext-manan-001",
+    "task": "extraction.business_profile",
+    "ok": true,
+    "severity": "HIGH",
+    "categories": [
+      "EXTRACTION_ERROR",
+      "SCHEMA_ERROR"
+    ],
+    "fieldDetail": [
+      "missed identity.categories (expected Furniture store)",
+      "missed identity.business_type (expected Furniture store)",
+      "missed identity.description (expected Furniture store — sofas, beds, wardrobes, dining tables)",
+      "$.identity.name.status: value not in enum"
+    ],
+    "schemaCompliant": false,
+    "grounding": {
+      "grounded": 10,
+      "unsupported": 0,
+      "unverifiable": 10
+    }
+  },
+  {
+    "exampleId": "ext-bloom-001",
+    "task": "extraction.business_profile",
+    "ok": true,
+    "severity": "HIGH",
+    "categories": [
+      "EXTRACTION_ERROR",
+      "SCHEMA_ERROR",
+      "CONFIDENCE_ERROR"
+    ],
+    "fieldDetail": [
+      "missed identity.categories (expected Coffee shop)",
+      "missed identity.business_type (expected Coffee shop)",
+      "missed identity.products (expected single-origin coffee)",
+      "wrong hours: got [object Object] expected 8am to 10pm, all week",
+      "$.identity.name.provenance: value not in enum"
+    ],
+    "schemaCompliant": false,
+    "grounding": {
+      "grounded": 11,
+      "unsupported": 0,
+      "unverifiable": 9
+    }
+  },
+  {
+    "exampleId": "dna-tartine-001",
+    "task": "brand.dna",
+    "ok": false,
+    "severity": "HIGH",
+    "categories": [
+      "SCHEMA_ERROR"
+    ],
+    "description": "audience.primary is required; services.core must be a non-empty array; conversionStrategy.primaryCTA.text is required",
+    "error": "Task \"brand.dna\" failed post-validation: audience.primary is required; services.core must be a non-empty array; conversionStrategy.primaryCTA.text is required",
+    "schemaErrors": [],
+    "shape": {
+      "consumed": false,
+      "rawConsumable": false,
+      "repaired": true,
+      "method": "flat-renest",
+      "rawError": "missing required property \"primary\"",
+      "repairedError": "missing required property \"primary\""
+    },
+    "capturedKeys": [
+      "businessIdentity",
+      "audience",
+      "customerIntent",
+      "painPoints",
+      "services",
+      "trustSignals",
+      "brandPersonality",
+      "positioning",
+      "conversionStrategy"
+    ]
+  },
+  {
+    "exampleId": "dna-manan-001",
+    "task": "brand.dna",
+    "ok": false,
+    "severity": "HIGH",
+    "categories": [
+      "SCHEMA_ERROR"
+    ],
+    "description": "audience.primary is required; services.core must be a non-empty array; conversionStrategy.primaryCTA.text is required",
+    "error": "Task \"brand.dna\" failed post-validation: audience.primary is required; services.core must be a non-empty array; conversionStrategy.primaryCTA.text is required",
+    "schemaErrors": [],
+    "shape": {
+      "consumed": false,
+      "rawConsumable": false,
+      "repaired": true,
+      "method": "flat-renest",
+      "rawError": "missing required property \"primary\"",
+      "repairedError": "missing required property \"primary\""
+    },
+    "capturedKeys": [
+      "businessIdentity",
+      "audience",
+      "customerIntent",
+      "painPoints",
+      "services",
+      "trustSignals",
+      "brandPersonality",
+      "positioning",
+      "conversionStrategy"
+    ]
+  },
+  {
+    "exampleId": "web-tartine-001",
+    "task": "website.analysis",
+    "ok": true,
+    "severity": "HIGH",
+    "categories": [
+      "SCHEMA_ERROR"
+    ],
+    "fieldDetail": [
+      "$: missing required property \"websiteExists\""
+    ],
+    "schemaCompliant": false,
+    "grounding": null
+  },
+  {
+    "exampleId": "web-manan-001",
+    "task": "website.analysis",
+    "ok": true,
+    "severity": "HIGH",
+    "categories": [
+      "SCHEMA_ERROR"
+    ],
+    "fieldDetail": [
+      "$: missing required property \"websiteExists\""
+    ],
+    "schemaCompliant": false,
+    "grounding": null
+  },
+  {
+    "exampleId": "strat-tartine-website-001",
+    "task": "strategy.website",
+    "ok": false,
+    "severity": "HIGH",
+    "categories": [
+      "SCHEMA_ERROR"
+    ],
+    "description": "pages must be a non-empty array; homepageSections must be a non-empty array",
+    "error": "Task \"strategy.website\" failed post-validation: pages must be a non-empty array; homepageSections must be a non-empty array",
+    "schemaErrors": [],
+    "shape": {
+      "consumed": false,
+      "rawConsumable": false,
+      "repaired": true,
+      "method": "flat-renest",
+      "rawError": "missing required property \"text\"",
+      "repairedError": "missing required property \"text\""
+    },
+    "capturedKeys": [
+      "websiteGoal",
+      "targetAudience",
+      "primaryCTA",
+      "secondaryCTA",
+      "pages",
+      "homepageSections",
+      "trustStrategy",
+      "conversionStrategy",
+      "seoStrategy",
+      "visualDirection",
+      "contentStrategy"
+    ]
+  },
+  {
+    "exampleId": "strat-manan-landing-001",
+    "task": "strategy.landing_page",
+    "ok": true,
+    "severity": "HIGH",
+    "categories": [
+      "SCHEMA_ERROR"
+    ],
+    "fieldDetail": [
+      "$.pageTitle: expected type string, got object"
+    ],
+    "schemaCompliant": false,
+    "grounding": null
+  }
+]

@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "rules": {
+    "holdoutNeverTrained": true,
+    "trainEvalDisjoint": true,
+    "evidenceRequired": true,
+    "unknownIsExpected": true
+  },
+  "datasets": [
+    {
+      "task": "extraction.business_profile",
+      "dataset": "extraction",
+      "version": "v0.1.0",
+      "split": "train",
+      "path": "extraction/v0.1.0/train.jsonl",
+      "examples": 4,
+      "promptVersion": "webloom-tasks-v1"
+    },
+    {
+      "task": "extraction.business_profile",
+      "dataset": "extraction",
+      "version": "v0.1.0",
+      "split": "holdout",
+      "path": "evaluation/holdout/v0.1.0/extraction.jsonl",
+      "examples": 2,
+      "holdout": true,
+      "promptVersion": "webloom-tasks-v1"
+    },
+    {
+      "task": "brand.dna",
+      "dataset": "business-dna",
+      "version": "v0.1.0",
+      "split": "train",
+      "path": "business-dna/v0.1.0/train.jsonl",
+      "examples": 3,
+      "promptVersion": "webloom-tasks-v1"
+    },
+    {
+      "task": "brand.dna",
+      "dataset": "business-dna",
+      "version": "v0.1.0",
+      "split": "holdout",
+      "path": "evaluation/holdout/v0.1.0/business-dna.jsonl",
+      "examples": 1,
+      "holdout": true,
+      "promptVersion": "webloom-tasks-v1"
+    },
+    {
+      "task": "website.analysis",
+      "dataset": "website-analysis",
+      "version": "v0.1.0",
+      "split": "train",
+      "path": "website-analysis/v0.1.0/train.jsonl",
+      "examples": 3,
+      "promptVersion": "webloom-tasks-v1"
+    },
+    {
+      "task": "website.analysis",
+      "dataset": "website-analysis",
+      "version": "v0.1.0",
+      "split": "holdout",
+      "path": "evaluation/holdout/v0.1.0/website-analysis.jsonl",
+      "examples": 1,
+      "holdout": true,
+      "promptVersion": "webloom-tasks-v1"
+    },
+    {
+      "task": "strategy.website,strategy.landing_page",
+      "dataset": "strategy",
+      "version": "v0.1.0",
+      "split": "train",
+      "path": "strategy/v0.1.0/train.jsonl",
+      "examples": 4,
+      "promptVersion": "webloom-tasks-v1"
+    },
+    {
+      "task": "strategy.website,strategy.landing_page",
+      "dataset": "strategy",
+      "version": "v0.1.0",
+      "split": "holdout",
+      "path": "evaluation/holdout/v0.1.0/strategy.jsonl",
+      "examples": 2,
+      "holdout": true,
+      "promptVersion": "webloom-tasks-v1"
+    },
+    {
+      "task": "extraction.business_profile",
+      "dataset": "extraction",
+      "version": "v0.1.0",
+      "split": "validation",
+      "path": "evaluation/validation/v0.1.0/extraction.jsonl",
+      "examples": 2,
+      "promptVersion": "webloom-tasks-v1"
+    },
+    {
+      "task": "brand.dna",
+      "dataset": "business-dna",
+      "version": "v0.1.0",
+      "split": "validation",
+      "path": "evaluation/validation/v0.1.0/business-dna.jsonl",
+      "examples": 1,
+      "promptVersion": "webloom-tasks-v1"
+    },
+    {
+      "task": "website.analysis",
+      "dataset": "website-analysis",
+      "version": "v0.1.0",
+      "split": "validation",
+      "path": "evaluation/validation/v0.1.0/website-analysis.jsonl",
+      "examples": 2,
+      "promptVersion": "webloom-tasks-v1"
+    },
+    {
+      "task": "strategy.website,strategy.landing_page",
+      "dataset": "strategy",
+      "version": "v0.1.0",
+      "split": "validation",
+      "path": "evaluation/validation/v0.1.0/strategy.jsonl",
+      "examples": 1,
+      "promptVersion": "webloom-tasks-v1"
+    }
+  ]
+}

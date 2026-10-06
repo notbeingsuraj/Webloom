@@ -135,6 +135,10 @@ export const config = {
     enrichmentMinIncomingConfidence: process.env.AI_ENRICHMENT_MIN_CONFIDENCE != null
       ? parseFloat(process.env.AI_ENRICHMENT_MIN_CONFIDENCE)
       : 0.75,
+    // Evidence grounding: reject AI evidence snippets that do not actually
+    // occur in the source evidence text (hallucination guard). Default ON.
+    // Set AI_GROUNDING_ENFORCE=false to accept model-asserted snippets.
+    groundingEnforce: process.env.AI_GROUNDING_ENFORCE !== 'false',
     // Crawl the business's own website during enrichment to fill contact and
     // location gaps. Disable with AI_OFFICIAL_WEBSITE=false.
     officialWebsiteEnrichment: process.env.AI_OFFICIAL_WEBSITE !== 'false',
@@ -143,6 +147,29 @@ export const config = {
     officialWebsiteNameMatch: parseFloat(process.env.AI_OFFICIAL_WEBSITE_NAME_MATCH) || 0.75,
     // How many AI-proposed domains to probe when no website is known.
     officialWebsiteMaxCandidates: parseInt(process.env.AI_OFFICIAL_WEBSITE_MAX_CANDIDATES) || 3,
+
+    // Baseline evaluation target. The baseline is ONE fixed foundation model —
+    // the model registered as active-baseline in models/registry.json. It can
+    // be served through any OpenAI-compatible backend already configured:
+    //   AI_BASELINE_PROVIDER=local|openrouter   (default 'local'; one backend,
+    //                                            never an ordered chain)
+    //   AI_BASELINE_MODEL=<serving slug>        (default: the active baseline
+    //                                            registry record's serving model)
+    //   AI_BASELINE_FORMAT=json_object|json_schema|none
+    //     json_object   — plain JSON requested, schema enforced after the fact
+    //                     (honest measure of the foundation model's raw JSON)
+    //     json_schema   — strict response_format json_schema when the model
+    //                     supports it
+    //     none          — no response_format at all
+    baseline: {
+      provider: process.env.AI_BASELINE_PROVIDER || 'local',
+      model: process.env.AI_BASELINE_MODEL || null,
+      // 'none' (default) measures the model's natural output, which is what a
+      // fine-tuned model must imitate. Gateway-forced json_object/json_schema
+      // can alter a small base model's behaviour (observed: degraded output
+      // shape), so they are opt-in experiment flags, not the baseline.
+      format: process.env.AI_BASELINE_FORMAT || 'none',
+    },
   },
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,

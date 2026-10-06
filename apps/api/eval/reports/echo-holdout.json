@@ -1,0 +1,591 @@
+{
+  "runId": "bench-echo-holdout-1791293443989",
+  "dataset": "holdout",
+  "backend": "echo",
+  "startedAt": "2026-10-06T13:30:43.988Z",
+  "generatedAt": "2026-10-06T13:30:43.991Z",
+  "model": {
+    "provider": "echo",
+    "model": "echo (expected output)"
+  },
+  "totals": {
+    "examples": 6,
+    "ok": 6,
+    "failed": 0,
+    "pctOk": 100,
+    "attempts": 6,
+    "avgLatencyMs": 0
+  },
+  "perTask": {
+    "brand.dna": {
+      "summary": {
+        "examples": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "genericCoverage": 1
+      },
+      "table": [
+        [
+          "example",
+          "outcome",
+          "fields",
+          "expected",
+          "tp",
+          "fp",
+          "fn",
+          "tn",
+          "f1",
+          "halluc"
+        ],
+        [
+          "dna-skyline-001",
+          "ok",
+          "9/9",
+          "",
+          "",
+          "",
+          "",
+          "",
+          1,
+          ""
+        ]
+      ]
+    },
+    "extraction.business_profile": {
+      "summary": {
+        "examples": 2,
+        "succeeded": 2,
+        "failed": 0,
+        "envelope": {
+          "tp": 0,
+          "fp": 0,
+          "fn": 0,
+          "tn": 0,
+          "fields": 0,
+          "expectedValued": 0,
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "hallucinationRate": 0,
+          "missRate": 0
+        }
+      },
+      "table": [
+        [
+          "example",
+          "outcome",
+          "fields",
+          "expected",
+          "tp",
+          "fp",
+          "fn",
+          "tn",
+          "f1",
+          "halluc"
+        ],
+        [
+          "ext-skyline-001",
+          "ok",
+          20,
+          14,
+          14,
+          0,
+          0,
+          6,
+          1,
+          0
+        ],
+        [
+          "ext-bella-001",
+          "ok",
+          20,
+          16,
+          16,
+          0,
+          0,
+          4,
+          1,
+          0
+        ]
+      ]
+    },
+    "strategy.landing_page": {
+      "summary": {
+        "examples": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "genericCoverage": 1
+      },
+      "table": [
+        [
+          "example",
+          "outcome",
+          "fields",
+          "expected",
+          "tp",
+          "fp",
+          "fn",
+          "tn",
+          "f1",
+          "halluc"
+        ],
+        [
+          "strat-bella-landing-001",
+          "ok",
+          "6/6",
+          "",
+          "",
+          "",
+          "",
+          "",
+          1,
+          ""
+        ]
+      ]
+    },
+    "strategy.website": {
+      "summary": {
+        "examples": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "genericCoverage": 1
+      },
+      "table": [
+        [
+          "example",
+          "outcome",
+          "fields",
+          "expected",
+          "tp",
+          "fp",
+          "fn",
+          "tn",
+          "f1",
+          "halluc"
+        ],
+        [
+          "strat-skyline-website-001",
+          "ok",
+          "11/11",
+          "",
+          "",
+          "",
+          "",
+          "",
+          1,
+          ""
+        ]
+      ]
+    },
+    "website.analysis": {
+      "summary": {
+        "examples": 1,
+        "succeeded": 1,
+        "failed": 0,
+        "genericCoverage": 1,
+        "overallScoreMAE": 0,
+        "categoryScoreMAE": 0
+      },
+      "table": [
+        [
+          "example",
+          "outcome",
+          "fields",
+          "expected",
+          "tp",
+          "fp",
+          "fn",
+          "tn",
+          "f1",
+          "halluc"
+        ],
+        [
+          "web-skyline-001",
+          "ok",
+          "6/6",
+          "",
+          "",
+          "",
+          "",
+          "",
+          1,
+          ""
+        ]
+      ]
+    }
+  },
+  "results": [
+    {
+      "exampleId": "ext-skyline-001",
+      "task": "extraction.business_profile",
+      "datasetVersion": "v0.1.0",
+      "ok": true,
+      "error": null,
+      "inference": {
+        "provider": "echo",
+        "model": "echo (expected output)",
+        "modelId": null,
+        "promptVersion": "webloom-tasks-v1",
+        "latencyMs": 0,
+        "usage": null,
+        "confidence": {
+          "confidence": 0.9371,
+          "band": "HIGH",
+          "valuedFields": 14
+        },
+        "grounding": {
+          "checked": false,
+          "mode": "off",
+          "grounded": 0,
+          "unsupported": 0,
+          "unverifiable": 0
+        },
+        "generatedAt": "2026-10-06T13:30:43.989Z"
+      },
+      "metrics": {
+        "type": "envelope",
+        "fields": 20,
+        "expectedValued": 14,
+        "tp": 14,
+        "fp": 0,
+        "fn": 0,
+        "tn": 6,
+        "f1": 1,
+        "precision": 1,
+        "recall": 1,
+        "hallucinationRate": 0,
+        "missRate": 0,
+        "abstentionAccuracy": 1,
+        "statusAccuracy": 1,
+        "calibrationPairs": [
+          {
+            "confidence": 0.98,
+            "correct": true
+          },
+          {
+            "confidence": 0.96,
+            "correct": true
+          },
+          {
+            "confidence": 0.9,
+            "correct": true
+          },
+          {
+            "confidence": 0.88,
+            "correct": true
+          },
+          {
+            "confidence": 0.93,
+            "correct": true
+          },
+          {
+            "confidence": 0.92,
+            "correct": true
+          },
+          {
+            "confidence": 0.97,
+            "correct": true
+          },
+          {
+            "confidence": 0.9,
+            "correct": true
+          },
+          {
+            "confidence": 0.97,
+            "correct": true
+          },
+          {
+            "confidence": 0.95,
+            "correct": true
+          },
+          {
+            "confidence": 0.94,
+            "correct": true
+          },
+          {
+            "confidence": 0.94,
+            "correct": true
+          },
+          {
+            "confidence": 0.95,
+            "correct": true
+          },
+          {
+            "confidence": 0.93,
+            "correct": true
+          }
+        ]
+      },
+      "attempts": 1,
+      "latencyMs": 0
+    },
+    {
+      "exampleId": "ext-bella-001",
+      "task": "extraction.business_profile",
+      "datasetVersion": "v0.1.0",
+      "ok": true,
+      "error": null,
+      "inference": {
+        "provider": "echo",
+        "model": "echo (expected output)",
+        "modelId": null,
+        "promptVersion": "webloom-tasks-v1",
+        "latencyMs": 0,
+        "usage": null,
+        "confidence": {
+          "confidence": 0.9169,
+          "band": "HIGH",
+          "valuedFields": 16
+        },
+        "grounding": {
+          "checked": false,
+          "mode": "off",
+          "grounded": 0,
+          "unsupported": 0,
+          "unverifiable": 0
+        },
+        "generatedAt": "2026-10-06T13:30:43.990Z"
+      },
+      "metrics": {
+        "type": "envelope",
+        "fields": 20,
+        "expectedValued": 16,
+        "tp": 16,
+        "fp": 0,
+        "fn": 0,
+        "tn": 4,
+        "f1": 1,
+        "precision": 1,
+        "recall": 1,
+        "hallucinationRate": 0,
+        "missRate": 0,
+        "abstentionAccuracy": 1,
+        "statusAccuracy": 1,
+        "calibrationPairs": [
+          {
+            "confidence": 0.98,
+            "correct": true
+          },
+          {
+            "confidence": 0.96,
+            "correct": true
+          },
+          {
+            "confidence": 0.9,
+            "correct": true
+          },
+          {
+            "confidence": 0.93,
+            "correct": true
+          },
+          {
+            "confidence": 0.93,
+            "correct": true
+          },
+          {
+            "confidence": 0.88,
+            "correct": true
+          },
+          {
+            "confidence": 0.55,
+            "correct": true
+          },
+          {
+            "confidence": 0.97,
+            "correct": true
+          },
+          {
+            "confidence": 0.97,
+            "correct": true
+          },
+          {
+            "confidence": 0.97,
+            "correct": true
+          },
+          {
+            "confidence": 0.95,
+            "correct": true
+          },
+          {
+            "confidence": 0.94,
+            "correct": true
+          },
+          {
+            "confidence": 0.94,
+            "correct": true
+          },
+          {
+            "confidence": 0.92,
+            "correct": true
+          },
+          {
+            "confidence": 0.95,
+            "correct": true
+          },
+          {
+            "confidence": 0.93,
+            "correct": true
+          }
+        ]
+      },
+      "attempts": 1,
+      "latencyMs": 0
+    },
+    {
+      "exampleId": "dna-skyline-001",
+      "task": "brand.dna",
+      "datasetVersion": "v0.1.0",
+      "ok": true,
+      "error": null,
+      "inference": {
+        "provider": "echo",
+        "model": "echo (expected output)",
+        "modelId": null,
+        "promptVersion": "webloom-tasks-v1",
+        "latencyMs": 0,
+        "usage": null,
+        "confidence": {
+          "confidence": 0,
+          "band": "UNSUPPORTED",
+          "valuedFields": 0
+        },
+        "grounding": {
+          "checked": false,
+          "mode": "off",
+          "grounded": 0,
+          "unsupported": 0,
+          "unverifiable": 0
+        },
+        "generatedAt": "2026-10-06T13:30:43.991Z"
+      },
+      "metrics": {
+        "type": "generative",
+        "keys": 9,
+        "requiredKeys": 9,
+        "coverage": 1,
+        "missing": [],
+        "scoreDelta": null
+      },
+      "attempts": 1,
+      "latencyMs": 0
+    },
+    {
+      "exampleId": "web-skyline-001",
+      "task": "website.analysis",
+      "datasetVersion": "v0.1.0",
+      "ok": true,
+      "error": null,
+      "inference": {
+        "provider": "echo",
+        "model": "echo (expected output)",
+        "modelId": null,
+        "promptVersion": "webloom-tasks-v1",
+        "latencyMs": 0,
+        "usage": null,
+        "confidence": {
+          "confidence": 0,
+          "band": "UNSUPPORTED",
+          "valuedFields": 0
+        },
+        "grounding": {
+          "checked": false,
+          "mode": "off",
+          "grounded": 0,
+          "unsupported": 0,
+          "unverifiable": 0
+        },
+        "generatedAt": "2026-10-06T13:30:43.991Z"
+      },
+      "metrics": {
+        "type": "generative",
+        "keys": 6,
+        "requiredKeys": 6,
+        "coverage": 1,
+        "missing": [],
+        "scoreDelta": {
+          "overallMAE": 0,
+          "categoryMAE": 0,
+          "websiteExistsMatch": true
+        }
+      },
+      "attempts": 1,
+      "latencyMs": 0
+    },
+    {
+      "exampleId": "strat-skyline-website-001",
+      "task": "strategy.website",
+      "datasetVersion": "v0.1.0",
+      "ok": true,
+      "error": null,
+      "inference": {
+        "provider": "echo",
+        "model": "echo (expected output)",
+        "modelId": null,
+        "promptVersion": "webloom-tasks-v1",
+        "latencyMs": 0,
+        "usage": null,
+        "confidence": {
+          "confidence": 0,
+          "band": "UNSUPPORTED",
+          "valuedFields": 0
+        },
+        "grounding": {
+          "checked": false,
+          "mode": "off",
+          "grounded": 0,
+          "unsupported": 0,
+          "unverifiable": 0
+        },
+        "generatedAt": "2026-10-06T13:30:43.991Z"
+      },
+      "metrics": {
+        "type": "generative",
+        "keys": 11,
+        "requiredKeys": 11,
+        "coverage": 1,
+        "missing": [],
+        "scoreDelta": null
+      },
+      "attempts": 1,
+      "latencyMs": 0
+    },
+    {
+      "exampleId": "strat-bella-landing-001",
+      "task": "strategy.landing_page",
+      "datasetVersion": "v0.1.0",
+      "ok": true,
+      "error": null,
+      "inference": {
+        "provider": "echo",
+        "model": "echo (expected output)",
+        "modelId": null,
+        "promptVersion": "webloom-tasks-v1",
+        "latencyMs": 0,
+        "usage": null,
+        "confidence": {
+          "confidence": 0,
+          "band": "UNSUPPORTED",
+          "valuedFields": 0
+        },
+        "grounding": {
+          "checked": false,
+          "mode": "off",
+          "grounded": 0,
+          "unsupported": 0,
+          "unverifiable": 0
+        },
+        "generatedAt": "2026-10-06T13:30:43.991Z"
+      },
+      "metrics": {
+        "type": "generative",
+        "keys": 6,
+        "requiredKeys": 6,
+        "coverage": 1,
+        "missing": [],
+        "scoreDelta": null
+      },
+      "attempts": 1,
+      "latencyMs": 0
+    }
+  ]
+}
