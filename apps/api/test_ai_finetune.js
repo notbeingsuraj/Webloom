@@ -30,6 +30,13 @@ import { fileURLToPath } from 'node:url';
 
 import './test_env_ai.js';
 
+// D2/D3 assert that the webloom candidate stays unservable until a local
+// backend is explicitly pointed at it. apps/api/.env sets LOCAL_AI_BASE_URL
+// for real runs; dotenv.config() (src/config/env.js) does not override an
+// existing key, so clearing it here keeps the fixture honest without weakening
+// the assertions.
+process.env.LOCAL_AI_BASE_URL = '';
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
 const API_ROOT = path.join(REPO_ROOT, 'apps/api');

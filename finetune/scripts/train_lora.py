@@ -157,6 +157,50 @@ def guard_holdout(format_root):
     return {k: len(v) for k, v in ids.items()}, {k: len(v) for k, v in businesses.items()}
 
 
+def memory_efficient_causal_lm_loss(outputs, labels, num_items_in_batch=None, ignore_index=-100, **kwargs):
+    """Trainer `compute_loss_func` — numerically equivalent to transformers'
+    ForCausalLMLoss, but memory-safe on an 8 GB Apple Silicon MPS device.
+
+    transformers' default loss does `logits.float()` on the FULL
+    [tokens, vocab] tensor (151,936 entries) before cross-entropy: ~1.2 GB of
+    fp32 per 1k tokens plus its gradient, which pushed the MPS allocator past
+    its cap (RuntimeError: MPS backend out of memory ... max allowed 9.07 GiB)
+    at seq len ~1.9k, and pushed the whole process (phys_footprint 8.6 GB) past
+    the 8.6 GB of physical RAM, so macOS thrashed on swap (~36 min/step).
+
+    Two coordinated savings:
+      1. `logits_to_keep` (set by the collator) truncates the LM head to the
+         last K positions, so full-sequence logits are never materialised.
+      2. Only the supervised (shifted, non -100) rows are upcast to fp32 before
+         cross-entropy.
+
+    Both are the same math: ignored positions contribute nothing to the loss or
+    to the LM-head gradient. The causal shift is realigned to whatever K the
+    model returned (`logits[:, :-1]` pairs with `labels[:, -(K-1):]`).
+    """
+    import torch
+    import torch.nn.functional as F
+
+    logits = outputs.logits if hasattr(outputs, "logits") else outputs[0]
+    keep_len = logits.size(1)
+    if keep_len <= 1:
+        # Not even one kept position can predict a label.
+        return logits.sum() * 0.0
+    shift_logits = logits[:, :-1, :].reshape(-1, logits.size(-1))
+    shift_labels = labels[:, -(keep_len - 1):].reshape(-1)
+    keep = shift_labels != ignore_index
+    shift_logits = shift_logits[keep].float()
+    shift_labels = shift_labels[keep]
+    reduction = "sum" if num_items_in_batch is not None else "mean"
+    loss = F.cross_entropy(shift_logits, shift_labels, reduction=reduction)
+    if reduction == "sum":
+        n = num_items_in_batch
+        if torch.is_tensor(n):
+            n = n.to(loss.device)
+        loss = loss / max(int(n), 1)
+    return loss
+
+
 def _mps_bf16_ok():
     """Probe: can the MPS backend do a bf16 autocast forward+backward?"""
     try:
@@ -439,7 +483,25 @@ def main():
         dataloader_pin_memory=False,
     )
 
-    collator = DataCollatorForSeq2Seq(tokenizer, padding=True, label_pad_token_id=-100)
+    base_collator = DataCollatorForSeq2Seq(tokenizer, padding=True, label_pad_token_id=-100)
+
+    def collator(features):
+        batch = base_collator(features)
+        labels = batch["labels"]
+        seq_len = labels.size(1)
+        # Keep only the logits needed to predict supervised tokens (plus one for
+        # the causal shift). The assistant labels are the trailing block, so the
+        # first non -100 index determines K. This avoids materialising the full
+        # [tokens, 151936] LM-head logits + fp32 loss upcast, which otherwise
+        # exceeds the machine's physical RAM and thrashes swap.
+        needed = 1
+        for row in labels:
+            idx = (row != -100).nonzero(as_tuple=True)[0]
+            if idx.numel() > 0:
+                needed = max(needed, seq_len - int(idx[0].item()) + 1)
+        batch["logits_to_keep"] = min(needed, seq_len)
+        return batch
+
     trainer = Trainer(
         model=model,
         args=train_args,
@@ -447,6 +509,10 @@ def main():
         eval_dataset=valid_rows if valid_rows else None,
         processing_class=tokenizer,
         data_collator=collator,
+        # Memory-efficient loss: identical math to the transformers default, but
+        # filters to supervised tokens BEFORE the float32 upcast (the default
+        # upcasts the full [T, 151936] logits and OOMs the 9 GiB MPS pool).
+        compute_loss_func=memory_efficient_causal_lm_loss,
     )
 
     start_monotonic = time.time()
