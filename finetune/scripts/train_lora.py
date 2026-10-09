@@ -7,26 +7,32 @@ datasets/manifest.json TRAIN + VALIDATION splits only. The holdout split is
 never loaded: a hard guard inside this script re-verifies every formatted
 training row against the manifest and aborts (exit 2) on any leak.
 
-Run (GPU):
+Run (dev Mac / CPU / GPU alike):
   python finetune/scripts/train_lora.py --config finetune/configs/webloom-v0.1.json
 
-Dry-run (pipeline check, tiny model + steps, no training claims):
+Dry-run (pipeline check, tiny steps, no training claims):
   python finetune/scripts/train_lora.py --config finetune/configs/webloom-v0.1.json \
-      --dry-run --model Qwen/Qwen2.5-0.5B-Instruct
+      --dry-run --max-steps 2
 
-Hardware note: QLoRA (4-bit) and paged_adamw_8bit require a CUDA GPU and
-bitsandbytes. On CPU/MPS the script auto-degrades to 16-bit LoRA with
-adamw_torch and records the deviation in the experiment manifest rather than
-wasting resources on an unusable configuration.
+Hardware note: the pinned experiment uses plain bf16 LoRA (the 1.54B base fits
+in 16-bit everywhere). QLoRA (4-bit) + paged_adamw_8bit only engage when
+quantization is enabled in the config AND a CUDA GPU with bitsandbytes exists.
+Any degradation (dtype, optimizer, quantization) is recorded as a deviation in
+the experiment manifest rather than hidden.
 """
 
 import argparse
 import hashlib
 import json
+import math
 import os
 import platform
+import shutil
+import socket
 import subprocess
 import sys
+import time
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -107,6 +113,8 @@ def guard_holdout(format_root):
         overlap = ids[a] & ids[b]
         for eid in sorted(overlap):
             errors.append(f"origin exampleId overlap {eid} in {a} and {b}")
+        for biz in sorted(businesses[a] & businesses[b]):
+            errors.append(f"origin business overlap {biz} in {a} and {b} (business-level split violation)")
 
     if not format_root.exists():
         errors.append(f"format root missing: {format_root}")
@@ -147,6 +155,20 @@ def guard_holdout(format_root):
         raise SystemExit(2)
     print("holdout guard PASS (python): train/validation rows contain no holdout ids or businesses")
     return {k: len(v) for k, v in ids.items()}, {k: len(v) for k, v in businesses.items()}
+
+
+def _mps_bf16_ok():
+    """Probe: can the MPS backend do a bf16 autocast forward+backward?"""
+    try:
+        import torch
+        x = torch.randn(8, 8, device="mps", dtype=torch.float32)
+        w = torch.randn(8, 8, device="mps", requires_grad=True)
+        with torch.autocast(device_type="mps", dtype=torch.bfloat16):
+            loss = (x @ w).sum()
+        loss.backward()
+        return w.grad is not None
+    except Exception:
+        return False
 
 
 def hardware_report():
@@ -239,8 +261,21 @@ def main():
     print(f"experiment: {exp['id']} → adapter {exp['registryModelId']} on {exp['foundationModel']}")
 
     format_root = (REPO_ROOT / args.data_root).resolve()
+    id_counts = biz_counts = None
     if not args.skip_holdout_guard:
-        guard_holdout(format_root)
+        id_counts, biz_counts = guard_holdout(format_root)
+        # §11 training-data sanity check — printed before anything expensive.
+        print("training data sanity check:")
+        print(f"  Training examples  : {id_counts['train']}")
+        print(f"  Validation examples: {id_counts['validation']}")
+        print(f"  Holdout examples   : {id_counts['holdout']} (never formatted, never loaded)")
+        print("  train ∩ validation = empty")
+        print("  train ∩ holdout = empty")
+        print("  validation ∩ holdout = empty")
+        print(f"  businesses (disjoint): train {biz_counts['train']} / "
+              f"validation {biz_counts['validation']} / holdout {biz_counts['holdout']}")
+        print(f"  fitting on split '{config['data'].get('fitSplit', 'train')}' only; "
+              f"'{config['data'].get('selectionSplit', 'validation')}' is selection-only")
     else:
         print("WARNING: holdout guard disabled by --skip-holdout-guard", file=sys.stderr)
 
@@ -302,9 +337,18 @@ def main():
             dtype = torch.float16
             DEVIATIONS.append("fp16 used (GPU does not support bf16)")
             print("dtype: fp16")
+    elif device == "mps":
+        if training.get("preferredDtype") == "bf16" and _mps_bf16_ok():
+            dtype = torch.bfloat16
+            print("dtype: bf16 (MPS probe passed)")
+        else:
+            dtype = torch.float16
+            DEVIATIONS.append("fp16 used on MPS (bf16 probe failed or bf16 not preferred)")
+            print("dtype: fp16 (MPS)")
     else:
-        DEVIATIONS.append(f"16-bit compute on {device} (no bf16)")
-        print("dtype: 16-bit CPU/MPS compute")
+        dtype = torch.float32
+        DEVIATIONS.append(f"fp32 compute on {device} (no mixed precision on this device)")
+        print("dtype: fp32 (CPU)")
 
     kwargs = {}
     if device != "cpu" and device != "mps":
@@ -314,7 +358,7 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         quantization_config=quantization_config,
-        torch_dtype=dtype,
+        dtype=dtype,
         trust_remote_code=True,
         use_cache=False if training.get("gradientCheckpointing") else True,
         **kwargs,
@@ -331,6 +375,10 @@ def main():
         task_type=lora_cfg["taskType"],
     )
     model = get_peft_model(model, lora)
+    if training.get("gradientCheckpointing"):
+        # Frozen base + gradient checkpointing: embeddings must carry grad for
+        # the LoRA params to receive any gradient at all.
+        model.enable_input_require_grads()
     trainable, total = model.get_nb_trainable_parameters()
     print(f"LoRA trainable: {trainable:,} / {total:,} ({100 * trainable / total:.3f}%)")
 
@@ -353,6 +401,16 @@ def main():
             optimizer = "adamw_torch"
             DEVIATIONS.append(f"optimizer paged_adamw_8bit unavailable → {optimizer}")
 
+    # transformers v5 exposes warmup_steps only; convert the pinned
+    # warmupRatio using the real optimizer-step schedule (deterministic).
+    micro_bs = training["perDeviceTrainBatchSize"]
+    accum_bs = training["gradientAccumulationSteps"]
+    steps_per_epoch = math.ceil(len(train_rows) / (micro_bs * accum_bs)) if train_rows else 0
+    planned_total_steps = max_steps if max_steps is not None else steps_per_epoch * int(training["numTrainEpochs"])
+    warmup_steps = max(0, round(float(training.get("warmupRatio", 0.0)) * planned_total_steps))
+    print(f"schedule: {steps_per_epoch} optimizer steps/epoch × {training['numTrainEpochs']} epochs "
+          f"= {planned_total_steps} planned, warmup {warmup_steps} steps")
+
     train_args = TrainingArguments(
         output_dir=str(output_dir),
         per_device_train_batch_size=training["perDeviceTrainBatchSize"],
@@ -360,13 +418,14 @@ def main():
         gradient_accumulation_steps=training["gradientAccumulationSteps"],
         learning_rate=training["learningRate"],
         lr_scheduler_type=training["lrSchedulerType"],
-        warmup_ratio=training["warmupRatio"],
+        warmup_steps=warmup_steps,
         num_train_epochs=training["numTrainEpochs"],
         max_steps=max_steps,
         optim=optimizer,
         bf16=(dtype == torch.bfloat16),
         fp16=(dtype == torch.float16),
         gradient_checkpointing=training.get("gradientCheckpointing", True),
+        gradient_checkpointing_kwargs={"use_reentrant": False},
         eval_strategy="steps" if valid_rows else "no",
         eval_steps=eval_steps,
         save_strategy="steps",
@@ -386,46 +445,105 @@ def main():
         args=train_args,
         train_dataset=train_rows,
         eval_dataset=valid_rows if valid_rows else None,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         data_collator=collator,
     )
 
-    import time
+    start_monotonic = time.time()
     start_ts = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     trainer.train()
     end_ts = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    duration_seconds = round(time.time() - start_monotonic, 1)
 
     (output_dir / "metrics.jsonl").write_text(
         "\n".join(json.dumps(line) for line in trainer.state.log_history), encoding="utf-8"
     )
 
     commit, commit_short = git_head(REPO_ROOT)
+
+    def rel(p):
+        try:
+            return str(Path(p).resolve().relative_to(REPO_ROOT))
+        except Exception:
+            return str(p)
+
+    def framework_versions():
+        out = {}
+        for pkg in ("torch", "transformers", "peft", "accelerate", "datasets"):
+            try:
+                out[pkg] = pkg_version(pkg)
+            except Exception:
+                out[pkg] = None
+        return out
+
     manifest = {
-        "experiment": exp,
-        "configFile": str(Path(args.config).resolve()),
+        "experiment": exp["id"],
+        "experimentPurpose": exp.get("purpose"),
+        "configFile": rel(args.config),
         "configSha256": config_hash(args.config),
         "commit": commit,
         "commitShort": commit_short,
+        "repoBranch": subprocess.run(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.strip() or None,
         "repoDirty": subprocess.run(["git", "-C", str(REPO_ROOT), "status", "--porcelain"], capture_output=True, text=True).stdout.strip() != "",
-        "hardware": hardware,
+        "hardware": {**hardware, "hostname": socket.gethostname()},
         "device": device,
         "dtype": str(dtype),
         "quantization": {"enabled": quantize, "bits": 4 if quantize else None, "type": quant.get("bnb4bitQuantType") if quantize else None},
         "optimizer": optimizer,
         "model": model_name,
+        "modelRevision": exp.get("modelRevision"),
         "tokenizer": tokenizer_name,
+        "tokenizerInfo": {
+            "source": tokenizer_name,
+            "vocabSize": len(tokenizer),
+            "chatTemplate": tok_cfg.get("chatTemplate"),
+        },
+        "framework": framework_versions(),
+        "datasetVersion": config["data"].get("datasetVersion"),
+        "validationVersion": config["data"].get("validationVersion"),
         "maxSeqLength": max_seq,
-        "data": {"train": len(train_rows), "validation": len(valid_rows)},
+        "seed": training["seed"],
+        "lora": {k: lora_cfg.get(k) for k in ("r", "loraAlpha", "loraDropout", "targetModules", "bias")},
+        "schedule": {
+            "stepsPerEpoch": steps_per_epoch,
+            "plannedTotalSteps": planned_total_steps,
+            "warmupSteps": warmup_steps,
+            "effectiveBatchSize": micro_bs * accum_bs,
+        },
+        "data": {
+            "train": len(train_rows),
+            "validation": len(valid_rows),
+            "holdout": (id_counts or {}).get("holdout"),
+            "fitSplit": config["data"].get("fitSplit"),
+            "selectionSplit": config["data"].get("selectionSplit"),
+        },
         "trainableParams": int(trainable),
         "totalParams": int(total),
         "dryRun": dry,
         "maxSteps": max_steps,
         "deviations": DEVIATIONS,
-        "bestCheckpoint": getattr(trainer.state, "best_model_checkpoint", None),
+        "bestCheckpoint": rel(getattr(trainer.state, "best_model_checkpoint", None)) if getattr(trainer.state, "best_model_checkpoint", None) else None,
         "startedAt": start_ts,
         "finishedAt": end_ts,
+        "durationSeconds": duration_seconds,
     }
     (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
+
+    # Small reproducibility artifacts are promoted into finetune/experiments/
+    # (committed); checkpoints + full logs stay local under finetune/runs/
+    # (gitignored, large).
+    if not dry:
+        exp_dir = REPO_ROOT / "finetune" / "experiments" / exp["id"]
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy(output_dir / "manifest.json", exp_dir / "manifest.json")
+        if (output_dir / "metrics.jsonl").exists():
+            shutil.copy(output_dir / "metrics.jsonl", exp_dir / "metrics.jsonl")
+        shutil.copy(args.config, exp_dir / "config.json")
+        print(f"experiment artifacts → {exp_dir}")
+
     print(f"experiment manifest → {output_dir / 'manifest.json'}")
     print("training complete." + (" (DRY RUN — no quality claims)" if dry else ""))
 

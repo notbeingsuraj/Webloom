@@ -3,17 +3,44 @@
   "experiment": {
     "id": "webloom-v0.1",
     "status": "configured",
-    "purpose": "First controlled fine-tune: LoRA/QLoRA adapter on the registered baseline foundation model so any improvement claim is a clean comparison against the preserved baseline on the untouched holdout split.",
-    "foundationModel": "Qwen/Qwen2.5-7B-Instruct",
-    "modelRevision": "main",
+    "purpose": "First controlled fine-tune: a LoRA adapter on an open-weight Qwen2.5 foundation model so any improvement claim is a clean comparison against the preserved baseline (webloom-ai-baseline-0.1.0) on the untouched holdout split. Targets the Phase 2 baseline failures: contract/schema drift, envelope-wrapped generative outputs, over-confidence, under-extraction and hallucination.",
+    "foundationModel": "Qwen/Qwen2.5-1.5B-Instruct",
+    "modelRevision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
     "registryModelId": "webloom-ai-v0.1.0",
-    "adapterSuffix": "webloom-v0.1.0"
+    "adapterSuffix": "webloom-v0.1.0",
+    "foundationSelection": {
+      "parameters": "1.54B",
+      "license": "Apache-2.0",
+      "contextLength": 32768,
+      "tokenizer": "Qwen/Qwen2.5 tokenizer (151936-entry vocab, shared across the Qwen2.5 family, so prompts are byte-identical to the baseline's serving prompts)",
+      "inferenceBackend": "OpenAI-compatible local server — bundled finetune/scripts/serve_model.py (transformers), or vLLM/llama.cpp/MLX — serving base + selected adapter merged in-process",
+      "selectedBecause": [
+        "Same Qwen2.5 family, tokenizer and chat template as the registered baseline foundation model — prompt formatting is identical, one confound removed from the comparison.",
+        "1.54B bf16 weights (~3 GB) train AND serve inside 8 GB unified memory on the Apple M3 development Mac: local inference compatibility and reasonable memory requirements, no paid cloud GPU required for the first experiment.",
+        "Strong instruction following and structured-JSON generation at small size (Qwen2.5 Instruct series), LoRA/QLoRA compatible, Apache-2.0, practical inference performance for eventual per-request deployment."
+      ],
+      "considered": [
+        {
+          "model": "Qwen/Qwen2.5-7B-Instruct",
+          "whyNot": "Identical to the baseline serving model (cleanest possible comparison), but untrainable on the 8 GB development Mac: 14 GB of fp16 weights, no CUDA, bitsandbytes has no macOS wheel, and MLX QLoRA of a 7B model exceeds unified memory. Would force paid cloud GPU authorization before the pipeline is even proven. Remains the recommended base for a later GPU confirmation run."
+        },
+        {
+          "model": "Qwen/Qwen2.5-0.5B-Instruct",
+          "whyNot": "Trainable locally, but too weak to model the nested envelope contracts and would measure the size limit instead of the dataset's value."
+        }
+      ]
+    }
   },
   "data": {
     "formatRoot": "finetune/format",
-    "trainSplits": ["train", "validation"],
+    "datasetVersion": "v0.1.0",
+    "validationVersion": "v0.1.0",
+    "allowedSplits": ["train", "validation"],
+    "fitSplit": "train",
+    "selectionSplit": "validation",
     "holdoutNeverTrained": true,
-    "maxSeqLength": 8192
+    "maxSeqLength": 8192,
+    "notes": "Model fitting uses ONLY the train split (14 examples). The validation split (6 examples) is used for eval loss and checkpoint selection — never gradient updates. The holdout split (6 examples) is never formatted, never loaded, never evaluated until the final benchmark."
   },
   "lora": {
     "enabled": true,
@@ -25,22 +52,23 @@
     "taskType": "CAUSAL_LM"
   },
   "quantization": {
-    "enabled": true,
+    "enabled": false,
     "bits": 4,
     "bnb4bitQuantType": "nf4",
     "bnb4bitComputeDtype": "bf16",
     "bnb4bitUseDoubleQuant": true,
+    "rationale": "QLoRA is used only when it materially reduces hardware requirements (>=7B bases on CUDA). The 1.54B base fits in 16-bit (~3 GB) on the dev Mac and any cloud GPU, so plain bf16 LoRA avoids quantization noise and keeps the experiment reproducible. Re-enable together with bitsandbytes on CUDA for a >=7B confirmation run.",
     "fallbackIfUnavailable": "none"
   },
   "training": {
-    "perDeviceTrainBatchSize": 2,
+    "perDeviceTrainBatchSize": 1,
     "perDeviceEvalBatchSize": 2,
-    "gradientAccumulationSteps": 2,
+    "gradientAccumulationSteps": 4,
     "learningRate": 0.0002,
     "lrSchedulerType": "cosine",
     "warmupRatio": 0.06,
     "numTrainEpochs": 8,
-    "optimizer": "paged_adamw_8bit",
+    "optimizer": "adamw_torch",
     "preferredDtype": "bf16",
     "packing": false,
     "seed": 17,
@@ -53,10 +81,11 @@
     "loadBestModelAtEnd": true,
     "metricForBestModel": "eval_loss",
     "reportTo": ["none"],
-    "outputDir": "finetune/runs/webloom-v0.1"
+    "outputDir": "finetune/runs/webloom-v0.1",
+    "notes": "micro-batch 1 x gradient accumulation 4 keeps peak activation memory inside 8 GB unified memory while preserving an effective batch of 4 (same optimizer-step schedule as batch 2 x accum 2). warmupRatio is converted to warmup_steps by the trainer because transformers v5 exposes warmup_steps only. Epoch-level step count: ceil(14 / (1 x 4)) = 4 optimizer steps/epoch, ~32 total, checkpoints every 4 steps."
   },
   "tokenizer": {
-    "source": "Qwen/Qwen2.5-7B-Instruct",
+    "source": "Qwen/Qwen2.5-1.5B-Instruct",
     "paddingSide": "right",
     "truncationSide": "left",
     "addEosToken": true,
@@ -65,23 +94,26 @@
   "checkpointSelection": {
     "on": "validation",
     "metric": "eval_loss",
+    "controlArm": "base-model-no-adapter",
     "composite": {
       "jsonValidity": 0.4,
       "fieldCoverage": 0.3,
       "abstentionAccuracy": 0.2,
       "hallucinationPenalty": 0.1
-    }
+    },
+    "notes": "Checkpoints are ranked by the composite score on the validation split; the un-fine-tuned base model is scored on the same rows as a control arm so 'improvement over the foundation model' is measured, not assumed. The holdout is untouched until the final benchmark."
   },
   "inference": {
-    "backend": "openai-compatible (vLLM or llama.cpp) serving base+adapter merged",
-    "benchmark": "node eval/run.js --backend webloom --dataset holdout",
-    "productionStatus": "opt-in candidate only; baseline remains default until proven better"
+    "backend": "openai-compatible local server (bundled finetune/scripts/serve_model.py; vLLM/llama.cpp/MLX also work) serving base + selected adapter merged in-process",
+    "developmentBenchmark": "node eval/run.js --backend webloom --model webloom-ai-v0.1.0 --dataset validation",
+    "holdoutBenchmark": "node eval/run.js --backend webloom --model webloom-ai-v0.1.0 --dataset holdout (next phase — untouched until then)",
+    "productionStatus": "opt-in candidate only; baseline remains default until the holdout benchmark proves otherwise"
   },
   "environment": {
     "minPython": "3.10",
-    "recommendedPython": "3.10-3.12",
-    "pypi": ["torch", "transformers", "accelerate", "peft", "datasets", "sentencepiece"],
+    "recommendedPython": "3.10-3.13",
+    "pypi": ["torch", "transformers", "peft", "accelerate", "datasets", "sentencepiece"],
     "gpuOnly": ["bitsandbytes", "paged_adamw_8bit"],
-    "notes": "On CPU/MPS (Apple Silicon) QLoRA is disabled automatically and the optimizer degrades to adamw_torch; a deviation is recorded in the experiment manifest."
+    "notes": "On CPU/MPS (Apple Silicon) the run uses bf16 LoRA + adamw_torch (probed at runtime; fp16 fallback). Deviations from the pinned configuration are recorded in the experiment manifest rather than hidden."
   }
 }
