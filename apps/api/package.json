@@ -25,6 +25,8 @@
     "ai:finetune:validate": "node ../../finetune/scripts/protect_holdout.mjs && node ../../finetune/scripts/format_dataset.mjs",
     "ai:finetune": "bash ../../finetune/scripts/train_runner.sh",
     "ai:finetune:evaluate": "bash ../../finetune/scripts/select_runner.sh",
+    "ai:finetune:register": "node ../../finetune/scripts/register_candidate.mjs",
+    "ai:serve": "bash ../../finetune/scripts/serve_runner.sh",
     "ai:model:load": "node ../../finetune/scripts/model_load_check.mjs"
   },
   "dependencies": {
