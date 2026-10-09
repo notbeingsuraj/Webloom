@@ -15,16 +15,20 @@ finetune/format/<dataset>@<version>/train.jsonl · validation.jsonl
    │   npm run ai:finetune:validate  →  holdout guard + format (fail-loud)
    ▼
 finetune/configs/webloom-v0.1.json        (single pinned experiment config)
-   │   npm run ai:finetune  →  scripts/train_lora.py (QLoRA → LoRA fallback)
+   │   npm run ai:finetune  →  scripts/train_lora.py (bf16 LoRA; QLoRA on CUDA)
    ▼
 finetune/runs/webloom-v0.1/               (checkpoints, metrics.jsonl, manifest.json)
-   │   npm run ai:finetune:evaluate → scripts/select_checkpoint.py (validation)
+   │   npm run ai:finetune:evaluate → scripts/select_checkpoint.py (validation
+   │                                  + un-fine-tuned base control arm)
    ▼
-register → models/registry.json  (type "webloom", status configured → candidate)
-   │   npm run ai:model:load  →  adapter serving health-check
+finetune/experiments/webloom-v0.1/        (committed manifest + evaluation copy)
+   │   npm run ai:finetune:register → register_candidate.mjs → models/registry.json
+   ▼                                        (type "webloom", status candidate)
+npm run ai:serve  →  scripts/serve_model.py (OpenAI-compatible base+adapter)
+   │   npm run ai:model:load  →  provider/registry resolution health-check
    ▼
 benchmark holdout (eval/run.js --backend webloom --model webloom-ai-v0.1.0)
-   → compare vs baseline → promote to active-production only when proven better
+   → compareModels vs baseline → promote to active-production only when proven
 ```
 
 ## Rules
@@ -45,26 +49,30 @@ benchmark holdout (eval/run.js --backend webloom --model webloom-ai-v0.1.0)
    are runtime measurements and are recorded as `null` here rather than
    fabricated.
 4. **One config, versioned.** `configs/webloom-v0.1.json` is the single
-   source of truth: experiment metadata, data, LoRA, quantization, training,
-   tokenizer, checkpoint selection, and environment requirements. Register
-   the exact values you train with into the model registry entry.
+   source of truth: experiment metadata (incl. foundation-model selection
+   rationale), data, LoRA, quantization, training, tokenizer, checkpoint
+   selection, and environment requirements. Register the exact values you
+   train with into the model registry entry; the trainer also hashes the
+   config into the experiment manifest.
 
 ## Commands (from apps/api)
 
-| command                  | purpose                                                  |
-|--------------------------|----------------------------------------------------------|
-| `ai:dataset:format`      | (re)build `finetune/format/*/train|validation.jsonl`     |
-| `ai:finetune:validate`   | holdout guard + format — must pass before training       |
-| `ai:finetune`            | run the pinned experiment (explicit; never in tests)     |
-| `ai:finetune:evaluate`   | rank checkpoints on validation, pick best                |
-| `ai:model:load`          | registry resolution + adapter serving health-check       |
+| command                    | purpose                                                |
+|----------------------------|--------------------------------------------------------|
+| `ai:dataset:format`        | (re)build `finetune/format/*/train|validation.jsonl`   |
+| `ai:finetune:validate`     | holdout guard + format — must pass before training     |
+| `ai:finetune`              | run the pinned experiment (explicit; never in tests)   |
+| `ai:finetune:evaluate`     | rank checkpoints on validation (+ base control), pick best |
+| `ai:finetune:register`     | build/refresh the `webloom-ai-v0.1.0` registry record  |
+| `ai:serve`                 | local OpenAI-compatible server (base + selected adapter) |
+| `ai:model:load`            | registry resolution + serving health-check             |
 
 Dry-run the full Python pipeline without training claims:
-`bash finetune/scripts/train_runner.sh --dry-run --model Qwen/Qwen2.5-0.5B-Instruct`
+`bash finetune/scripts/train_runner.sh --dry-run --output-dir finetune/runs/dryrun`
 
 ## Environment
 
-`requirements.txt` is the Python contract (torch, transformers, peft,
+`requirements.txt` is the Python contract (torch, transformers>=5, peft,
 accelerate, datasets, sentencepiece; bitsandbytes is CUDA-only). Create the
 venv, which is gitignored:
 
@@ -73,13 +81,17 @@ python3 -m venv finetune/.venv
 finetune/.venv/bin/pip install -r finetune/requirements.txt
 ```
 
-On CPU/MPS the trainer auto-degrades QLoRA → 16-bit LoRA and
-`paged_adamw_8bit` → `adamw_torch`, recording the deviation in the experiment
-manifest instead of wasting resources.
+The pinned v0.1 experiment (Qwen2.5-1.5B-Instruct, bf16 LoRA) trains and serves
+inside 8 GB unified memory on Apple Silicon, so no GPU is required. On CUDA,
+enable `quantization.enabled` + bitsandbytes for a QLoRA >=7B confirmation run;
+the trainer records dtype/optimizer/quantization deviations in the manifest.
 
 ## Cost / hardware reality
 
-The pinned experiment (`Qwen/Qwen2.5-7B-Instruct`, QLoRA 4-bit) needs a CUDA
-GPU with ≥16 GB VRAM. The trainer runs it; deployment is the same
-`VLLM`/llama.cpp OpenAI-compatible server used by the baseline. No cloud GPU
-is launched without explicit authorization.
+- **v0.1 (this experiment):** `Qwen/Qwen2.5-1.5B-Instruct` bf16 LoRA — local,
+  free, ~3 GB weights; trains on the dev Mac (CPU/MPS) and serves through the
+  bundled OpenAI-compatible shim (`ai:serve`).
+- **Later confirmation:** `Qwen/Qwen2.5-7B-Instruct` QLoRA 4-bit needs a CUDA
+  GPU with ≥16 GB VRAM. No cloud GPU is launched without explicit
+  authorization; the trainer reports the exact limitation rather than forcing
+  an unusable run.

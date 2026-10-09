@@ -134,6 +134,11 @@ function main() {
 
   const base = manifest.model;
   const servingModel = `${base.split('/').pop().toLowerCase().replace('-instruct', '')}-${config.experiment.adapterSuffix ?? 'webloom-v0.1'}`;
+  const dtypeRaw = String(manifest.dtype || 'bf16');
+  const dtypeShort = dtypeRaw.includes('bfloat16') ? 'bf16'
+    : dtypeRaw.includes('float16') ? 'fp16'
+      : dtypeRaw.includes('float32') ? 'fp32'
+        : dtypeRaw.replace('torch.', '');
   const metrics = report ? aggregateReport(report) : null;
   const best = evaluation?.ranking?.find((r) => r.checkpoint === evaluation.best_checkpoint) ?? null;
 
@@ -143,7 +148,7 @@ function main() {
     foundationModel: base,
     provider: 'local',
     servingModel,
-    quantization: manifest.quantization?.enabled ? 'nf4-qlora' : `${String(manifest.dtype || 'bf16').replace('torch.', '')}-lora`,
+    quantization: manifest.quantization?.enabled ? 'nf4-qlora' : `${dtypeShort}-lora`,
     license: config.experiment.foundationSelection?.license ?? 'Apache-2.0',
     promptVersion: 'webloom-tasks-v1',
     datasetVersions: {
@@ -171,7 +176,7 @@ function main() {
       seed: config.training.seed,
       maxSeqLength: config.data.maxSeqLength,
       optimizer: manifest.optimizer,
-      dtype: String(manifest.dtype ?? '').replace('torch.', ''),
+      dtype: dtypeShort,
       quantized4bit: Boolean(manifest.quantization?.enabled),
       trainExamples: manifest.data?.train ?? null,
       validationExamples: manifest.data?.validation ?? null,

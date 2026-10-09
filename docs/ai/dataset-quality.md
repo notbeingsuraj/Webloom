@@ -1,6 +1,6 @@
 # Dataset Quality — v0.1.0
 
-Generated 2026-10-06 by `node eval/dataset_report.js`.
+Generated 2026-10-09 by `node eval/dataset_report.js`.
 
 ## Composite quality score: **0.986**
 

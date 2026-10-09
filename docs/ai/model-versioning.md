@@ -53,6 +53,10 @@ Rules:
   `eval/run.js --backend webloom --model <id>` (provider accepts `candidate`
   or `active-production` records when explicitly targeted) but is **never**
   the default; `auto` still resolves the production role.
+- A development benchmark on the validation split may be recorded against a
+  `candidate` (that is how Webloom AI v0.1 is tracked) without promoting it.
+  Only a holdout benchmark plus the evaluation gate moves a model forward;
+  `recordBenchmark()` only auto-advances `configured → evaluated`.
 - A model may not go `active-production` without ≥ 1 recorded benchmark and a
   passing evaluation gate (see model-spec).
 

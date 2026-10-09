@@ -46,26 +46,32 @@ a frontier model for every business.
    experiment config (experiment metadata, data, LoRA, quantization, training,
    tokenizer, checkpoint selection, environment). Defaults are conservative:
    `r=8`, `alpha=16`, dropout 0.05, LR 2e-4 cosine, 8 epochs, seed 17,
-   `maxSeqLength=8192`, QLoRA 4-bit with graceful 16-bit LoRA fallback.
+   `maxSeqLength=8192`, plain bf16 LoRA (QLoRA 4-bit is reserved for ≥7B bases
+   on CUDA and is off for this experiment, with the rationale in the config).
 4. **Train** (explicit command, never part of tests):
 
    ```
    npm run ai:finetune            # trains finetune/configs/webloom-v0.1.json
-   bash finetune/scripts/train_runner.sh --dry-run --model Qwen/Qwen2.5-0.5B-Instruct  # plumbing check
+   bash finetune/scripts/train_runner.sh --dry-run --output-dir finetune/runs/dryrun  # plumbing check
    ```
    Writes checkpoints + `metrics.jsonl` + an experiment `manifest.json`
-   (commit, config hash, hardware, device, dtype, deviations) into
-   `finetune/runs/webloom-v0.1/`. Requires a Python ML venv per
-   `finetune/requirements.txt` and a CUDA GPU for the real 7B run.
+   (commit, config hash, seed, framework versions, hardware, device, dtype,
+   split counts, deviations) into `finetune/runs/webloom-v0.1/`, then promotes
+   the small reproducibility artifacts into `finetune/experiments/webloom-v0.1/`.
+   Requires a Python ML venv per `finetune/requirements.txt`; the 1.5B base
+   trains on CPU/MPS as well as CUDA, so no GPU is required for v0.1.
 5. **Select checkpoint** → `npm run ai:finetune:evaluate` scores checkpoints
    on the validation split (json validity, field coverage, abstention,
-   hallucination penalty) and records the ranking in `evaluation.json`. This
-   is development ranking; the decisive numbers come from the holdout.
+   hallucination penalty) against an un-fine-tuned **base control arm** and
+   records the ranking in `evaluation.json`. This is development ranking; the
+   decisive numbers come from the holdout.
 6. **Register** the produced adapter in `models/registry.json`:
    `type: "webloom"`, `foundationModel`, `trainingConfig`, `loraConfig`,
    `datasetVersions` pinned; status `candidate` (never `production` on day one).
-   `registerModel()` validates the shape. `npm run ai:model:load` is the
-   serving health-check.
+   `npm run ai:finetune:register` builds the record from the experiment
+   artifacts (no hand-typed metrics); `registerModel()` validates the shape and
+   `npm run ai:model:load` is the serving health-check. `npm run ai:serve`
+   starts the local OpenAI-compatible server (base + selected adapter merged).
 7. **Benchmark** the holdout: `eval/run.js --backend baseline` (before) and
    `--backend webloom --model webloom-ai-v0.1.0` (after, opt-in candidate),
    then `recordBenchmark` both and `compareModels`. Promote to
@@ -105,9 +111,9 @@ baseline benchmark ──┐
 - Pin the tokenizer/foundation to the foundation model recorded in
   `finetune/configs/webloom-v0.1.json` and the registry, or results shift with
   unrelated upstream changes.
-- Hardware reality: `Qwen/Qwen2.5-7B-Instruct` QLoRA 4-bit needs a CUDA GPU
-  with ≥16 GB VRAM (~4–6 GB model + LoRA + activations at batch 2 / seq 8192).
-  On CPU-only machines the pipeline is fully verifiable (`ai:finetune:validate`,
-  dry-run with a small model) but the real run must happen on authorized cloud
-  hardware; the trainer reports the exact limitation rather than forcing an
-  unusable run.
+- Hardware reality: the pinned v0.1 experiment uses `Qwen/Qwen2.5-1.5B-Instruct`
+  bf16 LoRA (~3 GB weights) and runs on CPU/MPS/CUDA — no GPU required. A later
+  confirmation run at `Qwen/Qwen2.5-7B-Instruct` QLoRA 4-bit needs a CUDA GPU
+  with ≥16 GB VRAM (~4–6 GB model + LoRA + activations at batch 2 / seq 8192);
+  that run must happen on explicitly authorized hardware. The trainer reports
+  the exact limitation rather than forcing an unusable run.
