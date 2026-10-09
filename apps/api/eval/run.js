@@ -207,6 +207,10 @@ async function main() {
       record.metrics = envelopeTaskShape(task)
         ? envelopeMetrics(result.output, ex.expectedOutput)
         : generativeMetrics(task, result.output, ex.expectedOutput);
+      // Keep the validated output in the report: downstream consumers
+      // (failure analysis, candidate validation, regression tests) re-check it
+      // against the task contract without re-running the model.
+      record.output = result.output;
 
       if (task.grounded) {
         const evidenceText = deriveEvidenceTextFor(ex.input);
