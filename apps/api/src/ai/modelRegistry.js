@@ -209,7 +209,17 @@ function round(n) {
   return Math.round(n * 10000) / 10000;
 }
 
-export default {
+/** Semver-ish bump used when cloning a model record for a new experiment. */
+export function bumpVersion(version, part = 'minor') {
+  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(version || ''));
+  if (!m) throw new Error(`Not a semver x.y.z: ${version}`);
+  const [, maj, min, pat] = m.map(Number);
+  if (part === 'major') return `${maj + 1}.0.0`;
+  if (part === 'patch') return `${maj}.${min}.${pat + 1}`;
+  return `${maj}.${min + 1}.0`;
+}
+
+const ModelRegistry = {
   loadRegistry,
   reloadRegistry,
   registerModel,
@@ -219,9 +229,13 @@ export default {
   setActiveModel,
   recordBenchmark,
   compareModels,
+  bumpVersion,
   getModelsByCapability,
   getModelsByProvider,
   getFreeTierModels,
   estimateCost,
   getModelsWithFreeTier,
 };
+
+export default ModelRegistry;
+
