@@ -3,6 +3,7 @@ import { createProviderChain } from './ai/AIProviderFactory.js';
 import { AIError, AIAllProvidersFailedError, AI_ERROR_CATEGORY, sanitizeSecretText, parseAffordableMaxTokens } from './ai/AIError.js';
 import { validateStructuredOutput } from './ai/AIResponseValidator.js';
 import aiHealthService from './ai/AIHealthService.js';
+import { AIOrchestrator } from '../ai/AIOrchestrator.js';
 
 /**
  * The single AI entry point for all of Webloom.
@@ -55,6 +56,20 @@ class AIService {
     this._chain = null;
     this._chainConfigRef = null;
     this.telemetry = [];
+
+    // New AI Orchestrator for capability-based routing
+    this._orchestrator = null;
+  }
+
+  /**
+   * Get or create the AI Orchestrator instance.
+   * Lazily initialized to avoid circular dependencies.
+   */
+  get orchestrator() {
+    if (!this._orchestrator) {
+      this._orchestrator = new (require('../ai/AIOrchestrator.js').default)();
+    }
+    return this._orchestrator;
   }
 
   get aiConfig() {
@@ -571,6 +586,95 @@ class AIService {
       detail: error ? String(error).slice(0, 200) : null,
     });
     return { requestId, businessId, model, promptVersion, tokens, latency, error };
+  }
+
+  /**
+   * NEW: Capability-based generation using the AI Orchestrator.
+   * This is the new preferred method for all new code.
+   *
+   * @param {string} capability - The capability to use (e.g., 'business_extraction', 'business_research')
+   * @param {object} input - Input data for the capability
+   * @param {object} options - Options for the orchestration
+   * @returns {Promise<object>} Result with output, provenance, and metadata
+   */
+  async generateByCapability(capability, input, options = {}) {
+    return this.orchestrator.execute(capability, input, options);
+  }
+
+  /**
+   * NEW: Check health of all AI providers.
+   */
+  async getAIHealthDetailed() {
+    return this.orchestrator.healthMonitor.getAllHealth();
+  }
+
+  /**
+   * NEW: Get cost tracking summary.
+   */
+  getCostSummary(period = 'monthly') {
+    return this.orchestrator.costTracker.getSummary(period);
+  }
+
+  /**
+   * NEW: Get cost projection.
+   */
+  getCostProjection() {
+    return this.orchestrator.costTracker.getProjection();
+  }
+
+  /**
+   * NEW: Get budget status.
+   */
+  getBudgetStatus() {
+    return this.orchestrator.costTracker.getBudgetStatus();
+  }
+
+  /**
+   * NEW: Get provider health for a specific provider.
+   */
+  async getProviderHealth(provider) {
+    return this.orchestrator.healthMonitor.getDetailedHealth(provider);
+  }
+
+  /**
+   * NEW: Run provider diagnostic.
+   */
+  async diagnoseProvider(provider) {
+    return this.orchestrator.healthMonitor.getDetailedHealth(provider);
+  }
+
+  /**
+   * NEW: Get capability routing policy.
+   */
+  getCapabilityPolicy(capability) {
+    return this.orchestrator.capabilityRouter.getPolicy(capability);
+  }
+
+  /**
+   * NEW: Get cost breakdown by capability.
+   */
+  getCostByCapability() {
+    return this.orchestrator.costTracker.getByCapability();
+  }
+
+  /**
+   * NEW: Get cost breakdown by provider.
+   */
+  getCostByProvider() {
+    return this.orchestrator.costTracker.getByProvider();
+  }
+
+  /**
+   * NEW: Invalidate orchestrator cache (for config reload).
+   */
+  invalidateOrchestrator() {
+    if (this._orchestrator) {
+      this._orchestrator._cacheManager?.clear();
+      this._orchestrator._providerRegistry?.invalidate();
+      this._orchestrator._capabilityRouter = null;
+      this._orchestrator = null;
+    }
+    this.invalidateChain();
   }
 }
 

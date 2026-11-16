@@ -2,7 +2,6 @@ import express from 'express';
 import { config } from '../config/env.js';
 import { getDb } from '../db/client.js';
 import aiService from '../services/AIService.js';
-import aiHealthService from '../services/ai/AIHealthService.js';
 
 const router = express.Router();
 
@@ -24,10 +23,9 @@ router.get('/', (req, res) => {
     status: status === 'ok' ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
     environment: config.nodeEnv,
-    version: '1.0.0',
+    version: '2.0.0',
     services: {
       database: status,
-      // Count only, never key material. Per-provider detail is on /health/ai.
       aiProvidersConfigured: aiService.getChainSummary()
         .providers.filter((p) => p.configured).length,
       geoapify: config.geoapify.apiKey ? 'configured' : 'optional',
@@ -38,33 +36,162 @@ router.get('/', (req, res) => {
 /**
  * GET /health/ai
  *
- * Per-provider AI health. Reports four distinct facts per provider and never
- * exposes keys, headers, or raw provider bodies:
+ * Per-provider AI health. Reports detailed facts per provider:
  *
  *   configured    — required settings exist (no network call)
  *   reachable     — the provider host answered
  *   authenticated — the provider accepted our credentials
  *   usable        — a real request against the configured model succeeded
+ *   latency       — p50, p95, p99 percentiles
+ *   failureRate   — recent failure rate
+ *   cooldown      — remaining cooldown time
+ *   circuit       — circuit breaker state
+ *   quota         — remaining budget
  *
  * @query force=1 bypass the cache and re-probe every provider.
+ * @query provider=<name> get detailed health for a specific provider.
+ * @query diagnose=1 run full diagnostic for a provider.
  */
 router.get('/ai', async (req, res) => {
   const force = req.query.force === '1' || req.query.force === 'true';
-  const health = await aiHealthService.getHealth({ force });
+  const provider = req.query.provider ?? null;
+  const diagnose = req.query.diagnose === '1' || req.query.diagnose === 'true';
 
-  // AI being fully unavailable is `degraded`, not `unavailable`: the rest of
-  // the API (DB, providers, caching) is still serving. Callers that depend on
-  // AI should read status/providers, not the HTTP code alone.
-  const httpStatus = health.status === 'healthy' ? 200 : 503;
+  try {
+    let health;
 
-  res.status(httpStatus).json({
-    status: health.status,
-    checkedAt: health.checkedAt,
-    chain: health.chain,
-    order: { primary: health.primary, secondary: health.secondary, fallback: health.fallback },
-    policy: { timeoutMs: health.timeoutMs, maxRetries: health.maxRetries },
-    providers: health.providers,
-  });
+    if (provider && diagnose) {
+      // Full diagnostic for a specific provider
+      health = await aiService.diagnoseProvider(provider);
+      return res.json({ success: true, data: health });
+    }
+
+    if (provider) {
+      // Single provider detailed health
+      health = await aiService.getProviderHealth(provider);
+      return res.json({ success: true, data: health });
+    }
+
+    // Full AI health
+    health = await aiService.getAIHealthDetailed({ force });
+
+    // AI being fully unavailable is `degraded`, not `unavailable`: the rest of
+    // the API (DB, providers, caching) is still serving. Callers that depend on
+    // AI should read status/providers, not the HTTP code alone.
+    const httpStatus = health.status === 'healthy' ? 200 : 503;
+
+    res.status(httpStatus).json({
+      success: true,
+      status: health.status,
+      checkedAt: health.checkedAt,
+      chain: health.chain,
+      order: { primary: health.primary, secondary: health.secondary, fallback: health.fallback },
+      policy: { timeoutMs: health.timeoutMs, maxRetries: health.maxRetries },
+      providers: health.providers,
+      capabilities: health.capabilities,
+      telemetry: health.telemetry,
+    });
+  } catch (error) {
+    console.error('[health/ai] Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'health_check_failed',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /health/ai/diagnose
+ * Run diagnostic for a specific provider.
+ */
+router.get('/ai/diagnose', async (req, res) => {
+  const provider = req.query.provider;
+  if (!provider) {
+    return res.status(400).json({
+      success: false,
+      error: 'provider_required',
+      message: 'provider query parameter is required',
+    });
+  }
+
+  try {
+    const health = await aiService.diagnoseProvider(provider);
+    res.json({ success: true, data: health });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'diagnostic_failed',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /health/ai/capabilities
+ * Get capability routing policies.
+ */
+router.get('/ai/capabilities', async (req, res) => {
+  try {
+    const capabilities = aiService.orchestrator.capabilityRouter._policies;
+    res.json({ success: true, data: capabilities });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'capabilities_failed',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /health/ai/costs
+ * Get cost tracking summary.
+ */
+router.get('/ai/costs', async (req, res) => {
+  try {
+    const period = req.query.period || 'monthly';
+    const summary = aiService.getCostSummary(period);
+    const projection = aiService.getCostProjection();
+    const budget = aiService.getBudgetStatus();
+    const byCapability = aiService.getCostByCapability();
+    const byProvider = aiService.getCostByProvider();
+
+    res.json({
+      success: true,
+      data: {
+        period,
+        summary,
+        projection,
+        budget,
+        byCapability,
+        byProvider,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'costs_failed',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /health/ai/budget
+ * Get budget status.
+ */
+router.get('/ai/budget', async (req, res) => {
+  try {
+    const budget = aiService.getBudgetStatus();
+    res.json({ success: true, data: budget });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'budget_failed',
+      message: error.message,
+    });
+  }
 });
 
 /**
@@ -73,13 +200,11 @@ router.get('/ai', async (req, res) => {
  */
 router.get('/detailed', async (req, res) => {
   const status = dbStatus();
-  const health = await aiHealthService.getHealth();
+  const health = await aiService.getAIHealthDetailed();
 
   const checks = {
     server: { status: 'ok', timestamp: new Date().toISOString() },
     database: { status },
-    // "ok" only when every configured provider is genuinely usable. A degraded
-    // AI chain is reported honestly rather than being flattened to "configured".
     aiProviders: {
       status: health.status === 'healthy' ? 'ok' : health.status,
       chain: health.chain,
@@ -90,8 +215,17 @@ router.get('/detailed', async (req, res) => {
         authenticated: p.authenticated,
         usable: p.usable,
         detail: p.detail,
-        // Present only on a credit rejection. This is the number that turns
-        // "AI is broken" into "add credits, or lower AI_*_MODEL budgets".
+        latencyP50Ms: p.latencyP50Ms,
+        latencyP95Ms: p.latencyP95Ms,
+        latencyP99Ms: p.latencyP99Ms,
+        failureRate: p.failureRate,
+        cooldownRemainingSeconds: p.cooldownRemainingSeconds,
+        circuitState: p.circuitState,
+        lastSuccess: p.lastSuccess,
+        lastFailure: p.lastFailure,
+        lastError: p.lastError,
+        totalRequests: p.totalRequests,
+        successfulRequests: p.successfulRequests,
         ...(p.affordableMaxTokens != null
           ? { affordableMaxTokens: p.affordableMaxTokens }
           : {}),

@@ -16,10 +16,18 @@ export {
   ExternalLLMProvider,
   LocalFoundationModelProvider,
   WebloomFineTunedModelProvider,
+  BaselineProvider,
   FallbackProvider,
+  NVIDIAProvider,
+  DeepSeekProvider,
+  HuggingFaceProvider,
+  TogetherAIProvider,
+  FireworksAIProvider,
+  SelfHostedProvider,
   createProvider,
   resolveProviders,
   PROVIDER_NAMES,
+  getProviderCapabilities,
 } from './providers/index.js';
 
 export * as contracts from './contracts/index.js';
@@ -38,3 +46,24 @@ export {
 } from './contracts/common.js';
 
 export * as paths from './paths.js';
+
+// New orchestrator components
+export { AIOrchestrator } from './AIOrchestrator.js';
+export { ModelRegistry } from './ModelRegistry.js';
+export { ProviderRegistry } from './ProviderRegistry.js';
+export { CapabilityRouter } from './CapabilityRouter.js';
+export { ProviderHealthMonitor } from './ProviderHealthMonitor.js';
+export { QuotaManager } from './QuotaManager.js';
+export { CircuitBreaker } from './CircuitBreaker.js';
+export { RetryController } from './RetryController.js';
+export { OutputValidator } from './OutputValidator.js';
+export { CostTracker } from './CostTracker.js';
+export { AIExecutionLogger } from './AIExecutionLogger.js';
+export { FallbackController } from './FallbackController.js';
+export { CacheManager } from './CacheManager.js';
+export { AIOrchestrator } from './AIOrchestrator.js';
+
+// Re-export for convenience
+export {
+  AIOrchestrator as default,
+} from './AIOrchestrator.js';

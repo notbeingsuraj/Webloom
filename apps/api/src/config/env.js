@@ -12,7 +12,9 @@ dotenv.config();
  * features, and /health/ai reports exactly which are available.
  */
 const hasAnyAIProviderKey = Boolean(
-  process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY || process.env.LOCAL_AI_BASE_URL,
+  process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY || process.env.LOCAL_AI_BASE_URL ||
+  process.env.NVIDIA_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY ||
+  process.env.TOGETHER_API_KEY || process.env.FIREWORKS_API_KEY || process.env.HF_API_KEY,
 );
 
 export const config = {
@@ -101,18 +103,78 @@ export const config = {
           audit: process.env.GEMINI_AUDIT_MODEL || null,
         },
       },
+      nvidia: {
+        enabled: process.env.NVIDIA_API_KEY ? true : false,
+        apiKey: process.env.NVIDIA_API_KEY || null,
+        baseUrl: process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+        model: process.env.NVIDIA_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b',
+        timeoutMs: parseInt(process.env.NVIDIA_TIMEOUT_MS) || 60000,
+        // Per-operation model overrides
+        operationModels: {
+          extraction: process.env.NVIDIA_EXTRACTION_MODEL || null,
+          brand: process.env.NVIDIA_BRAND_MODEL || null,
+          audit: process.env.NVIDIA_AUDIT_MODEL || null,
+          reasoning: process.env.NVIDIA_REASONING_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b',
+        },
+      },
+      deepseek: {
+        enabled: process.env.DEEPSEEK_API_KEY ? true : false,
+        apiKey: process.env.DEEPSEEK_API_KEY || null,
+        baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+        model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+        timeoutMs: parseInt(process.env.DEEPSEEK_TIMEOUT_MS) || 30000,
+        reasoningModel: process.env.DEEPSEEK_REASONING_MODEL || 'deepseek-reasoner',
+        operationModels: {
+          extraction: process.env.DEEPSEEK_EXTRACTION_MODEL || 'deepseek-chat',
+          brand: process.env.DEEPSEEK_BRAND_MODEL || 'deepseek-reasoner',
+          audit: process.env.DEEPSEEK_AUDIT_MODEL || 'deepseek-reasoner',
+        },
+      },
+      together: {
+        enabled: process.env.TOGETHER_API_KEY ? true : false,
+        apiKey: process.env.TOGETHER_API_KEY || null,
+        baseUrl: process.env.TOGETHER_BASE_URL || 'https://api.together.xyz/v1',
+        model: process.env.TOGETHER_MODEL || 'meta-llama/Meta-Llama-3.1-70B-Instruct',
+        timeoutMs: parseInt(process.env.TOGETHER_TIMEOUT_MS) || 30000,
+        reasoningModel: process.env.TOGETHER_REASONING_MODEL || 'meta-llama/Meta-Llama-3.1-70B-Instruct',
+      },
+      fireworks: {
+        enabled: process.env.FIREWORKS_API_KEY ? true : false,
+        apiKey: process.env.FIREWORKS_API_KEY || null,
+        baseUrl: process.env.FIREWORKS_BASE_URL || 'https://api.fireworks.ai/inference/v1',
+        model: process.env.FIREWORKS_MODEL || 'accounts/fireworks/models/llama-v3p1-70b-instruct',
+        timeoutMs: parseInt(process.env.FIREWORKS_TIMEOUT_MS) || 30000,
+        reasoningModel: process.env.FIREWORKS_REASONING_MODEL || 'accounts/fireworks/models/llama-v3p1-70b-instruct',
+      },
+      huggingface: {
+        enabled: process.env.HF_API_KEY ? true : false,
+        apiKey: process.env.HF_API_KEY || null,
+        baseUrl: process.env.HF_BASE_URL || 'https://api-inference.huggingface.co',
+        model: process.env.HF_MODEL || 'meta-llama/Meta-Llama-3.1-8B-Instruct',
+        timeoutMs: parseInt(process.env.HF_TIMEOUT_MS) || 60000,
+        endpointUrl: process.env.HF_ENDPOINT_URL || null,
+      },
       local: {
         // Opt-in. A local server is a bonus, never a dependency, so this stays
         // enabled-by-configured rather than required.
         enabled: process.env.LOCAL_AI_BASE_URL ? true : false,
         apiKey: process.env.LOCAL_AI_API_KEY || null,
         baseUrl: process.env.LOCAL_AI_BASE_URL || 'http://localhost:11434/v1',
-        model: process.env.LOCAL_AI_MODEL || null,
-        timeoutMs: parseInt(process.env.LOCAL_AI_TIMEOUT_MS) || null,
+        model: process.env.LOCAL_AI_MODEL || 'llama3.1:8b',
+        timeoutMs: parseInt(process.env.LOCAL_AI_TIMEOUT_MS) || 120000,
         label: 'Local AI',
         // Ollama/LM Studio/llama.cpp usually need no key; set
         // LOCAL_AI_REQUIRES_API_KEY=true for servers that do.
         requiresApiKey: process.env.LOCAL_AI_REQUIRES_API_KEY === 'true',
+      },
+      selfhosted: {
+        enabled: process.env.SELF_HOSTED_BASE_URL ? true : false,
+        apiKey: process.env.SELF_HOSTED_API_KEY || null,
+        baseUrl: process.env.SELF_HOSTED_BASE_URL || 'http://localhost:8000/v1',
+        model: process.env.SELF_HOSTED_MODEL || 'meta-llama/Meta-Llama-3.1-70B-Instruct',
+        timeoutMs: parseInt(process.env.SELF_HOSTED_TIMEOUT_MS) || 60000,
+        label: 'Self-Hosted',
+        requiresApiKey: process.env.SELF_HOSTED_REQUIRES_API_KEY === 'true',
       },
     },
 
@@ -170,6 +232,77 @@ export const config = {
       // shape), so they are opt-in experiment flags, not the baseline.
       format: process.env.AI_BASELINE_FORMAT || 'none',
     },
+
+    // ---- Orchestrator Configuration ----
+    // Cost phase: free | controlled | production
+    costPhase: process.env.AI_COST_PHASE || 'free',
+    // Monthly budget in USD
+    monthlyBudgetUSD: parseInt(process.env.AI_MONTHLY_BUDGET_USD) || 50,
+    // Disable all paid providers (free-tier only mode)
+    disablePaidProviders: process.env.AI_DISABLE_PAID_PROVIDERS === 'true',
+    // Prefer free-tier models when available
+    preferFreeTier: process.env.AI_PREFER_FREE_TIER !== 'false',
+    // Free tier alert threshold (0.8 = 80%)
+    freeTierAlertThreshold: parseFloat(process.env.AI_FREE_TIER_ALERT_THRESHOLD) || 0.8,
+    // Cost tracking enabled
+    costTrackingEnabled: process.env.AI_COST_TRACKING_ENABLED !== 'false',
+    // Daily cost alert threshold (USD)
+    costAlertThresholdUSD: parseFloat(process.env.AI_COST_ALERT_THRESHOLD_USD) || 10,
+    // Cost projection enabled
+    costProjectionEnabled: process.env.AI_COST_PROJECTION_ENABLED !== 'false',
+
+    // Capability-specific budgets (optional, override defaults)
+    maxCostBusinessExtraction: parseFloat(process.env.AI_MAX_COST_BUSINESS_EXTRACTION) || 0.001,
+    maxCostBusinessResearch: parseFloat(process.env.AI_MAX_COST_BUSINESS_RESEARCH) || 0.010,
+    maxCostEntityResolution: parseFloat(process.env.AI_MAX_COST_ENTITY_RESOLUTION) || 0.0005,
+    maxCostReviewAnalysis: parseFloat(process.env.AI_MAX_COST_REVIEW_ANALYSIS) || 0.001,
+    maxCostSentimentClassification: parseFloat(process.env.AI_MAX_COST_SENTIMENT_CLASSIFICATION) || 0.0003,
+    maxCostCompetitorAnalysis: parseFloat(process.env.AI_MAX_COST_COMPETITOR_ANALYSIS) || 0.005,
+    maxCostTrendClassification: parseFloat(process.env.AI_MAX_COST_TREND_CLASSIFICATION) || 0.003,
+    maxCostReportGeneration: parseFloat(process.env.AI_MAX_COST_REPORT_GENERATION) || 0.020,
+    maxCostStructuredOutput: parseFloat(process.env.AI_MAX_COST_STRUCTURED_OUTPUT) || 0.001,
+
+    // Latency SLA per capability (milliseconds)
+    maxLatencyBusinessExtraction: parseInt(process.env.AI_MAX_LATENCY_BUSINESS_EXTRACTION) || 5000,
+    maxLatencyBusinessResearch: parseInt(process.env.AI_MAX_LATENCY_BUSINESS_RESEARCH) || 30000,
+    maxLatencyEntityResolution: parseInt(process.env.AI_MAX_LATENCY_ENTITY_RESOLUTION) || 3000,
+    maxLatencyReviewAnalysis: parseInt(process.env.AI_MAX_LATENCY_REVIEW_ANALYSIS) || 5000,
+    maxLatencySentimentClassification: parseInt(process.env.AI_MAX_LATENCY_SENTIMENT_CLASSIFICATION) || 2000,
+    maxLatencyCompetitorAnalysis: parseInt(process.env.AI_MAX_LATENCY_COMPETITOR_ANALYSIS) || 20000,
+    maxLatencyTrendClassification: parseInt(process.env.AI_MAX_LATENCY_TREND_CLASSIFICATION) || 15000,
+    maxLatencyReportGeneration: parseInt(process.env.AI_MAX_LATENCY_REPORT_GENERATION) || 45000,
+    maxLatencyStructuredOutput: parseInt(process.env.AI_MAX_LATENCY_STRUCTURED_OUTPUT) || 5000,
+
+    // Per-provider budget overrides (JSON: {"openrouter": 20, "nvidia": 15, "deepseek": 15})
+    providerBudgets: process.env.AI_PROVIDER_BUDGETS ? JSON.parse(process.env.AI_PROVIDER_BUDGETS) : {},
+
+    // Resilience
+    circuitBreakerThreshold: parseInt(process.env.AI_CIRCUIT_BREAKER_THRESHOLD) || 5,
+    circuitBreakerTimeout: parseInt(process.env.AI_CIRCUIT_BREAKER_TIMEOUT) || 60000,
+    circuitBreakerSuccessThreshold: parseInt(process.env.AI_CIRCUIT_BREAKER_SUCCESS_THRESHOLD) || 2,
+    cooldownBaseMs: parseInt(process.env.AI_COOLDOWN_BASE_MS) || 30000,
+    cooldownMaxMs: parseInt(process.env.AI_COOLDOWN_MAX_MS) || 600000,
+    cooldownMultiplier: parseFloat(process.env.AI_COOLDOWN_MULTIPLIER) || 2,
+    retryBaseDelayMs: parseInt(process.env.AI_RETRY_BASE_DELAY_MS) || 250,
+    retryMaxDelayMs: parseInt(process.env.AI_RETRY_MAX_DELAY_MS) || 5000,
+    retryJitterMs: parseInt(process.env.AI_RETRY_JITTER_MS) || 250,
+
+    // Cost & Free Tier
+    costPhase: process.env.AI_COST_PHASE || 'free',
+    monthlyBudgetUSD: parseInt(process.env.AI_MONTHLY_BUDGET_USD) || 50,
+    disablePaidProviders: process.env.AI_DISABLE_PAID_PROVIDERS === 'true',
+    preferFreeTier: process.env.AI_PREFER_FREE_TIER !== 'false',
+    freeTierAlertThreshold: parseFloat(process.env.AI_FREE_TIER_ALERT_THRESHOLD) || 0.8,
+    costTrackingEnabled: process.env.AI_COST_TRACKING_ENABLED !== 'false',
+    costAlertThresholdUSD: parseFloat(process.env.AI_COST_ALERT_THRESHOLD_USD) || 10,
+    costProjectionEnabled: process.env.AI_COST_PROJECTION_ENABLED !== 'false',
+
+    // Feature flags
+    officialWebsiteEnrichment: process.env.AI_OFFICIAL_WEBSITE !== 'false',
+    groundingEnforce: process.env.AI_GROUNDING_ENFORCE !== 'false',
+    costPhase: process.env.AI_COST_PHASE || 'free',
+    disablePaidProviders: process.env.AI_DISABLE_PAID_PROVIDERS === 'true',
+    debugBusinessAnalysis: process.env.DEBUG_BUSINESS_ANALYSIS === 'true',
   },
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000,
