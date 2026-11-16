@@ -1,0 +1,366 @@
+{
+  "ok": false,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 6,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "composition_file_too_large",
+        "severity": "warning",
+        "message": "This HTML composition file has 359 lines. Smaller sub-compositions are easier to read, iterate on, and diff.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "/Users/surajkumar/Desktop/Webloom/brag-output/composition/index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Split coherent scenes or layers into separate .html files under compositions/, then mount them from the parent with data-composition-src so each file stays small enough to inspect, revise, and validate independently."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<section id=\"s1\"> is a timeline element that contains nested <div>. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#s1",
+        "dataAttributes": {},
+        "sourceFile": "/Users/surajkumar/Desktop/Webloom/brag-output/composition/index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <section id=\"s1\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<section id=\"s2\"> is a timeline element that contains nested <div id=\"s2-form\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#s2",
+        "dataAttributes": {},
+        "sourceFile": "/Users/surajkumar/Desktop/Webloom/brag-output/composition/index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <section id=\"s2\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<section id=\"s3\"> is a timeline element that contains nested <div id=\"s3-card\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#s3",
+        "dataAttributes": {},
+        "sourceFile": "/Users/surajkumar/Desktop/Webloom/brag-output/composition/index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <section id=\"s3\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<section id=\"s4\"> is a timeline element that contains nested <div id=\"s4-card\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#s4",
+        "dataAttributes": {},
+        "sourceFile": "/Users/surajkumar/Desktop/Webloom/brag-output/composition/index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <section id=\"s4\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      },
+      {
+        "code": "nested_structure_needs_subcomposition",
+        "severity": "warning",
+        "message": "<section id=\"s5\"> is a timeline element that contains nested <div id=\"s5-lockup\">. The timeline shows one row per top-level element, and the root composition is built only from sub-compositions.",
+        "selector": "#s5",
+        "dataAttributes": {},
+        "sourceFile": "/Users/surajkumar/Desktop/Webloom/brag-output/composition/index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Move <section id=\"s5\"> and its contents into a sub-composition file and mount it with data-composition-src."
+      }
+    ],
+    "filesScanned": 1
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "layout": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 1,
+    "infoCount": 2,
+    "findings": [
+      {
+        "code": "container_overflow",
+        "severity": "warning",
+        "time": 1.167,
+        "selector": "#meshC",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 960,
+          "top": -180,
+          "right": 1860,
+          "bottom": 440,
+          "width": 900,
+          "height": 620
+        },
+        "containerSelector": "div.bg",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 0,
+          "top": 0,
+          "right": 1920,
+          "bottom": 1080,
+          "width": 1920,
+          "height": 1080
+        },
+        "overflow": {
+          "top": 180
+        },
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 960,
+          "y": -180,
+          "width": 900,
+          "height": 620
+        },
+        "firstSeen": 1.167,
+        "lastSeen": 19.833,
+        "occurrences": 9,
+        "heldMs": 0,
+        "times": [
+          1.167,
+          3.5,
+          5.833,
+          8.167,
+          10.5,
+          12.833,
+          15.167,
+          17.5,
+          19.833
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "info",
+        "time": 1.167,
+        "selector": "#meshA",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": -199.7,
+          "top": -250.18,
+          "right": 1200.3,
+          "bottom": 649.82,
+          "width": 1400,
+          "height": 900
+        },
+        "containerSelector": "div.bg",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 0,
+          "top": 0,
+          "right": 1920,
+          "bottom": 1080,
+          "width": 1920,
+          "height": 1080
+        },
+        "overflow": {
+          "left": 199.7,
+          "top": 250.18
+        },
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": -199.7,
+          "y": -250.18,
+          "width": 1400,
+          "height": 900
+        },
+        "firstSeen": 1.167,
+        "lastSeen": 19.833,
+        "occurrences": 9,
+        "heldMs": 0,
+        "times": [
+          1.167,
+          3.5,
+          5.833,
+          8.167,
+          10.5,
+          12.833,
+          15.167,
+          17.5,
+          19.833
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "info",
+        "time": 1.167,
+        "selector": "#meshB",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 877.74,
+          "top": 468.21,
+          "right": 2177.74,
+          "bottom": 1368.21,
+          "width": 1300,
+          "height": 900
+        },
+        "containerSelector": "div.bg",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 0,
+          "top": 0,
+          "right": 1920,
+          "bottom": 1080,
+          "width": 1920,
+          "height": 1080
+        },
+        "overflow": {
+          "right": 257.74,
+          "bottom": 288.21
+        },
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 877.74,
+          "y": 468.21,
+          "width": 1300,
+          "height": 900
+        },
+        "firstSeen": 1.167,
+        "lastSeen": 19.833,
+        "occurrences": 9,
+        "heldMs": 0,
+        "times": [
+          1.167,
+          3.5,
+          5.833,
+          8.167,
+          10.5,
+          12.833,
+          15.167,
+          17.5,
+          19.833
+        ]
+      }
+    ],
+    "duration": 21,
+    "samples": [
+      1.167,
+      3.5,
+      5.833,
+      8.167,
+      10.5,
+      12.833,
+      15.167,
+      17.5,
+      19.833
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 3,
+    "truncated": false
+  },
+  "motion": {
+    "ok": false,
+    "errorCount": 1,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "motion_off_frame",
+        "severity": "error",
+        "time": 1.686,
+        "selector": "#s1-headline",
+        "message": "#s1-headline drifts off the 1920×1080 canvas at 1.69s (box -23.42,392.8→1943.42,617.01)",
+        "rect": {
+          "left": -23.42,
+          "top": 392.8,
+          "right": 1943.42,
+          "bottom": 617.01,
+          "width": 1966.85,
+          "height": 224.22
+        },
+        "fixHint": "Clamp the element's motion so its box stays within the canvas for the whole shot.",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": -23.42,
+          "y": 392.8,
+          "width": 1966.85,
+          "height": 224.22
+        },
+        "firstSeen": 1.686,
+        "lastSeen": 1.686,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          1.686
+        ]
+      }
+    ],
+    "enabled": true,
+    "specPath": "/Users/surajkumar/Desktop/Webloom/brag-output/composition/index.motion.json",
+    "samples": 300
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": true,
+    "samples": [
+      1.167,
+      5.833,
+      10.5,
+      15.167,
+      19.833
+    ],
+    "checked": 34,
+    "passed": 34
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  }
+}

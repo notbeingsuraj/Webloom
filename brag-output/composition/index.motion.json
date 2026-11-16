@@ -1,0 +1,77 @@
+{
+  "duration": 21,
+  "assertions": [
+    {
+      "kind": "appearsBy",
+      "selector": "#s1-headline .hl-inner",
+      "bySec": 2.15
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#s2-hint",
+      "bySec": 4.2
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#step-1",
+      "bySec": 8.3
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#step-7",
+      "bySec": 11.5
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#s4-num",
+      "bySec": 14.5
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#s5-word",
+      "bySec": 18.6
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#s5-tagline",
+      "bySec": 18.9
+    },
+    {
+      "kind": "before",
+      "a": "#s1-headline .hl-inner",
+      "b": "#s2-hint"
+    },
+    {
+      "kind": "before",
+      "a": "#s2-hint",
+      "b": "#step-1"
+    },
+    {
+      "kind": "before",
+      "a": "#step-1",
+      "b": "#step-7"
+    },
+    {
+      "kind": "before",
+      "a": "#step-7",
+      "b": "#s4-num"
+    },
+    {
+      "kind": "before",
+      "a": "#s4-num",
+      "b": "#s5-word"
+    },
+    {
+      "kind": "staysInFrame",
+      "selector": "#s1-headline .hl-inner"
+    },
+    {
+      "kind": "staysInFrame",
+      "selector": "#s2-cursor"
+    },
+    {
+      "kind": "staysInFrame",
+      "selector": "#s4-ring-wrap"
+    }
+  ]
+}

@@ -74,9 +74,109 @@
 
 ---
 
+## Milestone 2: AI Infrastructure Recovery
+
+**Phase 2: AI Infrastructure Recovery — Open-Weight Model Strategy, Free Inference, Provider Resilience and Production Reliability**  
+**Goal:** Build a reliable AI execution infrastructure that prioritizes high-quality open-weight models, uses free hosted inference endpoints, avoids unnecessary paid API dependencies, supports multiple independent inference providers, automatically handles provider failures, uses different models for different workloads, preserves Webloom's evidence/provenance architecture, and can eventually support paid production inference without architectural rewrites.
+
+**Requirements:** [AIR-01, AIR-02, AIR-03, AIR-03, AIR-04, AIR-05, AIR-06, AIR-07, AIR-08, AIR-09, AIR-10, AIR-11, AIR-12]
+
+**Plans:** 11 plans
+
+### Plans Created
+
+- [ ] 02-01-PLAN.md — Phase 1: Complete Existing Infrastructure Audit
+- [ ] 02-02-PLAN.md — Phase 2: Open-Weight Model Research and Selection
+- [ ] 02-03-PLAN.md — Phase 3: Create a Model Evaluation Benchmark
+- [ ] 02-04-PLAN.md — Phase 4: Design a Central AI Orchestrator
+- [ ] 02-05-PLAN.md — Phase 5: Provider Adapters
+- [ ] 02-06-PLAN.md — Phase 6: Failure Handling and Resilience
+- [ ] 02-07-PLAN.md — Phase 7: Output Validation and Webloom Data Integrity
+- [ ] 02-08-PLAN.md — Phase 8: Cost and Free-Tier Optimisation
+- [ ] 02-09-PLAN.md — Phase 9: Health Monitoring
+- [ ] 02-10-PLAN.md — Phase 10: Testing
+- [ ] 02-11-PLAN.md — Phase 11: Implementation and Deliverables
+
+### Phase 2 Plans
+
+#### Plan 1: Complete Existing Infrastructure Audit
+**Objective:** Inspect the entire repository. Locate and inspect AI provider adapters, provider configuration, existing AI gateway integrations, OmniRoute integrations, OpenRouter integrations, Gemini integrations, model identifiers and base URLs, AI orchestration and routing logic, environment variable handling, health-check endpoints, retry and timeout logic, and all AI-dependent services. Trace real requests from application entry points to actual provider response. Identify broken adapters, invalid model identifiers, invalid endpoints, authentication failures, unsupported request formats, incorrect response parsing, missing environment variables, quota exhaustion, rate limits, provider outages, unnecessary gateway dependencies, duplicate implementations, incorrect error handling, silent failures. Create a provider failure matrix with verified evidence.
+
+**Requirements:** AIR-01
+
+#### Plan 2: Open-Weight Model Research and Selection
+**Objective:** Research and evaluate high-quality open-weight models and their available inference providers. Mandatory evaluation of NVIDIA Nemotron 3 Ultra 550B A55B. Evaluate additional candidates: DeepSeek V4.1 Flash, Qwen3.5 35B A3B, Mistral Small 4, GLM 5.3 Flash, and other relevant models from NVIDIA, Alibaba Qwen, DeepSeek, Mistral, Z.ai. Document exact model identifier, developer, open-weight status, license, hosted inference providers, free inference availability, rate limits, context length, tool-calling support, structured output support, latency, expected inference cost, production suitability, deployment requirements. Distinguish between free downloadable weights vs free hosted inference vs free trial credits vs paid hosted inference vs self-hosted GPU infrastructure.
+
+**Requirements:** AIR-02
+
+#### Plan 3: Create a Model Evaluation Benchmark
+**Objective:** Build a Webloom-specific evaluation dataset with at least 30 representative tasks covering business information extraction, identity resolution, service/product extraction, price extraction, contact extraction, review sentiment classification, complaint clustering, competitor comparison, opportunity identification, business report generation, structured JSON generation, evidence-grounded summarization. Use same inputs across all candidate models. Evaluate extraction correctness, hallucination rate, JSON validity, schema compliance, instruction following, reasoning quality, latency, token consumption, cost per successful task, failure rate. Create model comparison report.
+
+**Requirements:** AIR-03
+
+#### Plan 4: Design a Central AI Orchestrator
+**Objective:** Implement a provider-independent AI orchestration layer with ModelRegistry, ProviderRegistry, CapabilityRouter, ProviderHealthMonitor, QuotaManager, CircuitBreaker, RetryController, OutputValidator, CostTracker, AIExecutionLogger, FallbackController. Application requests capabilities (business_extraction, business_research, entity_resolution, review_analysis, sentiment_classification, competitor_analysis, trend_classification, report_generation, structured_output) rather than hardcoding provider names. Each capability has its own model selection policy with primary/secondary/tertiary/fallback providers.
+
+**Requirements:** AIR-04
+
+#### Plan 5: Provider Adapters
+**Objective:** Create consistent provider adapter interface with generate(), healthCheck(), getModels(), getCapabilities(), classifyError(), getUsage(), validateConfiguration(). Support OpenAI-compatible endpoints. Prioritize adapters for: NVIDIA NIM/hosted inference, Hugging Face Inference Providers, other verified free/low-cost hosted inference, DeepSeek API, Gemini API, OpenRouter as optional routing layer, self-hosted OpenAI-compatible endpoints. Providers independently configurable and removable.
+
+**Requirements:** AIR-05
+
+#### Plan 6: Failure Handling and Resilience
+**Objective:** Implement provider health checks, circuit breakers, bounded retries, exponential backoff with jitter, provider-specific cooldown periods, quota-aware routing, request timeouts, fallback selection, response validation, failure logging, provider recovery detection. Classify errors correctly: 400 (invalid request - no blind retry), 401/403 (credentials - disable provider), 404 (invalid endpoint/model - config problem), 429 (rate limit/quota - respect retry headers), 500/502/503 (provider failure - try another), timeout (bounded retry/failover), malformed JSON (validate, attempt repair, or switch provider). No repeated calls to exhausted provider, no fallback loops, no single provider blocking others. Account for concurrent requests and serverless execution with Redis/shared state.
+
+**Requirements:** AIR-06
+
+#### Plan 7: Output Validation and Webloom Data Integrity
+**Objective:** Preserve Webloom's evidence and provenance architecture. AI cannot overwrite verified business information. AI-generated data must be labelled appropriately. Missing fields remain missing. Unsupported information not fabricated. Source provenance preserved. Failed AI requests must not corrupt previously extracted records. Every structured output validated against schema. Provider-specific response formats normalized. For models without native structured output, implement reliable JSON extraction, parsing, and schema validation.
+
+**Requirements:** AIR-07
+
+#### Plan 8: Cost and Free-Tier Optimisation
+**Objective:** Minimize operating expenses. Priorities: genuinely free inference where suitable, smaller models for simple classification/extraction, reserve large reasoning models for difficult tasks, cache deterministic/repeatable results, avoid unnecessary repeated inference, track token consumption and estimated cost, per-task token and cost budgets, prevent runaway retries, configurable monthly spending limits, allow paid providers to be disabled entirely. Explicit transition strategy from free experimentation to controlled paid production inference.
+
+**Requirements:** AIR-08
+
+#### Plan 9: Health Monitoring
+**Objective:** Implement meaningful /health/ai endpoint exposing provider configuration status, availability, model identifiers, last successful request, last error, latency, failure rate, cooldown state, quota state, active provider per capability, fallback status. No secrets exposed. Configured API key does not automatically mean healthy. Include provider-level diagnostic command/endpoint for independent testing.
+
+**Requirements:** AIR-09
+
+#### Plan 10: Testing
+**Objective:** Test failure scenarios: all providers unavailable, primary returns 429/503, invalid credentials, invalid model identifier, incorrect endpoint, provider timeout, malformed JSON, incomplete output, fallback succeeds, all providers fail, provider recovers after cooldown, concurrent requests during outage, quota exhaustion, deterministic fallback activates, verified data unchanged after AI failure. Test every adapter independently. Add integration tests for actual provider endpoints only when credentials configured. Don't make entire test suite depend on live API availability.
+
+**Requirements:** AIR-10
+
+#### Plan 11: Implementation and Deliverables
+**Objective:** After audit and documentation, implement approved architecture in small verifiable stages. Don't rewrite working services unnecessarily. Deliver: root-cause investigation report, model comparison/benchmark report, provider compatibility matrix, recommended model-routing policy, central AI orchestration implementation, provider adapters, environment variable documentation, health monitoring endpoint, unit/integration tests, deployment instructions, cost/quota management documentation, migration guide for existing AI-dependent services. Update .env.example with variable names and safe placeholders only. Never expose real API keys. Run complete existing test suite after implementation. Conclude with final engineering decision: which providers work, which models passed tests, primary model per capability, genuinely usable free inference endpoints, which providers to retain/remove, expected cost at 100/1000/10000 tasks, behavior when all providers fail, production readiness.
+
+**Requirements:** AIR-11
+
+---
+
+## Requirement Definitions
+
+| ID | Description |
+|----|-------------|
+| AIR-01 | Complete infrastructure audit with provider failure matrix |
+| AIR-02 | Open-weight model research and selection with mandatory Nemotron 3 Ultra evaluation |
+| AIR-03 | Webloom-specific model evaluation benchmark (30+ tasks) |
+| AIR-04 | Central AI orchestrator with capability-based routing |
+| AIR-05 | Provider adapters for NVIDIA, HF, DeepSeek, Gemini, OpenRouter, self-hosted |
+| AIR-06 | Failure handling: circuit breakers, retries, fallbacks, quota awareness |
+| AIR-07 | Output validation preserving Webloom provenance architecture |
+| AIR-08 | Cost optimization: free inference, model sizing, caching, budgets |
+| AIR-09 | Health monitoring: /health/ai endpoint with provider diagnostics |
+| AIR-10 | Comprehensive testing of failure scenarios and adapter tests |
+| AIR-11 | Implementation deliverables and final engineering decision |
+
+---
+
 ## Future Phases (Post-MVP Validation)
 
-### Phase 2: Core Prospect Intelligence Engine (P0 Implementation)
+### Phase 3: Core Prospect Intelligence Engine (P0 Implementation)
 - Google Maps URL / CSV / website input handling
 - Business identity resolution with provenance
 - Multi-source verification (Geoapify + web extraction + official website)

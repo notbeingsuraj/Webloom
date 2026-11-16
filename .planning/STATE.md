@@ -1,7 +1,7 @@
 # Webloom 2.0 — Planning State
 
 ## Current Phase
-**Phase 1: Product Validation & MVP Definition** — Planning in progress
+**Phase 2: AI Infrastructure Recovery** — Planning in progress
 
 ## Decisions Made
 
@@ -68,3 +68,8 @@
 - CONTEXT.md: N/A (no discuss-phase run)
 - RESEARCH.md: ✅ Exists (AUDIT-REPORT.md)
 - PLAN.md files: ⏳ Pending creation
+
+## Accumulated Context
+
+### Roadmap Evolution
+- Phase 2 added: AI Infrastructure Recovery — Open-Weight Model Strategy, Free Inference, Provider Resilience and Production Reliability

@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Webloom — Launch Video (2016 Series A energy)</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/TextPlugin.min.js"></script>
+    <script src="assets/audio-data.js"></script>
+    <style>
+      @font-face {
+        font-family: "Sora";
+        src: url("assets/fonts/sora-latin.woff2") format("woff2");
+        font-weight: 400 800;
+        font-style: normal;
+        font-display: block;
+      }
+      @font-face {
+        font-family: "Inter";
+        src: url("assets/fonts/inter-latin.woff2") format("woff2");
+        font-weight: 400 800;
+        font-style: normal;
+        font-display: block;
+      }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0f111a; }
+
+      :root {
+        --bg: #0f111a;
+        --card: #171b26;
+        --secondary: #202432;
+        --border: #2a2e3c;
+        --input-border: #2e3342;
+        --fg: #f2f4f7;
+        --muted-fg: #9299aa;
+        --primary: #468af6;
+        --primary-fg: #121521;
+        --ai: #9c6cef;
+        --creative: #ee77a6;
+        --verified: #41c897;
+        --opportunity: #f79545;
+        --card-shadow: 0 1px 2px hsl(0 0% 0% / 0.3), 0 12px 32px -16px hsl(0 0% 0% / 0.55);
+      }
+
+      body { font-family: "Inter", ui-sans-serif, system-ui, sans-serif; color: var(--fg); }
+
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+
+      /* ---------- persistent background ---------- */
+      .bg { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+      .mesh { position: absolute; border-radius: 50%; }
+      #meshA {
+        width: 1400px; height: 900px; left: -180px; top: -260px; opacity: 0.7;
+        background: radial-gradient(closest-side, hsl(217 91% 62% / 0.22), transparent 70%);
+      }
+      #meshB {
+        width: 1300px; height: 900px; right: -240px; bottom: -300px; opacity: 0.6;
+        background: radial-gradient(closest-side, hsl(262 80% 68% / 0.2), transparent 70%);
+      }
+      #meshC {
+        width: 900px; height: 620px; right: 60px; top: -180px; opacity: 0.5;
+        background: radial-gradient(closest-side, hsl(27 92% 62% / 0.12), transparent 70%);
+      }
+      .vignette {
+        position: absolute; inset: 0;
+        background: radial-gradient(ellipse 1500px 900px at 50% 46%, transparent 55%, hsl(226 40% 4% / 0.55) 100%);
+      }
+
+      /* ---------- shared ---------- */
+      .scene { position: absolute; inset: 0; width: 1920px; height: 1080px; z-index: 1; }
+      .card {
+        position: absolute;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        box-shadow: var(--card-shadow);
+        overflow: hidden;
+      }
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(420px 220px at 92% 0%, hsl(217 91% 62% / 0.14), transparent 60%),
+          radial-gradient(360px 220px at 70% 110%, hsl(262 80% 68% / 0.12), transparent 60%),
+          radial-gradient(300px 180px at 0% 60%, hsl(27 92% 62% / 0.1), transparent 60%);
+      }
+      .eyebrow {
+        position: absolute;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted-fg);
+        white-space: nowrap;
+      }
+      .tile {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--ai) 52%, var(--creative) 100%);
+        color: #ffffff;
+        font-family: "Sora", sans-serif;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* ---------- scene 1 : announce card ---------- */
+      .s1-row {
+        position: absolute; left: 0; width: 1920px; top: 296px;
+        display: flex; align-items: center; justify-content: center; gap: 26px;
+      }
+      .s1-rule { width: 92px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, var(--primary), var(--ai)); }
+      #s1-rule-r { background: linear-gradient(90deg, var(--ai), var(--primary)); }
+      #s1-announce {
+        font-size: 22px; font-weight: 600; letter-spacing: 0.34em;
+        text-transform: uppercase; color: var(--muted-fg);
+      }
+      #s1-headline {
+        position: absolute; left: 0; width: 1920px; top: 372px;
+        font-family: "Sora", sans-serif; font-weight: 700; font-size: 96px;
+        line-height: 1.14; letter-spacing: -0.035em; text-align: center; color: var(--fg);
+      }
+      #s1-headline .hl-inner { display: inline-block; }
+      #s1-headline .grad {
+        background: linear-gradient(100deg, var(--primary) 0%, var(--ai) 55%, var(--creative) 115%);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+      }
+      .s1-brand {
+        position: absolute; left: 0; width: 1920px; top: 664px;
+        display: flex; align-items: center; justify-content: center; gap: 20px;
+      }
+      .s1-brand .tile { width: 64px; height: 64px; border-radius: 16px; font-size: 32px; }
+      .s1-brand .word { font-family: "Sora", sans-serif; font-weight: 600; font-size: 42px; letter-spacing: -0.02em; }
+
+      /* ---------- scene 2 : analyse form ---------- */
+      #s2-form { left: 248px; top: 330px; width: 980px; height: 378px; }
+      #s2-side { left: 1272px; top: 330px; width: 400px; height: 378px; }
+
+      #s2-input {
+        position: absolute; left: 52px; top: 84px; width: 876px; height: 76px;
+        background: var(--bg); border: 1px solid var(--primary); border-radius: 12px;
+        box-shadow: 0 0 0 4px hsl(217 91% 62% / 0.16);
+        display: flex; align-items: center; padding: 0 26px; gap: 16px;
+      }
+      #s2-input svg { width: 30px; height: 30px; flex: none; color: var(--muted-fg); }
+      .s2-typing { display: flex; align-items: center; }
+      #s2-url { font-size: 26px; font-weight: 500; color: var(--fg); white-space: nowrap; }
+      #s2-caret { display: inline-block; width: 3px; height: 34px; background: var(--primary); margin-left: 3px; }
+      #s2-hint {
+        position: absolute; left: 52px; top: 176px; width: 876px;
+        font-size: 20px; line-height: 1.4; color: var(--muted-fg);
+      }
+      #s2-btn {
+        position: absolute; left: 52px; top: 236px; height: 76px;
+        padding: 0 44px; border: none; border-radius: 999px;
+        background: var(--primary); color: var(--primary-fg);
+        font-family: "Inter", sans-serif; font-size: 24px; font-weight: 700;
+        display: inline-flex; align-items: center; justify-content: center; gap: 14px;
+        box-shadow: 0 8px 24px -8px hsl(217 91% 62% / 0.55);
+        cursor: default;
+      }
+      #s2-btn svg { width: 26px; height: 26px; }
+      #s2-btn-load {
+        position: absolute; inset: 0; display: flex; align-items: center;
+        justify-content: center; gap: 14px; opacity: 0;
+      }
+      .s2-ringwrap { position: absolute; left: 350px; top: 490px; width: 280px; height: 280px; pointer-events: none; }
+      .s2-ring {
+        position: absolute; inset: 0; margin: auto; width: 280px; height: 280px;
+        border-radius: 50%; border: 3px solid hsl(217 91% 62% / 0.8);
+      }
+      #s2-cursor { position: absolute; left: 740px; top: 900px; width: 44px; height: 44px; z-index: 5; }
+      #s2-cursor svg { width: 44px; height: 44px; filter: drop-shadow(0 4px 10px hsl(0 0% 0% / 0.6)); }
+
+      #s2-side .compass {
+        position: absolute; left: 40px; top: 40px; width: 56px; height: 56px;
+        border-radius: 16px; background: hsl(27 92% 62% / 0.15);
+        display: flex; align-items: center; justify-content: center;
+      }
+      #s2-side .compass svg { width: 30px; height: 30px; color: var(--opportunity); }
+      #s2-side .eyebrow { left: 112px; top: 59px; }
+      #s2-side .side-title {
+        position: absolute; left: 40px; top: 120px; width: 320px;
+        font-size: 26px; font-weight: 600; line-height: 1.35; color: var(--fg);
+      }
+      #s2-side .side-sub {
+        position: absolute; left: 40px; top: 204px; width: 320px;
+        font-size: 19px; line-height: 1.5; color: var(--muted-fg);
+      }
+      #s2-side .side-pill {
+        position: absolute; left: 40px; top: 282px; width: 320px; height: 56px;
+        border-radius: 28px; background: linear-gradient(90deg, var(--primary), var(--ai));
+        color: var(--primary-fg); font-size: 20px; font-weight: 700;
+        display: flex; align-items: center; justify-content: center; gap: 10px;
+        box-shadow: 0 8px 24px -10px hsl(217 91% 62% / 0.5);
+      }
+      #s2-side .side-pill svg { width: 22px; height: 22px; }
+
+      /* ---------- scene 3 : pipeline checklist ---------- */
+      #s3-card { left: 530px; top: 163px; width: 860px; height: 754px; }
+      #s3-card .eyebrow { left: 56px; top: 52px; }
+      #s3-status {
+        position: absolute; left: 56px; top: 84px;
+        display: flex; align-items: center; gap: 16px;
+        font-size: 26px; font-weight: 500; color: var(--muted-fg);
+      }
+      #s3-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--primary); flex: none; }
+      #s3-spine {
+        position: absolute; left: 77px; top: 178px; width: 2px; height: 480px; z-index: 0;
+        background: linear-gradient(180deg, var(--primary), hsl(262 80% 68% / 0.4), transparent);
+      }
+      .step { position: absolute; left: 56px; width: 748px; height: 62px; z-index: 1; }
+      .step-circle {
+        position: absolute; left: 0; top: 0; width: 44px; height: 44px;
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 8px 22px -8px hsl(0 0% 0% / 0.8);
+      }
+      .step-circle svg { width: 24px; height: 24px; color: #ffffff; }
+      .step-text { position: absolute; left: 62px; top: 0; }
+      .step-label {
+        display: block; font-size: 26px; font-weight: 600; line-height: 34px;
+        color: var(--fg); text-decoration: line-through;
+        text-decoration-color: hsl(158 55% 52% / 0.6); text-decoration-thickness: 2px;
+        white-space: nowrap;
+      }
+      .step-done { display: block; margin-top: 4px; font-size: 16px; line-height: 22px; color: var(--verified); }
+
+      /* ---------- scene 4 : lead workspace / score ---------- */
+      #s4-card { left: 260px; top: 200px; width: 1400px; height: 680px; }
+      #s4-card .eyebrow { left: 64px; top: 56px; }
+      #s4-pill-new {
+        position: absolute; left: 254px; top: 46px; height: 42px; padding: 0 20px;
+        border-radius: 21px; background: var(--secondary); border: 1px solid var(--border);
+        font-size: 17px; font-weight: 600; color: var(--fg);
+        display: flex; align-items: center;
+      }
+      #s4-name {
+        position: absolute; left: 64px; top: 88px;
+        font-family: "Sora", sans-serif; font-weight: 700; font-size: 64px;
+        line-height: 1.1; letter-spacing: -0.03em; color: var(--fg);
+      }
+      #s4-chip {
+        position: absolute; left: 872px; top: 48px; width: 464px; height: 210px;
+        background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+        box-shadow: var(--card-shadow);
+      }
+      #s4-chip .eyebrow { left: 32px; top: 44px; }
+      .s4-score {
+        position: absolute; left: 32px; top: 76px;
+        display: flex; align-items: baseline; gap: 10px;
+      }
+      #s4-num {
+        font-family: "Sora", sans-serif; font-weight: 700; font-size: 84px;
+        line-height: 1; letter-spacing: -0.02em; color: var(--fg);
+        font-variant-numeric: tabular-nums;
+      }
+      #s4-denom { font-size: 30px; font-weight: 600; color: var(--muted-fg); }
+      #s4-ring-wrap { position: absolute; left: 282px; top: 30px; width: 150px; height: 150px; }
+      #s4-ring-fill {
+        position: absolute; inset: 0; border-radius: 50%;
+        background: conic-gradient(hsl(217 91% 62%) 0deg, hsl(225 22% 15%) 0deg);
+      }
+      #s4-ring-inner {
+        position: absolute; inset: 27px; border-radius: 50%; background: var(--card);
+        display: flex; align-items: center; justify-content: center;
+      }
+      #s4-ring-num {
+        font-family: "Sora", sans-serif; font-weight: 700; font-size: 40px;
+        color: var(--fg); font-variant-numeric: tabular-nums;
+      }
+      #s4-workflow {
+        position: absolute; left: 64px; top: 330px; width: 1272px; height: 130px;
+        border: 2px dashed hsl(217 91% 62% / 0.35); border-radius: 16px;
+        background: linear-gradient(135deg, var(--secondary) 0%, var(--card) 62%, hsl(262 80% 68% / 0.07) 100%);
+      }
+      .wf-label { position: absolute; left: 32px; top: 24px; font-size: 22px; font-weight: 700; color: var(--fg); }
+      .wf-line { position: absolute; left: 32px; top: 68px; font-size: 21px; color: var(--muted-fg); white-space: nowrap; }
+      #s4-ready {
+        position: absolute; left: 64px; top: 496px; height: 64px; padding: 0 28px;
+        border-radius: 32px; background: hsl(158 55% 52% / 0.12);
+        border: 1px solid hsl(158 55% 52% / 0.35);
+        display: inline-flex; align-items: center; gap: 14px;
+        font-size: 24px; font-weight: 700; color: var(--verified);
+      }
+      #s4-ready svg { width: 26px; height: 26px; }
+      #s4-fineprint {
+        position: absolute; left: 64px; top: 596px; width: 1272px;
+        font-size: 19px; line-height: 1.4; color: var(--muted-fg);
+      }
+
+      /* ---------- scene 5 : logo lockup ---------- */
+      #s5-lockup { position: absolute; left: 885px; top: 280px; width: 150px; height: 150px; border-radius: 38px; font-size: 76px; }
+      #s5-word {
+        position: absolute; left: 0; width: 1920px; top: 470px; text-align: center;
+        font-family: "Sora", sans-serif; font-weight: 700; font-size: 92px;
+        letter-spacing: -0.03em; color: var(--fg);
+      }
+      #s5-tagline {
+        position: absolute; left: 0; width: 1920px; top: 620px; text-align: center;
+        font-size: 36px; line-height: 1.4; color: var(--muted-fg);
+      }
+    </style>
+  </head>
+  <body>
+    <div data-hf-id="hf-onjd"
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="21"
+      data-width="1920"
+      data-height="1080"
+      data-fps="30"
+    >
+      <!-- ============ persistent background ============ -->
+      <div data-hf-id="hf-m7dd" class="bg">
+        <div data-hf-id="hf-5dwg" class="mesh" id="meshA" data-layout-allow-overflow></div>
+        <div data-hf-id="hf-e1sb" class="mesh" id="meshB" data-layout-allow-overflow></div>
+        <div data-hf-id="hf-a3oa" class="mesh" id="meshC" data-layout-allow-overflow></div>
+        <div data-hf-id="hf-q7bi" class="vignette"></div>
+      </div>
+
+      <!-- ============ scene 1 : announce card (0 – 3.70) ============ -->
+      <section data-hf-id="hf-7t3a" id="s1" class="clip scene" data-start="0" data-duration="3.7" data-track-index="0">
+        <div data-hf-id="hf-6enb" class="s1-row">
+          <span data-hf-id="hf-ciyi" class="s1-rule" id="s1-rule-l"></span>
+          <span data-hf-id="hf-vlu2" id="s1-announce">Announcing</span>
+          <span data-hf-id="hf-1jzg" class="s1-rule" id="s1-rule-r"></span>
+        </div>
+        <h1 data-hf-id="hf-210o" id="s1-headline"><span data-hf-id="hf-f2z2" class="hl-inner">Turn local businesses into<br data-hf-id="hf-x5px" /><span data-hf-id="hf-zirs" class="grad">intelligence.</span></span></h1>
+        <div data-hf-id="hf-l3nq" class="s1-brand" id="s1-brand">
+          <div data-hf-id="hf-d481" class="tile">W</div>
+          <span data-hf-id="hf-bkoc" class="word">Webloom</span>
+        </div>
+      </section>
+
+      <!-- ============ scene 2 : one field, one button (3.70 – 7.91) ============ -->
+      <section data-hf-id="hf-omwi" id="s2" class="clip scene" data-start="3.7" data-duration="4.21" data-track-index="2">
+        <div data-hf-id="hf-u1sm" class="card" id="s2-form">
+          <p data-hf-id="hf-2vzi" class="eyebrow" style="left: 52px; top: 48px">Analysis</p>
+          <div data-hf-id="hf-w0yp" id="s2-input">
+            <svg data-hf-id="hf-h0hq" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path data-hf-id="hf-vfhb" d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z" />
+              <circle data-hf-id="hf-d4n7" cx="12" cy="10" r="3" />
+            </svg>
+            <span data-hf-id="hf-cs6y" class="s2-typing"><span data-hf-id="hf-w3oh" id="s2-url"></span><span data-hf-id="hf-6h6n" id="s2-caret"></span></span>
+          </div>
+          <p data-hf-id="hf-b14y" id="s2-hint">Paste a Google Maps link for any business — e.g. maps.google.com/place/...</p>
+          <button data-hf-id="hf-wm16" id="s2-btn">
+            <span data-hf-id="hf-w5oi" id="s2-btn-label"
+              >Analyse Business
+              <svg data-hf-id="hf-12oc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <path data-hf-id="hf-8gds" d="M5 12h14" />
+                <path data-hf-id="hf-ldqe" d="m13 6 6 6-6 6" />
+              </svg>
+            </span>
+            <span data-hf-id="hf-7wxf" id="s2-btn-load">
+              <svg data-hf-id="hf-szmf" id="s2-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
+                <path data-hf-id="hf-cwsb" d="M21 12a9 9 0 1 1-6.22-8.56" />
+              </svg>
+              Analysing...
+            </span>
+          </button>
+        </div>
+
+        <aside data-hf-id="hf-z9bg" class="card" id="s2-side">
+          <div data-hf-id="hf-sy60" class="compass">
+            <svg data-hf-id="hf-pmle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle data-hf-id="hf-m1lh" cx="12" cy="12" r="10" />
+              <polygon data-hf-id="hf-9qpb" points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+            </svg>
+          </div>
+          <p data-hf-id="hf-beet" class="eyebrow">Web Intelligence</p>
+          <p data-hf-id="hf-8k3j" class="side-title">Start with a Google Maps URL</p>
+          <p data-hf-id="hf-hkom" class="side-sub">Structured extraction · verified data · AI enrichment</p>
+          <div data-hf-id="hf-ykuj" class="side-pill">
+            <svg data-hf-id="hf-477q" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
+              <path data-hf-id="hf-um4s" d="M12 5v14" />
+              <path data-hf-id="hf-etvs" d="M5 12h14" />
+            </svg>
+            New analysis
+          </div>
+        </aside>
+
+        <div data-hf-id="hf-iv0m" class="s2-ringwrap">
+          <span data-hf-id="hf-8wtd" class="s2-ring" id="s2-ring-1"></span>
+          <span data-hf-id="hf-cuxe" class="s2-ring" id="s2-ring-2"></span>
+        </div>
+
+        <div data-hf-id="hf-xfc5" id="s2-cursor">
+          <svg data-hf-id="hf-ihgo" viewBox="0 0 24 24" fill="#f2f4f7" stroke="#0f111a" stroke-width="1.6" stroke-linejoin="round">
+            <path data-hf-id="hf-8tzg" d="M4 2.5 11.6 21l2.7-7.1L21.5 11 4 2.5Z" />
+          </svg>
+        </div>
+      </section>
+
+      <!-- ============ scene 3 : the intelligence pipeline (7.91 – 12.65) ============ -->
+      <section data-hf-id="hf-yusj" id="s3" class="clip scene" data-start="7.91" data-duration="4.74" data-track-index="3">
+        <div data-hf-id="hf-ma41" class="card" id="s3-card">
+          <p data-hf-id="hf-xi5g" class="eyebrow">Analysis status</p>
+          <div data-hf-id="hf-jcap" id="s3-status"><span data-hf-id="hf-1pqu" id="s3-dot"></span>Running the intelligence pipeline</div>
+          <div data-hf-id="hf-sjtx" id="s3-spine"></div>
+
+          <div data-hf-id="hf-lcp1" class="step" id="step-1" style="top: 156px">
+            <span data-hf-id="hf-54s8" class="step-circle" style="background: #3b82f6">
+              <svg data-hf-id="hf-085v" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path data-hf-id="hf-ixkq" d="m4.5 12.5 5 5 10-11" /></svg>
+            </span>
+            <span data-hf-id="hf-zur9" class="step-text"><span data-hf-id="hf-jyun" class="step-label">Reading business location</span><span data-hf-id="hf-kepz" class="step-done">Complete</span></span>
+          </div>
+          <div data-hf-id="hf-iacl" class="step" id="step-2" style="top: 236px">
+            <span data-hf-id="hf-4zhv" class="step-circle" style="background: #8b5cf6">
+              <svg data-hf-id="hf-s9f7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path data-hf-id="hf-9ogu" d="m4.5 12.5 5 5 10-11" /></svg>
+            </span>
+            <span data-hf-id="hf-08mh" class="step-text"><span data-hf-id="hf-xg4l" class="step-label">Resolving business identity</span><span data-hf-id="hf-6gtj" class="step-done">Complete</span></span>
+          </div>
+          <div data-hf-id="hf-khgh" class="step" id="step-3" style="top: 316px">
+            <span data-hf-id="hf-1nwv" class="step-circle" style="background: #ec4899">
+              <svg data-hf-id="hf-rv46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path data-hf-id="hf-a2rv" d="m4.5 12.5 5 5 10-11" /></svg>
+            </span>
+            <span data-hf-id="hf-1fjk" class="step-text"><span data-hf-id="hf-kimh" class="step-label">Gathering business information</span><span data-hf-id="hf-62ii" class="step-done">Complete</span></span>
+          </div>
+          <div data-hf-id="hf-qnbw" class="step" id="step-4" style="top: 396px">
+            <span data-hf-id="hf-8idh" class="step-circle" style="background: #f97316">
+              <svg data-hf-id="hf-rgt5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path data-hf-id="hf-ah2w" d="m4.5 12.5 5 5 10-11" /></svg>
+            </span>
+            <span data-hf-id="hf-118j" class="step-text"><span data-hf-id="hf-blnb" class="step-label">Reconciling sources</span><span data-hf-id="hf-5o7h" class="step-done">Complete</span></span>
+          </div>
+          <div data-hf-id="hf-pifa" class="step" id="step-5" style="top: 476px">
+            <span data-hf-id="hf-wjuk" class="step-circle" style="background: #10b981">
+              <svg data-hf-id="hf-r2i4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path data-hf-id="hf-7oxp" d="m4.5 12.5 5 5 10-11" /></svg>
+            </span>
+            <span data-hf-id="hf-z1pe" class="step-text"><span data-hf-id="hf-cuzx" class="step-label">Building Business DNA</span><span data-hf-id="hf-8gco" class="step-done">Complete</span></span>
+          </div>
+          <div data-hf-id="hf-hexs" class="step" id="step-6" style="top: 556px">
+            <span data-hf-id="hf-508u" class="step-circle" style="background: #f59e0b">
+              <svg data-hf-id="hf-qo73" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path data-hf-id="hf-838q" d="m4.5 12.5 5 5 10-11" /></svg>
+            </span>
+            <span data-hf-id="hf-yned" class="step-text"><span data-hf-id="hf-qpxe" class="step-label">Calculating opportunity score</span><span data-hf-id="hf-821n" class="step-done">Complete</span></span>
+          </div>
+          <div data-hf-id="hf-o2fm" class="step" id="step-7" style="top: 636px">
+            <span data-hf-id="hf-hqog" class="step-circle" style="background: #3b82f6">
+              <svg data-hf-id="hf-q9w2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path data-hf-id="hf-8hjr" d="m4.5 12.5 5 5 10-11" /></svg>
+            </span>
+            <span data-hf-id="hf-zubg" class="step-text"><span data-hf-id="hf-1dwc" class="step-label">Preparing analysis</span><span data-hf-id="hf-7nqm" class="step-done">Complete</span></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ scene 4 : the score (12.65 – 17.91) ============ -->
+      <section data-hf-id="hf-045u" id="s4" class="clip scene" data-start="12.65" data-duration="5.26" data-track-index="4">
+        <div data-hf-id="hf-vljo" class="card" id="s4-card">
+          <div data-hf-id="hf-fgxb" id="s4-head">
+            <p data-hf-id="hf-4bm7" class="eyebrow">Lead workspace</p>
+            <div data-hf-id="hf-f84l" id="s4-pill-new">New</div>
+            <h2 data-hf-id="hf-jeqg" id="s4-name">Local business</h2>
+          </div>
+
+          <div data-hf-id="hf-83en" id="s4-chip">
+            <p data-hf-id="hf-9co9" class="eyebrow">Opportunity</p>
+            <div data-hf-id="hf-gb5o" class="s4-score">
+              <span data-hf-id="hf-yacw" id="s4-num">0</span>
+              <span data-hf-id="hf-8gql" id="s4-denom">/100</span>
+            </div>
+            <div data-hf-id="hf-22s0" id="s4-ring-wrap">
+              <div data-hf-id="hf-2ifj" id="s4-ring-fill"></div>
+              <div data-hf-id="hf-8ft8" id="s4-ring-inner"><span data-hf-id="hf-w5nf" id="s4-ring-num">0</span></div>
+            </div>
+          </div>
+
+          <div data-hf-id="hf-nnhu" id="s4-workflow">
+            <p data-hf-id="hf-tagw" class="wf-label">Workflow</p>
+            <p data-hf-id="hf-hk7q" class="wf-line">Business analysis → DNA → score → website → outreach</p>
+          </div>
+
+          <div data-hf-id="hf-uqyk" id="s4-ready">
+            <svg data-hf-id="hf-8nvo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <circle data-hf-id="hf-jqh5" cx="12" cy="12" r="10" />
+              <path data-hf-id="hf-ebvf" d="m7.5 12.5 3 3 6-7" />
+            </svg>
+            Website ready
+          </div>
+
+          <p data-hf-id="hf-1tk6" id="s4-fineprint">Launch video shot before the website finished building. This can take a minute.</p>
+        </div>
+      </section>
+
+      <!-- ============ scene 5 : logo lockup (17.91 – 21.0) ============ -->
+      <section data-hf-id="hf-8mu3" id="s5" class="clip scene" data-start="17.91" data-duration="3.09" data-track-index="5">
+        <div data-hf-id="hf-0cf6" class="tile" id="s5-lockup">W</div>
+        <div data-hf-id="hf-9ocx" id="s5-word">Webloom</div>
+        <p data-hf-id="hf-au4i" id="s5-tagline">Research a real business. Understand its brand. Generate its website.</p>
+      </section>
+
+      <!-- ============ audio ============ -->
+      <audio data-hf-id="hf-yrca"
+        id="music"
+        src="assets/music/happy-beats-business-moves-vol-11-by-ende-dot-app.mp3"
+        data-start="0"
+        data-duration="21"
+        data-track-index="1"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":0},{"t":0.4,"v":0.3},{"t":19.8,"v":0.3},{"t":21,"v":0}]}]}'
+      ></audio>
+
+      <!-- keypresses during URL typing (3.88 – 5.48) -->
+      <audio data-hf-id="hf-qnlq" id="key-1" src="assets/sfx/keyboard/keypress-003.wav" data-start="3.88" data-volume="0.5" data-track-index="11"></audio>
+      <audio data-hf-id="hf-qsuc" id="key-2" src="assets/sfx/keyboard/keypress-007.wav" data-start="4.05" data-volume="0.5" data-track-index="12"></audio>
+      <audio data-hf-id="hf-7mco" id="key-3" src="assets/sfx/keyboard/keypress-012.wav" data-start="4.23" data-volume="0.5" data-track-index="13"></audio>
+      <audio data-hf-id="hf-4qtd" id="key-4" src="assets/sfx/keyboard/keypress-016.wav" data-start="4.42" data-volume="0.5" data-track-index="14"></audio>
+      <audio data-hf-id="hf-50d3" id="key-5" src="assets/sfx/keyboard/keypress-021.wav" data-start="4.62" data-volume="0.5" data-track-index="15"></audio>
+      <audio data-hf-id="hf-yyqe" id="key-6" src="assets/sfx/keyboard/keypress-025.wav" data-start="4.83" data-volume="0.5" data-track-index="16"></audio>
+      <audio data-hf-id="hf-yxhs" id="key-7" src="assets/sfx/keyboard/keypress-028.wav" data-start="5.05" data-volume="0.5" data-track-index="17"></audio>
+      <audio data-hf-id="hf-rexs" id="key-8" src="assets/sfx/keyboard/keypress-031.wav" data-start="5.27" data-volume="0.5" data-track-index="18"></audio>
+      <audio data-hf-id="hf-8xge" id="key-9" src="assets/sfx/keyboard/keypress-005.wav" data-start="5.48" data-volume="0.5" data-track-index="19"></audio>
+
+      <!-- click Analyse Business -->
+      <audio data-hf-id="hf-ubla" id="sfx-click" src="assets/sfx/ui/mouseclick1.ogg" data-start="5.8" data-volume="0.6" data-track-index="20"></audio>
+      <!-- checklist: first and last item only -->
+      <audio data-hf-id="hf-km9n" id="sfx-drop-1" src="assets/sfx/interface/drop_001.ogg" data-start="7.91" data-volume="0.65" data-track-index="21"></audio>
+      <audio data-hf-id="hf-nkyr" id="sfx-drop-2" src="assets/sfx/interface/drop_002.ogg" data-start="11.06" data-volume="0.65" data-track-index="22"></audio>
+      <!-- score ring lands -->
+      <audio data-hf-id="hf-h6z5" id="sfx-bell" src="assets/sfx/impact/impactBell_heavy_000.ogg" data-start="14.4" data-volume="0.5" data-track-index="23"></audio>
+      <!-- final logo accent -->
+      <audio data-hf-id="hf-02kd" id="sfx-logo" src="assets/sfx/interface/drop_003.ogg" data-start="17.96" data-volume="0.55" data-track-index="24"></audio>
+    </div>
+
+    <script>
+      gsap.registerPlugin(TextPlugin);
+
+      var tl = gsap.timeline({ paused: true });
+
+      /* ================= scene 1 : announce card ================= */
+      tl.fromTo("#s1-announce", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.3);
+      tl.fromTo("#s1-rule-l", { opacity: 0, scaleX: 0 }, { opacity: 1, scaleX: 1, duration: 0.6, ease: "power3.inOut" }, 0.34);
+      tl.fromTo("#s1-rule-r", { opacity: 0, scaleX: 0 }, { opacity: 1, scaleX: 1, duration: 0.6, ease: "power3.inOut" }, 0.34);
+      tl.fromTo(
+        "#s1-headline .hl-inner",
+        { opacity: 0, y: 48, scale: 1.05 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "power4.out" },
+        1.6
+      );
+      tl.fromTo(
+        "#s1-brand",
+        { opacity: 0, y: 20, scale: 0.9 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: "back.out(1.5)" },
+        2.9
+      );
+
+      /* ================= scene 2 : analyse form ================= */
+      tl.fromTo("#s2-form", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, 3.7);
+      tl.fromTo("#s2-side", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, 3.84);
+
+      var URL_TEXT = "https://maps.google.com/place/...";
+      tl.to("#s2-url", { text: { value: URL_TEXT }, duration: 1.7, ease: "none" }, 3.85);
+      tl.to("#s2-caret", { opacity: 0, duration: 0.12, repeat: 1, yoyo: true, ease: "steps(1)" }, 5.56);
+
+      tl.fromTo("#s2-cursor", { opacity: 0 }, { opacity: 1, duration: 0.18, ease: "none" }, 4.7);
+      tl.fromTo("#s2-cursor", { x: 0, y: 0 }, { x: -250, y: -270, duration: 0.87, ease: "power2.inOut" }, 4.85);
+
+      tl.to("#s2-cursor", { scale: 0.9, duration: 0.1, yoyo: true, repeat: 1, ease: "power2.out" }, 5.8);
+      tl.to("#s2-btn", { scale: 0.96, duration: 0.1, yoyo: true, repeat: 1, ease: "power2.out" }, 5.8);
+      tl.fromTo(
+        ".s2-ring",
+        { opacity: 0.5, scale: 0.25 },
+        { opacity: 0, scale: 1.7, duration: 0.7, ease: "power2.out", stagger: 0.09 },
+        5.8
+      );
+      tl.to("#s2-caret", { opacity: 0, duration: 0.05, ease: "none" }, 5.84);
+      tl.to("#s2-btn-label", { opacity: 0, duration: 0.1, ease: "none" }, 5.84);
+      tl.to("#s2-btn-load", { opacity: 1, duration: 0.14, ease: "none" }, 5.84);
+      tl.fromTo("#s2-spinner", { rotation: 0 }, { rotation: 720, duration: 1.6, ease: "none" }, 5.84);
+
+      /* ================= scene 3 : pipeline checklist ================= */
+      tl.fromTo("#s3-card", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.35, ease: "power3.out" }, 7.91);
+      tl.to("#s3-dot", { opacity: 0.3, duration: 0.55, repeat: 7, yoyo: true, ease: "sine.inOut" }, 8.3);
+
+      var STEP_TIMES = [7.91, 8.44, 8.96, 9.5, 10.01, 10.54, 11.06];
+      for (var i = 0; i < STEP_TIMES.length; i++) {
+        var sel = "#step-" + (i + 1);
+        tl.fromTo(sel, { opacity: 0, x: -14 }, { opacity: 1, x: 0, duration: 0.34, ease: "power2.out" }, STEP_TIMES[i]);
+        tl.fromTo(sel + " .step-circle", { scale: 0.55 }, { scale: 1, duration: 0.42, ease: "back.out(1.8)" }, STEP_TIMES[i]);
+      }
+
+      /* ================= scene 4 : the score ================= */
+      tl.fromTo("#s4-card", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, 12.65);
+      tl.fromTo("#s4-head", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }, 12.9);
+      tl.fromTo("#s4-chip", { opacity: 0, scale: 0.94 }, { opacity: 1, scale: 1, duration: 0.4, ease: "power3.out" }, 12.98);
+
+      var scoreState = { p: 0 };
+      var ringFill = document.getElementById("s4-ring-fill");
+      var scoreNum = document.getElementById("s4-num");
+      var ringNum = document.getElementById("s4-ring-num");
+      function renderScore() {
+        var pct = Math.round(scoreState.p * 100);
+        ringFill.style.background =
+          "conic-gradient(hsl(217 91% 62%) " + scoreState.p * 360 + "deg, hsl(225 22% 15%) 0deg)";
+        scoreNum.textContent = String(pct);
+        ringNum.textContent = String(pct);
+      }
+      renderScore();
+      tl.to(scoreState, { p: 0.78, duration: 1.3, ease: "power2.out", onUpdate: renderScore }, 13.1);
+      tl.fromTo("#s4-ring-wrap", { scale: 1 }, { scale: 1.05, duration: 0.16, yoyo: true, repeat: 1, ease: "power2.out" }, 14.4);
+
+      tl.fromTo("#s4-workflow", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.35, ease: "power3.out" }, 15.1);
+      tl.fromTo("#s4-ready", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.6)" }, 16.2);
+
+      /* ================= scene 5 : logo lockup ================= */
+      tl.fromTo("#s5-lockup", { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.7)" }, 17.96);
+      tl.fromTo("#s5-word", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" }, 18.1);
+      tl.fromTo("#s5-tagline", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.35, ease: "power3.out" }, 18.4);
+
+      /* ================= ambient mesh drift ================= */
+      tl.fromTo("#meshA", { x: -20, y: 10 }, { x: 20, y: -14, duration: 21, ease: "sine.inOut" }, 0);
+      tl.fromTo("#meshB", { x: 18, y: -12 }, { x: -16, y: 16, duration: 21, ease: "sine.inOut" }, 0);
+
+      /* ================= audio-reactive glow (pre-extracted, per frame) ================= */
+      (function () {
+        var AD = window.AUDIO_DATA;
+        if (!AD || !AD.frames || !AD.frames.length) return;
+        var N = Math.min(AD.totalFrames, Math.ceil(21 * AD.fps));
+        var rmsS = new Float32Array(N);
+        var bassS = new Float32Array(N);
+        var accR = 0;
+        var accB = 0;
+        for (var i = 0; i < N; i++) {
+          var fr = AD.frames[i];
+          accR = i === 0 ? fr.rms : accR * 0.65 + fr.rms * 0.35;
+          accB = i === 0 ? fr.bands[0] : accB * 0.65 + fr.bands[0] * 0.35;
+          rmsS[i] = accR;
+          bassS[i] = accB;
+        }
+        var mA = document.getElementById("meshA");
+        var mB = document.getElementById("meshB");
+        for (var f = 0; f < N; f++) {
+          tl.call(
+            (function (idx) {
+              return function () {
+                var bass = Math.min(1, bassS[idx] * 1.6);
+                var rms = Math.min(1, rmsS[idx] * 1.8);
+                mA.style.opacity = (0.5 + 0.5 * bass).toFixed(3);
+                mB.style.opacity = (0.4 + 0.45 * rms).toFixed(3);
+              };
+            })(f),
+            [],
+            f / AD.fps
+          );
+        }
+      })();
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

@@ -1,23 +1,15 @@
+/**
+ * Model Registry — Central registry for all AI models Webloom can use.
+ *
+ * Extends the fine-tuned model registry to include all available models
+ * from all providers, with capability tags, cost metadata, and routing hints.
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { MODEL_REGISTRY_FILE, MODELS_DIR } from './paths.js';
 import { AI_MODEL_METADATA_SCHEMA } from './contracts/common.js';
 import { validateSchema } from '../services/ai/AIResponseValidator.js';
-
-/**
- * Model registry — versioning for every model Webloom evaluates or deploys.
- *
- * Rules encoded here:
- *  - Every model has a semver-style id (webloom-ai-x.y.z) and a metadata
- *    record: foundation model, dataset versions, training/LoRA config,
- *    benchmark results, known weaknesses.
- *  - A model is never replaced blindly: setActive() keeps the previous
- *    record intact and every benchmark run is appended, so Model A vs
- *    Model B comparisons remain possible forever.
- *  - Exactly one model is active for each role ('baseline', 'production').
- *
- * Storage: models/registry.json at the repository root, written atomically.
- */
 
 const ROLE_TYPES = Object.freeze({ baseline: 'baseline', production: 'webloom' });
 
@@ -51,7 +43,6 @@ function writeFile(registry) {
   cacheMtimeMs = 0;
 }
 
-/** Drop the in-memory cache (tests, long-running processes after external edits). */
 export function reloadRegistry() {
   cache = null;
   cacheMtimeMs = 0;
@@ -64,12 +55,6 @@ export function loadRegistry() {
   return registry;
 }
 
-/**
- * Register (or update) a model. Metadata is validated against
- * AI_MODEL_METADATA_SCHEMA before it is allowed into the registry.
- *
- * @returns {object} the stored metadata
- */
 export function registerModel(metadata) {
   if (!metadata || typeof metadata !== 'object' || !metadata.id) {
     throw new Error('registerModel requires metadata with an id');
@@ -88,6 +73,19 @@ export function registerModel(metadata) {
     benchmarks: [],
     status: 'configured',
     registeredAt: new Date().toISOString(),
+    // Extended fields for routing
+    capabilities: [],
+    costPer1MInputTokensUSD: null,
+    costPer1MOutputTokensUSD: null,
+    freeTierAvailable: false,
+    freeTierLimits: null,
+    maxContextTokens: null,
+    maxOutputTokens: null,
+    supportsStructuredOutput: false,
+    supportsToolCalling: false,
+    supportsReasoning: false,
+    latencyP50Ms: null,
+    latencyP95Ms: null,
     ...metadata,
   };
 
@@ -117,9 +115,6 @@ export function listModels() {
   return loadRegistry().models.map((m) => ({ ...m }));
 }
 
-/**
- * The model currently active for a role: 'baseline' or 'production'.
- */
 export function getActiveModel(role) {
   const registry = loadRegistry();
   const id = registry.active?.[role] ?? null;
@@ -127,10 +122,6 @@ export function getActiveModel(role) {
   return registry.models.find((m) => m.id === id) ?? null;
 }
 
-/**
- * Activate a registered model for a role. Throws if the model is unknown.
- * The previous model stays in the registry — activation is a pointer move.
- */
 export function setActiveModel(role, id) {
   if (!ROLE_TYPES[role]) throw new Error(`Unknown registry role "${role}" (expected baseline|production)`);
   const registry = loadRegistry();
@@ -142,12 +133,6 @@ export function setActiveModel(role, id) {
   return id;
 }
 
-/**
- * Append a benchmark result to a model's record.
- *
- * @param {string} modelId
- * @param {object} record { runId, datasetVersion, split, tasks, backend, provider, metrics, runAt, promptVersion, inference }
- */
 export function recordBenchmark(modelId, record) {
   const registry = loadRegistry();
   const model = registry.models.find((m) => m.id === modelId);
@@ -160,10 +145,6 @@ export function recordBenchmark(modelId, record) {
   return entry;
 }
 
-/**
- * Compare two models on shared (datasetVersion, split, task) benchmark runs.
- * Returns only the intersections — incomparable runs are reported as skipped.
- */
 export function compareModels(idA, idB) {
   const a = getModel(idA);
   const b = getModel(idB);
@@ -194,14 +175,34 @@ export function compareModels(idA, idB) {
   };
 }
 
-/** Semver-ish bump used when cloning a model record for a new experiment. */
-export function bumpVersion(version, part = 'minor') {
-  const m = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(version || ''));
-  if (!m) throw new Error(`Not a semver x.y.z: ${version}`);
-  const [, maj, min, pat] = m.map(Number);
-  if (part === 'major') return `${maj + 1}.0.0`;
-  if (part === 'patch') return `${maj}.${min}.${pat + 1}`;
-  return `${maj}.${min + 1}.0`;
+export function getModelsByCapability(capability) {
+  return loadRegistry().models.filter((m) => m.capabilities?.includes(capability));
+}
+
+export function getModelsByProvider(provider) {
+  return loadRegistry().models.filter((m) => m.provider === provider);
+}
+
+export function getFreeTierModels(capability) {
+  return loadRegistry().models.filter((m) =>
+    m.freeTierAvailable && m.capabilities?.includes(capability)
+  );
+}
+
+export function estimateCost(modelId, promptTokens, completionTokens) {
+  const model = getModel(modelId);
+  if (!model || model.costPer1MInputTokensUSD === null || model.costPer1MOutputTokensUSD === null) {
+    return 0;
+  }
+  const inputCost = (promptTokens / 1_000_000) * model.costPer1MInputTokensUSD;
+  const outputCost = (completionTokens / 1_000_000) * model.costPer1MOutputTokensUSD;
+  return inputCost + outputCost;
+}
+
+export function getModelsWithFreeTier(capability) {
+  return loadRegistry().models.filter((m) =>
+    m.freeTierAvailable && m.capabilities?.includes(capability)
+  );
 }
 
 function round(n) {
@@ -218,5 +219,9 @@ export default {
   setActiveModel,
   recordBenchmark,
   compareModels,
-  bumpVersion,
+  getModelsByCapability,
+  getModelsByProvider,
+  getFreeTierModels,
+  estimateCost,
+  getModelsWithFreeTier,
 };
