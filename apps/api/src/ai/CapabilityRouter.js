@@ -4,8 +4,8 @@
  */
 
 import { config } from '../config/env.js';
-import { ModelRegistry, estimateCost, getModelsByCapability, getFreeTierModels } from './ModelRegistry.js';
-import { ProviderRegistry } from './ProviderRegistry.js';
+import ModelRegistry, { estimateCost, getModelsByCapability, getFreeTierModels } from './ModelRegistry.js';
+import ProviderRegistry from './ProviderRegistry.js';
 import { ProviderHealthMonitor } from './ProviderHealthMonitor.js';
 import { QuotaManager } from './QuotaManager.js';
 
@@ -258,7 +258,7 @@ class CapabilityRouter {
   getFreeTierCandidates(capability) {
     if (!this._modelRegistry) return [];
 
-    const freeModels = getFreeTierModels(capability);
+    const freeModels = this._modelRegistry.getFreeTierModels(capability);
     return freeModels.map(m => ({
       provider: m.provider,
       model: m.servingModel || m.id,
@@ -326,7 +326,7 @@ class CapabilityRouter {
     // Use ModelRegistry if available
     if (this._modelRegistry) {
       const modelId = `${provider}:${model}`;
-      return estimateCost(modelId, promptTokens, completionTokens);
+      return this._modelRegistry.estimateCost(modelId, promptTokens, completionTokens);
     }
 
     // Fallback estimates

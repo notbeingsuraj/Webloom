@@ -212,7 +212,8 @@ export class OutputValidator {
         }
       }
 
-    throw lastError;
+      throw lastError;
+    }
   }
 }
 
