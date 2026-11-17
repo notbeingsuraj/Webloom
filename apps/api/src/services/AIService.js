@@ -65,10 +65,12 @@ class AIService {
    * Get or create the AI Orchestrator instance.
    * Lazily initialized to avoid circular dependencies.
    */
-  get orchestrator() {
+  async getOrchestrator() {
     if (!this._orchestrator) {
-      this._orchestrator = new (require('../ai/AIOrchestrator.js').default)();
+      const { default: AIOrchestrator } = await import('../ai/AIOrchestrator.js');
+      this._orchestrator = new AIOrchestrator();
     }
+    await this._orchestrator._ensureInitialized();
     return this._orchestrator;
   }
 
@@ -598,70 +600,80 @@ class AIService {
    * @returns {Promise<object>} Result with output, provenance, and metadata
    */
   async generateByCapability(capability, input, options = {}) {
-    return this.orchestrator.execute(capability, input, options);
+    const orchestrator = await this.getOrchestrator();
+    return orchestrator.execute(capability, input, options);
   }
 
   /**
    * NEW: Check health of all AI providers.
    */
   async getAIHealthDetailed() {
-    return this.orchestrator.healthMonitor.getAllHealth();
+    const orchestrator = await this.getOrchestrator();
+    return orchestrator.healthMonitor.getAllHealth();
   }
 
   /**
    * NEW: Get cost tracking summary.
    */
-  getCostSummary(period = 'monthly') {
-    return this.orchestrator.costTracker.getSummary(period);
+  async getCostSummary(period = 'monthly') {
+    const orchestrator = await this.getOrchestrator();
+    return orchestrator.costTracker.getSummary(period);
   }
 
   /**
    * NEW: Get cost projection.
    */
-  getCostProjection() {
-    return this.orchestrator.costTracker.getProjection();
+  async getCostProjection() {
+    const orchestrator = await this.getOrchestrator();
+    return orchestrator.costTracker.getProjection();
   }
 
   /**
    * NEW: Get budget status.
    */
-  getBudgetStatus() {
-    return this.orchestrator.costTracker.getBudgetStatus();
+  async getBudgetStatus() {
+    const orchestrator = await this.getOrchestrator();
+    return orchestrator.costTracker.getBudgetStatus();
   }
 
   /**
    * NEW: Get provider health for a specific provider.
    */
   async getProviderHealth(provider) {
-    return this.orchestrator.healthMonitor.getDetailedHealth(provider);
+    const orchestrator = await this.getOrchestrator();
+    return orchestrator.healthMonitor.getDetailedHealth(provider);
   }
 
   /**
    * NEW: Run provider diagnostic.
    */
   async diagnoseProvider(provider) {
-    return this.orchestrator.healthMonitor.getDetailedHealth(provider);
+    const orchestrator = await this.getOrchestrator();
+    return orchestrator.healthMonitor.getDetailedHealth(provider);
   }
 
   /**
    * NEW: Get capability routing policy.
    */
-  getCapabilityPolicy(capability) {
-    return this.orchestrator.capabilityRouter.getPolicy(capability);
+  async getCapabilityPolicy(capability) {
+    const orchestrator = await this.getOrchestrator();
+    return orchestrator.capabilityRouter.getPolicy(capability);
   }
 
   /**
    * NEW: Get cost breakdown by capability.
    */
-  getCostByCapability() {
-    return this.orchestrator.costTracker.getByCapability();
+  async getCostByCapability() {
+    const orchestrator = await this.getOrchestrator();
+    return orchestrator.costTracker.getByCapability();
   }
 
   /**
    * NEW: Get cost breakdown by provider.
    */
-  getCostByProvider() {
-    return this.orchestrator.costTracker.getByProvider();
+  async getCostByProvider() {
+    const orchestrator = await this.getOrchestrator();
+    return orchestrator.costTracker.getByProvider();
   }
 
   /**

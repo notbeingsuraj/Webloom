@@ -1,6 +1,13 @@
 import { OpenRouterProvider } from './providers/OpenRouterProvider.js';
 import { GeminiProvider } from './providers/GeminiProvider.js';
 import { LocalProvider } from './providers/LocalProvider.js';
+import { MercuryProvider } from '../../ai/providers/MercuryProvider.js';
+import { NVIDIAProvider } from '../../ai/providers/NVIDIAProvider.js';
+import { DeepSeekProvider } from '../../ai/providers/DeepSeekProvider.js';
+import { TogetherAIProvider } from '../../ai/providers/TogetherAIProvider.js';
+import { FireworksAIProvider } from '../../ai/providers/FireworksAIProvider.js';
+import { HuggingFaceProvider } from '../../ai/providers/HuggingFaceProvider.js';
+import { SelfHostedProvider } from '../../ai/providers/SelfHostedProvider.js';
 import { AIError, AI_ERROR_CATEGORY } from './AIError.js';
 
 /**
@@ -12,6 +19,13 @@ const REGISTRY = {
   openrouter: OpenRouterProvider,
   gemini: GeminiProvider,
   local: LocalProvider,
+  mercury: MercuryProvider,
+  nvidia: NVIDIAProvider,
+  deepseek: DeepSeekProvider,
+  together: TogetherAIProvider,
+  fireworks: FireworksAIProvider,
+  huggingface: HuggingFaceProvider,
+  selfhosted: SelfHostedProvider,
 };
 
 export const KNOWN_PROVIDERS = Object.freeze(Object.keys(REGISTRY));

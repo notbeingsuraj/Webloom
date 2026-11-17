@@ -12,10 +12,9 @@ dotenv.config();
  * features, and /health/ai reports exactly which are available.
  */
 const hasAnyAIProviderKey = Boolean(
-  process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY || process.env.LOCAL_AI_BASE_URL ||
-  process.env.NVIDIA_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY ||
-  process.env.TOGETHER_API_KEY || process.env.FIREWORKS_API_KEY || process.env.HF_API_KEY ||
-  process.env.MERCURY_API_KEY,
+  process.env.MERCURY_API_KEY || process.env.NVIDIA_API_KEY || process.env.LOCAL_AI_BASE_URL ||
+  process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY || process.env.DEEPSEEK_API_KEY ||
+  process.env.TOGETHER_API_KEY || process.env.FIREWORKS_API_KEY || process.env.HF_API_KEY,
 );
 
 export const config = {
@@ -331,9 +330,20 @@ export const config = {
     maxRetries: parseInt(process.env.EXTRACTION_MAX_RETRIES) || 2,
     userAgent: 'Webloom/1.0 (+https://webloom.dev)',
   },
+  googleMapsScraper: {
+    enabled: process.env.GOOGLE_MAPS_SCRAPER_ENABLED === 'true',
+    baseUrl: process.env.GOOGLE_MAPS_SCRAPER_URL || 'http://localhost:8080',
+    timeoutMs: parseInt(process.env.GOOGLE_MAPS_SCRAPER_TIMEOUT_MS) || 180000,
+    concurrency: parseInt(process.env.GOOGLE_MAPS_SCRAPER_CONCURRENCY) || 2,
+    maxResults: parseInt(process.env.GOOGLE_MAPS_SCRAPER_MAX_RESULTS) || 100,
+    jobRetries: parseInt(process.env.GOOGLE_MAPS_SCRAPER_JOB_RETRIES) || 2,
+    emailExtraction: process.env.GOOGLE_MAPS_SCRAPER_EMAIL_EXTRACTION === 'true',
+    extraReviews: process.env.GOOGLE_MAPS_SCRAPER_EXTRA_REVIEWS === 'true',
+  },
+  // Geoapify configuration (DEPRECATED - Replaced by Google Maps Scraper)
+  // Kept for reference but not used in active pipeline
   geoapify: {
     apiKey: process.env.GEOAPIFY_API_KEY || null,
-    // Base endpoints
     baseUrl: process.env.GEOAPIFY_BASE_URL || 'https://api.geoapify.com/v2/places',
     geocodeUrl: process.env.GEOAPIFY_GEOCODE_URL || 'https://api.geoapify.com/v1/geocode/search',
     placeDetailsUrl: process.env.GEOAPIFY_PLACE_DETAILS_URL || 'https://api.geoapify.com/v2/place-details',

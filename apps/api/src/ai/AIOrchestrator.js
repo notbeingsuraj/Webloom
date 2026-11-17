@@ -21,32 +21,68 @@ import { config } from '../config/env.js';
 
 export class AIOrchestrator {
   constructor(options = {}) {
+    // Core registries - use options or create defaults
+    this._modelRegistry = options.modelRegistry ?? null;
+    this._providerRegistry = options.providerRegistry ?? null;
+    this._capabilityRouter = options.capabilityRouter ?? null;
+    this._healthMonitor = options.healthMonitor ?? null;
+    this._quotaManager = options.quotaManager ?? null;
+    this._circuitBreaker = options.circuitBreaker ?? null;
+    this._retryController = options.retryController ?? null;
+    this._outputValidator = options.outputValidator ?? null;
+    this._costTracker = options.costTracker ?? null;
+    this._executionLogger = options.executionLogger ?? null;
+    this._fallbackController = options.fallbackController ?? null;
+    this._cacheManager = options.cacheManager ?? null;
+
+    this._initialized = false;
+  }
+
+  async _ensureInitialized() {
+    if (this._initialized) return;
+    
+    // Dynamic imports to avoid require() in ESM
+    const { default: ModelRegistry } = await import('./ModelRegistry.js');
+    const { default: ProviderRegistry } = await import('./ProviderRegistry.js');
+    const { default: CapabilityRouter } = await import('./CapabilityRouter.js');
+    const { default: ProviderHealthMonitor } = await import('./ProviderHealthMonitor.js');
+    const { default: QuotaManager } = await import('./QuotaManager.js');
+    const { default: CircuitBreaker } = await import('./CircuitBreaker.js');
+    const { default: RetryController } = await import('./RetryController.js');
+    const { default: OutputValidator } = await import('./OutputValidator.js');
+    const { default: CostTracker } = await import('./CostTracker.js');
+    const { default: AIExecutionLogger } = await import('./AIExecutionLogger.js');
+    const { default: FallbackController } = await import('./FallbackController.js');
+    const { default: CacheManager } = await import('./CacheManager.js');
+
     // Core registries
-    this._modelRegistry = options.modelRegistry ?? new (require('./ModelRegistry.js').default)();
-    this._providerRegistry = options.providerRegistry ?? new (require('./ProviderRegistry.js').default)();
-    this._capabilityRouter = options.capabilityRouter ?? new (require('./CapabilityRouter.js').default)({
+    // ModelRegistry is an object with functions, not a class
+    this._modelRegistry = this._modelRegistry ?? ModelRegistry;
+    // ProviderRegistry is exported as a singleton instance
+    this._providerRegistry = this._providerRegistry ?? ProviderRegistry;
+    this._capabilityRouter = this._capabilityRouter ?? new CapabilityRouter({
       modelRegistry: this._modelRegistry,
       providerRegistry: this._providerRegistry,
     });
 
     // Resilience components
-    this._healthMonitor = options.healthMonitor ?? new (require('./ProviderHealthMonitor.js').default)();
-    this._quotaManager = options.quotaManager ?? new (require('./QuotaManager.js').default)();
-    this._circuitBreaker = options.circuitBreaker ?? new (require('./CircuitBreaker.js').default)();
-    this._retryController = options.retryController ?? new (require('./RetryController.js').default)();
+    this._healthMonitor = this._healthMonitor ?? new ProviderHealthMonitor();
+    this._quotaManager = this._quotaManager ?? new QuotaManager();
+    this._circuitBreaker = this._circuitBreaker ?? new CircuitBreaker();
+    this._retryController = this._retryController ?? new RetryController();
 
     // Validation & quality
-    this._outputValidator = options.outputValidator ?? new (require('./OutputValidator.js').default)();
+    this._outputValidator = this._outputValidator ?? new OutputValidator();
 
     // Observability & cost
-    this._costTracker = options.costTracker ?? new (require('./CostTracker.js').default)();
-    this._executionLogger = options.executionLogger ?? new (require('./AIExecutionLogger.js').default)();
+    this._costTracker = this._costTracker ?? new CostTracker();
+    this._executionLogger = this._executionLogger ?? new AIExecutionLogger();
 
     // Fallback & caching
-    this._fallbackController = options.fallbackController ?? new (require('./FallbackController.js').default)({
+    this._fallbackController = this._fallbackController ?? new FallbackController({
       capabilityRouter: this._capabilityRouter,
     });
-    this._cacheManager = options.cacheManager ?? new (require('./CacheManager.js').default)();
+    this._cacheManager = this._cacheManager ?? new CacheManager();
 
     // Wire up dependencies
     this._capabilityRouter.setDependencies({
@@ -63,15 +99,18 @@ export class AIOrchestrator {
     // Initialize provider registry
     this._providerRegistry.initialize();
 
-    // Config
-    this._config = config;
-    this._requestId = 0;
-  }
+    this._initialized = true;
+  
+  // Config
+  this._config = config;
+  this._requestId = 0;
+}
 
   /**
    * Main execution method — routes request to optimal provider.
    */
   async execute(capability, input, options = {}) {
+    await this._ensureInitialized();
     const requestId = `req_${Date.now()}_${++this._requestId}`;
     const startedAt = Date.now();
 

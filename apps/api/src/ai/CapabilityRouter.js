@@ -24,8 +24,7 @@ export const CAPABILITIES = Object.freeze([
 const DEFAULT_POLICIES = {
   business_extraction: {
     primary: 'mercury:mercury-3',
-    secondary: 'deepseek:deepseek-chat',
-    tertiary: 'together:meta-llama/Meta-Llama-3.1-70B-Instruct',
+    secondary: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b',
     fallback: 'local:llama3.1:8b',
     maxTokens: 2000,
     maxCostUSD: 0.001,
@@ -36,7 +35,6 @@ const DEFAULT_POLICIES = {
   business_research: {
     primary: 'mercury:mercury-3',
     secondary: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b',
-    tertiary: 'deepseek:deepseek-reasoner',
     fallback: 'deepseek:deepseek-chat',
     maxTokens: 6000,
     maxCostUSD: 0.010,
@@ -46,8 +44,7 @@ const DEFAULT_POLICIES = {
   },
   entity_resolution: {
     primary: 'mercury:mercury-3',
-    secondary: 'deepseek:deepseek-chat',
-    tertiary: 'together:meta-llama/Meta-Llama-3.1-70B-Instruct',
+    secondary: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b',
     fallback: 'local:llama3.1:8b',
     maxTokens: 1000,
     maxCostUSD: 0.0005,
@@ -57,8 +54,7 @@ const DEFAULT_POLICIES = {
   },
   review_analysis: {
     primary: 'mercury:mercury-3',
-    secondary: 'deepseek:deepseek-chat',
-    tertiary: 'together:meta-llama/Meta-Llama-3.1-8B-Instruct',
+    secondary: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b',
     fallback: 'local:llama3.1:8b',
     maxTokens: 1500,
     maxCostUSD: 0.001,
@@ -68,8 +64,7 @@ const DEFAULT_POLICIES = {
   },
   sentiment_classification: {
     primary: 'mercury:mercury-3',
-    secondary: 'deepseek:deepseek-chat',
-    tertiary: 'together:meta-llama/Meta-Llama-3.1-8B-Instruct',
+    secondary: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b',
     fallback: 'local:llama3.1:8b',
     maxTokens: 500,
     maxCostUSD: 0.0003,
@@ -80,7 +75,6 @@ const DEFAULT_POLICIES = {
   competitor_analysis: {
     primary: 'mercury:mercury-3',
     secondary: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b',
-    tertiary: 'deepseek:deepseek-reasoner',
     fallback: 'deepseek:deepseek-chat',
     maxTokens: 4000,
     maxCostUSD: 0.005,
@@ -91,7 +85,6 @@ const DEFAULT_POLICIES = {
   trend_classification: {
     primary: 'mercury:mercury-3',
     secondary: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b',
-    tertiary: 'deepseek:deepseek-reasoner',
     fallback: 'deepseek:deepseek-chat',
     maxTokens: 3000,
     maxCostUSD: 0.003,
@@ -102,7 +95,6 @@ const DEFAULT_POLICIES = {
   report_generation: {
     primary: 'mercury:mercury-3',
     secondary: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b',
-    tertiary: 'deepseek:deepseek-chat',
     fallback: 'deterministic',
     maxTokens: 8000,
     maxCostUSD: 0.020,
@@ -112,8 +104,7 @@ const DEFAULT_POLICIES = {
   },
   structured_output: {
     primary: 'mercury:mercury-3',
-    secondary: 'deepseek:deepseek-chat',
-    tertiary: 'together:meta-llama/Meta-Llama-3.1-70B-Instruct',
+    secondary: 'nvidia:nvidia/nemotron-3-ultra-550b-a55b',
     fallback: 'json_repair',
     maxTokens: 2000,
     maxCostUSD: 0.001,

@@ -7,7 +7,6 @@
  */
 
 import BusinessProfile from './BusinessProfile.js';
-import GeoapifyProvider from './providers/GeoapifyProvider.js';
 import WebExtractionProvider from './providers/WebExtractionProvider.js';
 import GoogleMapsUrlParserProvider from './GoogleMapsUrlParserProvider.js';
 import { extractDeterministicHints } from './providers/ProviderAdapter.js';
@@ -21,6 +20,12 @@ import { analyzeEntityRelocation, TEMPORAL_VERDICT } from './TemporalRelocationA
 import { looksLikeStreetAddress } from '../utils/streetAddressDetector.js';
 import { mergeRecordThroughPipeline, runFallbackPipeline, runReputationPipeline, runAIEnrichmentPipeline } from './CandidatePipeline.js';
 import OfficialWebsiteProvider from './OfficialWebsiteProvider.js';
+import { 
+  GoogleMapsScraperAdapter, 
+  ScrapingResultNormalizer,
+  ScrapingJobManager,
+  GoogleMapsUrlParser 
+} from '../scraping/index.js';
 
 /**
  * Field keys the enrichment prompt asks for, in the order they are requested.
@@ -544,7 +549,7 @@ class BusinessResearchService {
   }
 
   // =========================================================================
-  // PROVIDER ORCHESTRATION (Geoapify-first, with web-extraction fallback)
+  // PROVIDER ORCHESTRATION (Google Maps Scraper-first, with web-extraction fallback)
   // =========================================================================
 
   /**
@@ -552,7 +557,7 @@ class BusinessResearchService {
    *
    * Pipeline order (data priority):
    *   1. Deterministic data from input (name, coords)
-   *   2. Geoapify structured place information (if available)
+   *   2. Google Maps Scraper structured place information (if available)
    *   3. Existing web-extraction fallback (for missing fields)
    *   4. AI enrichment (fill gaps only, never overwrite high-confidence)
    *   5. Schema validation
@@ -564,7 +569,7 @@ class BusinessResearchService {
     const { forceRefresh = false, ...restInput } = input;
     const hints = await this._buildHints(restInput);
     const profile = new BusinessProfile();
-    const providerTrace = { geoapify: null, webExtraction: null, officialWebsite: null, aiEnrichment: false };
+    const providerTrace = { googleMapsScraper: null, webExtraction: null, officialWebsite: null, aiEnrichment: false };
     const sourceUrl = input.googleMapsUrl || input.sourceUrl || null;
 
     // --- LEVEL 1: deterministic data from input (IDENTIFIED provenance) ---
@@ -575,73 +580,126 @@ class BusinessResearchService {
       profile.set('location.coordinates', { lat: hints.latitude, lng: hints.longitude }, 'identified', 0.8, { sourceUrl });
     }
 
-    // --- LEVEL 2: Geoapify structured data (provider provenance) ---
-    // ONE acquisition: search() returns the lossless AcquisitionResult
-    // (status, records, error, diagnostics). selectBestRecord() locally picks
-    // the best match; enrichRecord() best-effort adds place-details for the
-    // chosen record ONLY. There is no second search when the first returns no
-    // record — the diagnostics come from the same acquisition call (#2).
+    // --- LEVEL 2: Google Maps Scraper structured data (provider provenance) ---
+    // Uses gosom/google-maps-scraper via REST API (Dockerized worker).
+    // Supports both single-business (place URL) and multi-business (search URL) modes.
+    // Results are normalized through ScrapingResultNormalizer with 'discovered' provenance.
     //
-    // P1.7: After selectBestRecord, validate that the selected record's
+    // P1.7: After normalization, validate that the selected record's
     // coordinates are compatible with the authoritative URL/operator
-    // coordinates. A candidate in a different city (e.g. Tarn Taran vs Sri
-    // Ganganagar, 165 km apart) must be rejected even if it is the only
-    // Geoapify result.
-    let geoapifyRecord = null;
-    if (GeoapifyProvider.isAvailable()) {
-      const geoResult = await GeoapifyProvider.search(hints);
-      providerTrace.geoapify = geoResult.status;
-      providerTrace.geoapifyError = geoResult.error || null;
-      if (config?.debugBusinessAnalysis) {
-        providerTrace.geoapifyDiagnostics = geoResult.diagnostics || null;
-      }
-
-      const best = GeoapifyProvider.selectBestRecord(geoResult, hints);
-      if (best) {
-        // P1.7: Coordinate-anchor validation. When authoritative coordinates
-        // are available (a /place/ URL's @lat,lng or explicit operator-supplied
-        // coordinates; NOT a search-URL viewport), the selected record must be
-        // within a reasonable geographic radius. This prevents a name-only
-        // search from silently returning a different business in another city.
-        // hints.coordinatesAuthoritative (set in _buildHints) distinguishes
-        // coordinates that anchor identity from coordinates that merely bias
-        // the search ranking.
-        const selectedRecord = await GeoapifyProvider.enrichRecord(best, {
-          lat: hints?.latitude,
-          lng: hints?.longitude,
-        });
-        const geoapifyCoords = selectedRecord?.location?.coordinates;
-        const urlLat = hints?.latitude;
-        const urlLng = hints?.longitude;
-        let coordinateReject = false;
-        if (geoapifyCoords && urlLat != null && urlLng != null && hints?.coordinatesAuthoritative === true) {
-          const dist = Math.hypot(geoapifyCoords.lat - urlLat, geoapifyCoords.lng - urlLng);
-          // 0.35° ≈ ~39 km: generous enough for pin-vs-centroid drift, but
-          // tight enough to reject a business 165 km away in a different state.
-          const MAX_DEVIATION_DEGREES = 0.35;
-          if (dist > MAX_DEVIATION_DEGREES) {
-            coordinateReject = true;
-            console.warn(
-              `[P1.7] Geoapify candidate rejected: coordinates ${geoapifyCoords.lat},${geoapifyCoords.lng} are ` +
-              `${dist.toFixed(2)}° from authoritative coordinates ${urlLat},${urlLng}. ` +
-              `Candidate city: ${selectedRecord?.location?.city || 'unknown'} — likely a different business.`,
-            );
-            providerTrace.geoapify = 'coordinate_rejected';
+    // coordinates. A candidate in a different city must be rejected even if it is the only result.
+    let scraperRecord = null;
+    const scraperAdapter = new GoogleMapsScraperAdapter();
+    const scraperNormalizer = new ScrapingResultNormalizer();
+    
+    // Check if scraper is configured and available
+    const scraperHealth = await scraperAdapter.healthCheck();
+    if (scraperHealth.healthy) {
+      try {
+        let scraperResults;
+        
+        // Determine scraping mode based on URL type
+        const scrapingMode = sourceUrl ? GoogleMapsUrlParser.getScrapingMode(sourceUrl) : 'multi';
+        
+        if (scrapingMode === 'single' && sourceUrl) {
+          // Single business mode - direct place URL
+          scraperResults = await scraperAdapter.scrapeSingleBusiness(sourceUrl, {
+            onProgress: (job) => {
+              if (config?.debugBusinessAnalysis) {
+                console.log(`[GoogleMapsScraper] Progress: ${job.progress}%, ${job.completedPlaces}/${job.totalPlaces}`);
+              }
+            },
+          });
+        } else {
+          // Multi-business discovery mode - use search query from hints
+          const searchQuery = hints.query || hints.name || null;
+          const location = hints.city ? `${hints.city}${hints.state ? ', ' + hints.state : ''}${hints.country ? ', ' + hints.country : ''}` : null;
+          
+          if (searchQuery) {
+            scraperResults = await scraperAdapter.scrapeMultiBusiness({
+              query: searchQuery,
+              location,
+              maxResults: 10,
+              depth: 1,
+              onProgress: (job) => {
+                if (config?.debugBusinessAnalysis) {
+                  console.log(`[GoogleMapsScraper] Progress: ${job.progress}%, ${job.completedPlaces}/${job.totalPlaces}`);
+                }
+              },
+            });
           }
         }
-        if (!coordinateReject) {
-          geoapifyRecord = selectedRecord;
-          await this._mergeCanonical(profile, geoapifyRecord, 'discovered', 'geoapify', sourceUrl);
-          providerTrace.geoapify = 'ok';
+        
+        providerTrace.googleMapsScraper = scraperResults ? 'ok' : 'no_results';
+        
+        if (scraperResults && scraperResults.businesses && scraperResults.businesses.length > 0) {
+          // Normalize all results with provenance tracking
+          const normalized = scraperNormalizer.normalizeBatch(scraperResults.businesses, {
+            sourceUrl,
+            hints,
+            authoritativeCoordinates: hints.coordinatesAuthoritative ? { lat: hints.latitude, lng: hints.longitude } : null,
+          });
+          
+          // Select best record using the same logic as before
+          const best = this._selectBestScraperRecord(normalized.records, hints);
+          
+          if (best) {
+            // P1.7: Coordinate-anchor validation
+            const scraperCoords = best.location?.coordinates?.value;
+            const urlLat = hints?.latitude;
+            const urlLng = hints?.longitude;
+            let coordinateReject = false;
+            
+            if (scraperCoords && urlLat != null && urlLng != null && hints?.coordinatesAuthoritative === true) {
+              const dist = Math.hypot(scraperCoords.lat - urlLat, scraperCoords.lng - urlLng);
+              // 0.35° ≈ ~39 km: generous enough for pin-vs-centroid drift, but
+              // tight enough to reject a business 165 km away in a different state.
+              const MAX_DEVIATION_DEGREES = 0.35;
+              if (dist > MAX_DEVIATION_DEGREES) {
+                coordinateReject = true;
+                console.warn(
+                  `[P1.7] Google Maps Scraper candidate rejected: coordinates ${scraperCoords.lat},${scraperCoords.lng} are ` +
+                  `${dist.toFixed(2)}° from authoritative coordinates ${urlLat},${urlLng}. ` +
+                  `Candidate city: ${best.location?.city?.value || 'unknown'} — likely a different business.`,
+                );
+                providerTrace.googleMapsScraper = 'coordinate_rejected';
+              }
+            }
+            
+            if (!coordinateReject) {
+              scraperRecord = this._convertNormalizedToRecord(best);
+              await this._mergeCanonical(profile, scraperRecord, 'discovered', 'google_maps_scraper', sourceUrl);
+              providerTrace.googleMapsScraper = 'ok';
+            }
+          }
+          
+          // Track duplicates for observability
+          if (normalized.duplicates.length > 0) {
+            providerTrace.googleMapsScraperDuplicates = normalized.duplicates.length;
+          }
+          
+          if (config?.debugBusinessAnalysis) {
+            console.log(`[GoogleMapsScraper] Found ${scraperResults.businesses.length} businesses, ${normalized.records.length} unique after dedup`);
+          }
+        } else {
+          providerTrace.googleMapsScraper = 'no_results';
+          if (config?.debugBusinessAnalysis) {
+            console.log('[GoogleMapsScraper] No businesses found');
+          }
         }
-      }
-      if (config?.debugBusinessAnalysis) {
-        console.log(`[Geoapify] status=${geoResult.status}, error=${geoResult.error?.safeMessage || 'none'}`);
+      } catch (error) {
+        providerTrace.googleMapsScraper = 'error';
+        providerTrace.googleMapsScraperError = error.message;
+        console.error('[GoogleMapsScraper] Extraction failed:', error.message);
       }
     } else {
-      console.error('Geoapify provider unavailable; using fallback extraction.');
-      providerTrace.geoapify = 'not_configured';
+      console.error('Google Maps Scraper unavailable; using fallback extraction.');
+      providerTrace.googleMapsScraper = 'unavailable';
+      providerTrace.googleMapsScraperError = scraperHealth.error || 'Health check failed';
     }
+    
+    // Cleanup
+    scraperAdapter.destroy();
 
     // --- LEVEL 3: web-extraction fallback / completion of gaps ---
     let webRecord = null;
@@ -659,11 +717,11 @@ class BusinessResearchService {
         webRecord = webResult.records[0];
         providerTrace.webExtraction = 'ok';
         
-        // When both Geoapify and web-extraction records exist, use Entity Resolution
+        // When both Google Maps Scraper and web-extraction records exist, use Entity Resolution
         // to determine if they represent the same business before merging.
-        if (geoapifyRecord) {
+        if (scraperRecord) {
           try {
-            const matchResult = calculateMatchScore(geoapifyRecord, webRecord);
+            const matchResult = calculateMatchScore(scraperRecord, webRecord);
             const resolutionInfo = {
               score: parseFloat(matchResult.score.toFixed(2)),
               matchType: matchResult.matchType,
@@ -672,12 +730,12 @@ class BusinessResearchService {
             };
             
             if (config?.debugBusinessAnalysis) {
-              console.log(`[EntityResolution] geoapify vs web_extraction: score=${resolutionInfo.score}, matchType=${resolutionInfo.matchType}`);
+              console.log(`[EntityResolution] google_maps_scraper vs web_extraction: score=${resolutionInfo.score}, matchType=${resolutionInfo.matchType}`);
             }
             
             // Decide merge behavior based on entity resolution result
             if (matchResult.matchType === 'same_entity') {
-              // Confident match: normal merge behavior with onlyIfMissing=true to preserve Geoapify
+              // Confident match: normal merge behavior with onlyIfMissing=true to preserve Google Maps Scraper
               await this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ true, resolutionInfo);
             } else if (matchResult.matchType === 'uncertain') {
               // Uncertain match: very conservative merge (only fill true gaps)
@@ -701,7 +759,7 @@ class BusinessResearchService {
             await this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ true);
           }
         } else {
-          // No Geoapify record: merge web-extraction normally
+          // No Google Maps Scraper record: merge web-extraction normally
           await this._mergeCanonical(profile, webRecord, 'discovered', 'web_extraction', sourceUrl, /* onlyIfMissing= */ false);
         }
       } else {
@@ -716,7 +774,7 @@ class BusinessResearchService {
     }
 
     // --- LEVEL 3.5: P1.8 source-grounded Google Maps fallback ---
-    // When Geoapify omits fields (address/phone/email/website) that the
+    // When Google Maps Scraper omits fields (address/phone/email/website) that the
     // supplied Google Maps source actually contains, recover them from the
     // source before any AI enrichment. Deterministic first (URL parser +
     // provider record), then evidence-grounded AI extraction ONLY when the
@@ -729,11 +787,11 @@ class BusinessResearchService {
 
       // Structured source evidence available without any fetch:
       //   - exact Google Maps source identity (placeId, coordinates)
-      //   - best provider record (Geoapify) for fields Geoapify returned
+      //   - best provider record (Google Maps Scraper) for fields returned
       //   - retrieved page text when web extraction visited a Google Maps page
       const sourceEvidences = [];
       if (parsedSource) sourceEvidences.push(parsedSource);
-      const providerRecordForFallback = geoapifyRecord || webRecord || null;
+      const providerRecordForFallback = scraperRecord || webRecord || null;
 
       // Fetch the source text ONLY when we have a URL and fields are still
       // missing. If web extraction already retrieved visible text, reuse it —
@@ -791,7 +849,7 @@ class BusinessResearchService {
 
     // --- LEVEL 3.9: P1.9 Google reputation extraction (rating/reviews) ---
     // Google Maps visibly contains ratings + reviews, but the provider chain
-    // (Geoapify rarely returns ratings; web extraction omits them). Recover
+    // (Google Maps Scraper returns ratings; web extraction omits them). Recover
     // reputation ONLY from actual evidence: structured provider record first,
     // then deterministic source-text parsing, then evidence-grounded AI.
     // AI NEVER guesses a rating or estimates a review count.
@@ -799,7 +857,7 @@ class BusinessResearchService {
     // webRecord metadata or a fresh fetch, never double-fetch when possible.
     {
       const { extractReputation } = await import('./GoogleMapsReputationExtractor.js');
-      const providerRecordForReputation = geoapifyRecord || webRecord || null;
+      const providerRecordForReputation = scraperRecord || webRecord || null;
 
       let reputationSourceText = webRecord?.metadata?.sourceText || null;
       if (!reputationSourceText && sourceUrl) {
@@ -870,8 +928,8 @@ class BusinessResearchService {
     // fail the research pipeline, but is logged/surfaced, never treated as
     // "identity not found".
     let persistence = { status: 'skipped', entityId: null };
-    if (geoapifyRecord || webRecord) {
-      persistence = await this._persistIdentity(profile, hints, sourceUrl, geoapifyRecord, webRecord);
+    if (scraperRecord || webRecord) {
+      persistence = await this._persistIdentity(profile, hints, sourceUrl, scraperRecord, webRecord);
     }
 
     const intelligence = this._profileToIntelligence(profile, hints, providerTrace);
@@ -884,7 +942,7 @@ class BusinessResearchService {
     const exposedProviderTrace = config?.debugBusinessAnalysis
       ? providerTrace
       : {
-          geoapify: providerTrace.geoapify,
+          googleMapsScraper: providerTrace.googleMapsScraper,
           webExtraction: providerTrace.webExtraction,
           // Status only — never the probed/attempted URLs, which are model
           // guesses and internal crawl detail.
@@ -930,11 +988,11 @@ class BusinessResearchService {
    * @param {BusinessProfile} profile
    * @param {Object} hints
    * @param {string|null} sourceUrl
-   * @param {Object|null} geoapifyRecord
+   * @param {Object|null} scraperRecord
    * @param {Object|null} webRecord
    * @returns {Promise<Object>} { status, entityId, providerIdentities, resolutionRecord }
    */
-  async _persistIdentity(profile, hints, sourceUrl, geoapifyRecord, webRecord) {
+  async _persistIdentity(profile, hints, sourceUrl, scraperRecord, webRecord) {
     let repo;
     let transientEntityId = null;
     try {
@@ -959,21 +1017,21 @@ class BusinessResearchService {
     }
 
     // Build ordered list of provider observations to persist.
-    // Geoapify is the primary/authoritative provider; web-extraction is secondary.
+    // Google Maps Scraper is the primary/authoritative provider; web-extraction is secondary.
     //
     // P1.7: When the Google Maps URL carries an authoritative placeId/cid,
-    // use THAT as the providerRecordId for geoapify — not the raw URL.
+    // use THAT as the providerRecordId for the scraper — not the raw URL.
     // The raw URL changes with tracking parameters and is not a stable
     // identity key. A deterministic placeId from the URL is the correct
     // identifier for the provider mapping, ensuring repeat lookups resolve
     // to the same persistent entity.
     const urlPlaceId = hints?.placeId || hints?.cid || null;
     const observations = [];
-    if (geoapifyRecord) {
+    if (scraperRecord) {
       observations.push({
-        record: geoapifyRecord,
-        provider: 'geoapify',
-        providerRecordId: urlPlaceId || geoapifyRecord?.provider?.placeId || sourceUrl || null,
+        record: scraperRecord,
+        provider: 'google_maps_scraper',
+        providerRecordId: urlPlaceId || scraperRecord?.provider?.placeId || sourceUrl || null,
       });
     }
     if (webRecord) {
@@ -1027,7 +1085,7 @@ class BusinessResearchService {
           return { status: 'insufficient_evidence', entityId: null, providerIdentities: [], resolutionRecord: null };
         }
 
-        // Pick the canonical name. A provider (esp. Geoapify when the search
+        // Pick the canonical name. A provider (esp. Google Maps Scraper when the search
         // drifts to a street-level feature) can return a street address in the
         // `name` field. The URL-derived hint name is authoritative identity;
         // an address-looking string must not become the canonical business name.
@@ -2103,6 +2161,77 @@ class BusinessResearchService {
   // entity state. This method rebuilds a fresh BusinessProfile and regenerates
   // the canonical intelligence snapshot deterministically.
   // ===========================================================================
+
+  /**
+   * Select the best record from normalized scraper results.
+   * Uses the same logic as GeoapifyProvider.selectBestRecord.
+   *
+   * @param {Array} records - Normalized records from ScrapingResultNormalizer
+   * @param {Object} hints - Search hints with coordinates
+   * @returns {Object|null} Best matching record
+   */
+  _selectBestScraperRecord(records, hints = {}) {
+    if (!records || records.length === 0) return null;
+    
+    const lat = hints?.latitude;
+    const lng = hints?.longitude;
+    const authoritative = lat != null && lng != null && hints?.coordinatesAuthoritative === true;
+    const MAX_DEVIATION_DEGREES = 0.35;
+    
+    let candidates = records;
+    
+    // Filter by authoritative coordinates if available
+    if (authoritative) {
+      const nearCandidates = records.filter((rec) => {
+        const c = rec.location?.coordinates?.value;
+        if (!c) return false;
+        const dist = Math.hypot(c.lat - lat, c.lng - lng);
+        return dist <= MAX_DEVIATION_DEGREES;
+      });
+      if (nearCandidates.length === 0) return null;
+      candidates = nearCandidates;
+    }
+    
+    // Select best by distance to coordinates, or first if no coordinates
+    let best = candidates[0];
+    if (lat != null && lng != null) {
+      let bestDist = Infinity;
+      for (const rec of candidates) {
+        const c = rec.location?.coordinates?.value;
+        if (!c) continue;
+        const d = Math.hypot(c.lat - lat, c.lng - lng);
+        if (d < bestDist) {
+          bestDist = d;
+          best = rec;
+        }
+      }
+    }
+    
+    return best;
+  }
+
+  /**
+   * Convert normalized record (with provenance wrappers) to plain record format
+   * expected by _mergeCanonical and other pipeline methods.
+   *
+   * @param {Object} normalized - Normalized record with {value, confidence, provenance, evidence}
+   * @returns {Object} Plain record
+   */
+  _convertNormalizedToRecord(normalized) {
+    if (!normalized) return null;
+    
+    const unwrap = (obj) => {
+      if (!obj || typeof obj !== 'object') return obj;
+      if (obj.value !== undefined) return obj.value;
+      const result = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = unwrap(value);
+      }
+      return result;
+    };
+    
+    return unwrap(normalized);
+  }
 
   /**
    * Rebuild canonical business intelligence from a persisted entity's

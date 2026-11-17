@@ -13,10 +13,6 @@ export class NVIDIAProvider extends OpenAICompatibleProvider {
     return 'NVIDIA NIM';
   }
 
-  get name() {
-    return 'nvidia';
-  }
-
   get type() {
     return 'nvidia';
   }
