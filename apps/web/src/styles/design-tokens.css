@@ -1,0 +1,533 @@
+/**
+ * Webloom Design Tokens — BLACKSITE INTELLIGENCE Design System
+ * 
+ * Codename: BLACKSITE INTELLIGENCE
+ * An elite cyber intelligence organization aesthetic.
+ * Military intelligence interfaces, professional cybersecurity software, premium enterprise product design.
+ */
+
+:root {
+  /* ==========================================================================
+     COLOR SYSTEM
+     ========================================================================== */
+  
+  /* --- Primary Backgrounds (Near-black charcoal) --- */
+  --color-bg-primary: #090B0E;       /* Near-black charcoal - primary background */
+  --color-bg-secondary: #0E1217;     /* Secondary background */
+  --color-bg-elevated: #131920;      /* Elevated panels */
+  --color-bg-panel: #171F27;         /* Secondary panels */
+  
+  /* --- Borders --- */
+  --color-border-primary: #252D35;   /* Primary borders */
+  --color-border-subtle: #1E2530;    /* Subtle low-contrast separators */
+  
+  /* --- Text --- */
+  --color-text-primary: #E8EDF2;     /* Primary text */
+  --color-text-secondary: #8C99A6;   /* Secondary text */
+  --color-text-muted: #56616C;       /* Muted text */
+  
+  /* --- Accent & Semantic Colors --- */
+  --color-accent: #A3B18A;           /* Muted tactical green - primary accent */
+  --color-accent-hover: #8FA378;
+  --color-accent-muted: #6B7A5E;
+  
+  --color-warning: #E8B44D;          /* Amber - warnings and attention */
+  --color-warning-hover: #D4A03A;
+  
+  --color-danger: #D96B6B;           /* Muted red - failures and critical findings */
+  --color-danger-hover: #C45858;
+  
+  --color-info: #7AA2E3;             /* Steel blue - informational states */
+  --color-info-hover: #5D8BD9;
+  
+  --color-success: #8FC48F;          /* Success states */
+  --color-success-hover: #78B878;
+  
+  /* --- Status/State Colors (matching existing) --- */
+  --color-verified: #8FC48F;         /* Green - verified/confirmed */
+  --color-verified-bg: #0F2A1A;
+  --color-opportunity: #E8B44D;      /* Amber - high opportunity */
+  --color-opportunity-bg: #2A220D;
+  --color-primary: #6366F1;          /* Indigo - primary actions */
+  --color-primary-hover: #4F46E5;
+  --color-primary-bg: #1E1B3A;
+  --color-creative: #F59E0B;         /* Amber - creative/website */
+  --color-creative-bg: #2A220D;
+  
+  /* --- Legacy compatibility (map to new system) --- */
+  --color-background: var(--color-bg-primary);
+  --color-surface: var(--color-bg-elevated);
+  --color-surface-hover: var(--color-bg-panel);
+  --color-border: var(--color-border-primary);
+  --color-border-muted: var(--color-border-subtle);
+  --color-foreground: var(--color-text-primary);
+  --color-foreground-muted: var(--color-text-secondary);
+  --color-foreground-subtle: var(--color-text-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: #0E1217;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: var(--color-bg-panel);
+  --color-secondary-foreground: var(--color-text-primary);
+  --color-destructive: var(--color-danger);
+  --color-destructive-foreground: #FFFFFF;
+  --color-muted: var(--color-text-muted);
+  --color-muted-foreground: var(--color-text-muted);
+  --color-ring: var(--color-border-primary);
+  
+  /* ==========================================================================
+     TYPOGRAPHY SYSTEM
+     ========================================================================== */
+  
+  /* Font Families */
+  --font-sans: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Geist Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-serif: 'IBM Plex Serif', Georgia, serif;
+  
+  /* Display Typography */
+  --font-display: var(--font-sans);
+  --font-display-weight: 700;
+  --font-display-tracking: -0.05em;
+  
+  /* Heading Scale */
+  --text-display-xl: clamp(2.5rem, 5vw, 4rem);
+  --text-display-lg: clamp(2rem, 4vw, 3rem);
+  --text-display-md: clamp(1.5rem, 3vw, 2.25rem);
+  --text-display-sm: clamp(1.25rem, 2.5vw, 1.75rem);
+  --text-heading-lg: 1.5rem;
+  --text-heading-md: 1.25rem;
+  --text-heading-sm: 1.125rem;
+  --text-heading-xs: 1rem;
+  
+  /* Body Text */
+  --text-lg: 1.125rem;     /* 18px */
+  --text-base: 1rem;       /* 16px */
+  --text-sm: 0.875rem;     /* 14px */
+  --text-xs: 0.75rem;      /* 12px */
+  --text-xs2: 0.6875rem;   /* 11px */
+  
+  /* Monospace */
+  --text-mono: var(--font-mono);
+  --text-mono-sm: 0.8125rem;   /* 13px */
+  --text-mono-xs: 0.6875rem;   /* 11px */
+  
+  /* Letter spacing */
+  --tracking-tight: -0.05em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.05em;
+  --tracking-wider: 0.1em;
+  --tracking-widest: 0.16em;
+  
+  /* Line heights */
+  --leading-tight: 1.1;
+  --leading-snug: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+  --leading-loose: 2;
+  
+  /* ==========================================================================
+     SPACING SYSTEM
+     ========================================================================== */
+  
+  --space-0: 0;
+  --space-px: 1px;
+  --space-0_5: 0.125rem;  /* 2px */
+  --space-1: 0.25rem;     /* 4px */
+  --space-1_5: 0.375rem;  /* 6px */
+  --space-2: 0.5rem;      /* 8px */
+  --space-2_5: 0.625rem;  /* 10px */
+  --space-3: 0.75rem;     /* 12px */
+  --space-3_5: 0.875rem;  /* 14px */
+  --space-4: 1rem;        /* 16px */
+  --space-5: 1.25rem;     /* 20px */
+  --space-6: 1.5rem;      /* 24px */
+  --space-7: 1.75rem;     /* 28px */
+  --space-8: 2rem;        /* 32px */
+  --space-9: 2.25rem;     /* 36px */
+  --space-10: 2.5rem;     /* 40px */
+  --space-12: 3rem;       /* 48px */
+  --space-14: 3.5rem;     /* 56px */
+  --space-16: 4rem;       /* 64px */
+  --space-20: 5rem;       /* 80px */
+  --space-24: 6rem;       /* 96px */
+  
+  /* ==========================================================================
+     BORDER RADIUS
+     ========================================================================== */
+  --radius-none: 0;
+  --radius-xs: 0.125rem;   /* 2px */
+  --radius-sm: 0.25rem;    /* 4px */
+  --radius-md: 0.375rem;   /* 6px */
+  --radius-lg: 0.5rem;     /* 8px */
+  --radius-xl: 0.75rem;    /* 12px */
+  --radius-2xl: 1rem;      /* 16px */
+  --radius-3xl: 1.5rem;    /* 24px */
+  --radius-full: 9999px;
+  
+  /* ==========================================================================
+     SHADOWS & EFFECTS
+     ========================================================================== */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  
+  /* Glow effects */
+  --glow-primary: 0 0 20px -5px rgb(99 102 241 / 0.4);
+  --glow-primary-strong: 0 0 30px -5px rgb(99 102 241 / 0.6);
+  --glow-accent: 0 0 20px -5px rgb(163 177 138 / 0.3);
+  --glow-verified: 0 0 20px -5px rgb(143 196 143 / 0.3);
+  --glow-opportunity: 0 0 20px -5px rgb(232 180 77 / 0.3);
+  --glow-danger: 0 0 20px -5px rgb(217 107 107 / 0.3);
+  
+  /* ==========================================================================
+     TRANSITIONS & ANIMATION
+     ========================================================================== */
+  --transition-fast: 100ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slower: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Spring animations */
+  --spring-gentle: 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  --spring-smooth: 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  --spring-bouncy: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  
+  /* ==========================================================================
+     Z-INDEX LAYERS
+     ========================================================================== */
+  --z-hidden: -1;
+  --z-base: 0;
+  --z-raised: 10;
+  --z-dropdown: 50;
+  --z-sticky: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-popover: 400;
+  --z-tooltip: 500;
+  --z-toast: 600;
+  --z-command-palette: 700;
+  --z-tooltip-max: 800;
+  
+  /* ==========================================================================
+     BREAKPOINTS
+     ========================================================================== */
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+  --bp-2xl: 1536px;
+  
+  /* ==========================================================================
+     CONTAINER WIDTHS
+     ========================================================================== */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+  --container-2xl: 1536px;
+  --container-app: 1600px;  /* Max app width */
+  
+  /* ==========================================================================
+     COMPONENT-SPECIFIC TOKENS
+     ========================================================================== */
+  
+  /* Card */
+  --card-padding: var(--space-6);
+  --card-padding-sm: var(--space-4);
+  --card-gap: var(--space-4);
+  
+  /* Button */
+  --btn-height-sm: 2rem;       /* 32px */
+  --btn-height-md: 2.5rem;     /* 40px */
+  --btn-height-lg: 3rem;       /* 48px */
+  --btn-height-xl: 3.5rem;     /* 56px */
+  
+  /* Input */
+  --input-height-sm: 2rem;     /* 32px */
+  --input-height-md: 2.5rem;   /* 40px */
+  --input-height-lg: 3rem;     /* 48px */
+  
+  /* Sidebar */
+  --sidebar-width-collapsed: 4rem;   /* 64px */
+  --sidebar-width-expanded: 18rem;   /* 288px */
+  --sidebar-width-mobile: 16rem;     /* 256px */
+  
+  /* Topbar */
+  --topbar-height: 4rem;       /* 64px */
+  
+  /* Command Palette */
+  --cmd-palette-width: 42rem;  /* 672px */
+  --cmd-palette-height: 30rem; /* 480px */
+  
+  /* Table */
+  --table-row-height: 3rem;    /* 48px */
+  --table-row-height-compact: 2.5rem; /* 40px */
+  --table-cell-padding: var(--space-3) var(--space-4);
+  
+  /* Modal */
+  --modal-width-sm: 24rem;     /* 384px */
+  --modal-width-md: 32rem;     /* 512px */
+  --modal-width-lg: 48rem;     /* 768px */
+  --modal-width-xl: 64rem;     /* 1024px */
+  
+  /* Dropdown */
+  --dropdown-width-sm: 12rem;  /* 192px */
+  --dropdown-width-md: 16rem;  /* 256px */
+  --dropdown-width-lg: 24rem;  /* 384px */
+  
+  /* Tooltip */
+  --tooltip-max-width: 24rem;  /* 384px */
+  --tooltip-delay-show: 200ms;
+  --tooltip-delay-hide: 100ms;
+
+}
+
+/* Dark mode only (Webloom is dark-first) */
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Light mode overrides if ever needed */
+  }
+}
+
+/* ==========================================================================
+   UTILITY CLASSES
+   ========================================================================== */
+
+/* Text gradient */
+.text-gradient-brand {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-accent {
+  background: linear-gradient(135deg, var(--color-accent) 0%, #8FA378 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-verified {
+  background: linear-gradient(135deg, var(--color-verified) 0%, #78B878 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-opportunity {
+  background: linear-gradient(135deg, var(--color-opportunity) 0%, var(--color-warning) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glassmorphism (restrained) */
+.glass {
+  background: rgba(19, 25, 32, 0.7);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--color-border-primary);
+}
+
+.glass-strong {
+  background: rgba(19, 25, 32, 0.85);
+  backdrop-filter: blur(30px);
+  border: 1px solid var(--color-border-primary);
+}
+
+/* Glow effects */
+.glow-primary {
+  box-shadow: var(--glow-primary);
+}
+
+.glow-primary-strong {
+  box-shadow: var(--glow-primary-strong);
+}
+
+.glow-accent {
+  box-shadow: var(--glow-accent);
+}
+
+.glow-verified {
+  box-shadow: var(--glow-verified);
+}
+
+.glow-opportunity {
+  box-shadow: var(--glow-opportunity);
+}
+
+.glow-danger {
+  box-shadow: var(--glow-danger);
+}
+
+/* Shimmer skeleton */
+.wl-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-elevated) 25%,
+    var(--color-bg-panel) 50%,
+    var(--color-bg-elevated) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Dot indicator */
+.wl-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Mesh gradient background */
+.wl-mesh {
+  position: relative;
+  overflow: hidden;
+}
+
+.wl-mesh::before,
+.wl-mesh::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.wl-mesh::before {
+  width: 400px;
+  height: 400px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  top: -100px;
+  right: -100px;
+}
+
+.wl-mesh::after {
+  width: 300px;
+  height: 300px;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-creative));
+  bottom: -80px;
+  left: -80px;
+}
+
+/* Card base */
+.wl-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-xl);
+  background-clip: padding-box;
+}
+
+.wl-card-hover {
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.wl-card-hover:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--glow-primary);
+}
+
+/* Mesh card */
+.wl-mesh-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.wl-mesh-card::before,
+.wl-mesh-card::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.wl-mesh-card::before {
+  width: 300px;
+  height: 300px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  top: -80px;
+  right: -80px;
+}
+
+.wl-mesh-card::after {
+  width: 200px;
+  height: 200px;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-creative));
+  bottom: -60px;
+  left: -60px;
+}
+
+/* ==========================================================================
+   FOCUS VISIBLE
+   ========================================================================== */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   SCROLLBAR
+   ========================================================================== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-primary);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--color-bg-primary);
+}
+
+/* ==========================================================================
+   SELECTION
+   ========================================================================== */
+::selection {
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+}
+
+/* ==========================================================================
+   REDUCED MOTION
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .wl-shimmer {
+    animation: none;
+  }
+}

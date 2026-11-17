@@ -14,7 +14,8 @@ dotenv.config();
 const hasAnyAIProviderKey = Boolean(
   process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY || process.env.LOCAL_AI_BASE_URL ||
   process.env.NVIDIA_API_KEY || process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY ||
-  process.env.TOGETHER_API_KEY || process.env.FIREWORKS_API_KEY || process.env.HF_API_KEY,
+  process.env.TOGETHER_API_KEY || process.env.FIREWORKS_API_KEY || process.env.HF_API_KEY ||
+  process.env.MERCURY_API_KEY,
 );
 
 export const config = {
@@ -27,9 +28,9 @@ export const config = {
   ai: {
     // ---- Chain definition (single source of truth) ----
     // Provider names are declared ONLY here. No other module names a vendor.
-    primaryProvider: process.env.AI_PRIMARY_PROVIDER || 'openrouter',
-    secondaryProvider: process.env.AI_SECONDARY_PROVIDER || 'gemini',
-    fallbackProvider: process.env.AI_FALLBACK_PROVIDER || 'local',
+    primaryProvider: process.env.AI_PRIMARY_PROVIDER || 'mercury',
+    secondaryProvider: process.env.AI_SECONDARY_PROVIDER || 'nvidia',
+    fallbackProvider: process.env.AI_FALLBACK_PROVIDER || 'nvidia',
 
     // Hard ceiling on any single AI request. Brand DNA and digital audit are
     // long-running, so this is separate from the (much shorter) extraction
@@ -167,6 +168,13 @@ export const config = {
         // LOCAL_AI_REQUIRES_API_KEY=true for servers that do.
         requiresApiKey: process.env.LOCAL_AI_REQUIRES_API_KEY === 'true',
       },
+      mercury: {
+        enabled: process.env.MERCURY_API_KEY ? true : false,
+        apiKey: process.env.MERCURY_API_KEY || null,
+        baseUrl: process.env.MERCURY_BASE_URL || 'https://api.inceptionlabs.ai/v1',
+        model: process.env.MERCURY_MODEL || 'mercury-3',
+        timeoutMs: parseInt(process.env.MERCURY_TIMEOUT_MS) || 30000,
+      },
       selfhosted: {
         enabled: process.env.SELF_HOSTED_BASE_URL ? true : false,
         apiKey: process.env.SELF_HOSTED_API_KEY || null,
@@ -176,6 +184,15 @@ export const config = {
         label: 'Self-Hosted',
         requiresApiKey: process.env.SELF_HOSTED_REQUIRES_API_KEY === 'true',
       },
+    },
+
+    // Mercury provider configuration
+    mercury: {
+      enabled: process.env.MERCURY_API_KEY ? true : false,
+      apiKey: process.env.MERCURY_API_KEY || null,
+      baseUrl: process.env.MERCURY_BASE_URL || 'https://api.inceptionlabs.ai/v1',
+      model: process.env.MERCURY_MODEL || 'mercury-3',
+      timeoutMs: parseInt(process.env.MERCURY_TIMEOUT_MS) || 30000,
     },
 
     // At boot, spend one max_tokens:1 call per provider to confirm the key is
