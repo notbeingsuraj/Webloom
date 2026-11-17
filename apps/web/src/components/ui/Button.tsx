@@ -45,10 +45,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         {...props}
       />
-    />
-  );
-});
+    );
+  }
+);
 
 Button.displayName = 'Button';
 
+export default Button;
 export { buttonVariants };

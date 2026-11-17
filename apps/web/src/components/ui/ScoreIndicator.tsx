@@ -1,65 +1,98 @@
 import { cn } from '../../lib/utils';
 
 interface ScoreIndicatorProps {
-  score: number;
-  label?: string;
-  description?: string;
-  size?: 'sm' | 'lg';
+  value: number | null;
+  state: 'complete' | 'preliminary' | 'unavailable';
+  size?: 'sm' | 'md' | 'lg';
+  showLabel?: boolean;
 }
 
-const scoreTone = (score: number) => {
-  if (score >= 75) return { text: 'text-verified', glow: 'var(--shadow-glow-green)' };
-  if (score >= 50) return { text: 'text-primary', glow: 'var(--shadow-glow-blue)' };
-  return { text: 'text-opportunity', glow: 'var(--shadow-glow-orange)' };
+const sizeStyles = {
+  sm: 'h-14 w-14 text-2xl',
+  md: 'h-18 w-18 text-3xl',
+  lg: 'h-24 w-24 text-4xl',
 };
 
-export default function ScoreIndicator({ score, label = 'Opportunity', description, size = 'lg' }: ScoreIndicatorProps) {
-  const safeScore = Number.isFinite(score) ? Math.min(100, Math.max(0, score)) : 0;
-  const tone = scoreTone(safeScore);
-  const trackColor = 'hsl(var(--muted))';
-  const big = size === 'lg';
+const stateColors = {
+  complete: 'from-verified via-verified/80 to-verified/40',
+  preliminary: 'from-opportunity via-opportunity/80 to-opportunity/40',
+  unavailable: 'from-muted-foreground/20 via-muted-foreground/10 to-transparent',
+};
+
+const stateLabels = {
+  complete: 'Complete',
+  preliminary: 'Preliminary',
+  unavailable: 'Unavailable',
+};
+
+const stateDescriptions = {
+  complete: 'Based on completed digital audit.',
+  preliminary: 'Preliminary — audit incomplete.',
+  unavailable: 'Score unavailable',
+};
+
+function ScoreIndicator({
+  value,
+  state,
+  size = 'md',
+  showLabel = true,
+}: ScoreIndicatorProps) {
+  const isUnavailable = value === null || value === undefined || state === 'unavailable';
+  const displayValue = isUnavailable ? '—' : value;
 
   return (
-    <div className={cn('wl-card relative overflow-hidden p-5', big && 'p-6')}>
-      {/* corner decoration */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-60 blur-2xl"
-        style={{ background: `hsl(var(--primary) / 0.14)` }}
-      />
-      <div className="relative flex items-center justify-between gap-4">
-        <div>
-          <p className="wl-eyebrow">{label}</p>
-          <div className="mt-3 flex items-end gap-2">
-            <span className={cn('font-display font-bold tracking-[-0.06em] tabular-nums', big ? 'text-5xl' : 'text-4xl', tone.text)}>
-              {Math.round(safeScore)}
-            </span>
-            <span className="pb-1.5 text-sm text-muted-foreground">/ 100</span>
-          </div>
-        </div>
-        <div
-          className={cn('relative h-16 w-16 shrink-0 rounded-full border-[7px] bg-card', big && 'h-20 w-20')}
-          style={{ borderColor: trackColor, boxShadow: tone.glow }}
-        >
-          <div
-            className="flex h-full w-full items-center justify-center rounded-full bg-card"
-            style={{ background: `conic-gradient(hsl(var(--primary)) ${safeScore * 3.6}deg, ${trackColor} 0deg)` }}
-          >
-            <div className="flex h-full w-full items-center justify-center rounded-full bg-card text-[11px] font-bold text-foreground tabular-nums">
-              {Math.round(safeScore)}
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="relative mt-4">
-        <div className="wl-progress">
-          <div
-            className="wl-progress-fill"
-            style={{ width: `${safeScore}%`, background: `linear-gradient(90deg, hsl(var(--primary)), hsl(var(--ai)))` }}
+    <div className="relative flex flex-col items-center gap-2">
+      <div className={cn('relative flex h-18 w-18 items-center justify-center rounded-2xl', size === 'sm' && 'h-14 w-14', size === 'lg' && 'h-24 w-24')}>
+        <svg className="h-full w-full" viewBox="0 0 100 100">
+          <defs>
+            <linearGradient id="score-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="hsl(var(--color-verified))" />
+              <stop offset="100%" stopColor="hsl(var(--color-verified) / 0.4)" />
+            </linearGradient>
+          </defs>
+          <circle
+            cx="50"
+            cy="50"
+            r="44"
+            fill="none"
+            stroke="url(#score-gradient)"
+            strokeWidth="6"
+            strokeLinecap="round"
+            strokeDasharray={276.46}
+            strokeDashoffset={276.46 * (1 - (isNaN(Number(value)) ? 0 : Number(value)) / 100)}
+            transform="rotate(-90 50 50)"
+            style={{ filter: 'drop-shadow(0 4px 8px hsl(var(--verified) / 0.3))' }}
           />
+          <circle
+            cx="50"
+            cy="50"
+            r="44"
+            fill="none"
+            stroke="hsl(var(--muted) / 0.3)"
+            strokeWidth="6"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={cn('font-display font-bold tabular-nums text-foreground', 'text-2xl', size === 'sm' && 'text-lg', size === 'lg' && 'text-4xl')}>
+            {displayValue}
+          </span>
         </div>
       </div>
-      {description ? <p className="relative mt-4 text-sm leading-6 text-muted-foreground">{description}</p> : null}
+
+      {showLabel && (
+        <div className="text-center">
+          <p className="wl-eyebrow">Score</p>
+          <p className="mt-1 font-display text-lg font-bold text-foreground">
+            {displayValue}
+            <span className="text-muted-foreground">/100</span>
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {stateDescriptions[state]}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
+
+export default ScoreIndicator;
