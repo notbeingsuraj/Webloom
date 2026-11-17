@@ -9,6 +9,13 @@ import ThankYou from './pages/ThankYou';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Terms from './pages/Terms';
 import NotFound from './pages/NotFound';
+import IntelligenceOverview from './pages/IntelligenceOverview';
+import BusinessIntelligence from './pages/BusinessIntelligence';
+import BusinessIntelligenceResults from './pages/BusinessIntelligenceResults';
+import DigitalAudit from './pages/DigitalAudit';
+import StrategyIntelligence from './pages/StrategyIntelligence';
+import WebsiteGeneration from './pages/WebsiteGeneration';
+import Operations from './pages/Operations';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import CookieConsent from './components/CookieConsent';
@@ -19,16 +26,47 @@ function App() {
     <>
       <Routes>
         <Route path="/" element={<Layout />}>
+          {/* Intelligence Terminal - Main Sections */}
           <Route index element={
-            <ErrorBoundary label="Dashboard"><Dashboard /></ErrorBoundary>
+            <ErrorBoundary label="Intelligence Overview"><IntelligenceOverview /></ErrorBoundary>
           } />
+          <Route path="intelligence" element={
+            <ErrorBoundary label="Intelligence Overview"><IntelligenceOverview /></ErrorBoundary>
+          } />
+          <Route path="intelligence/overview" element={
+            <ErrorBoundary label="Intelligence Overview"><IntelligenceOverview /></ErrorBoundary>
+          } />
+          <Route path="intelligence/business" element={
+            <ErrorBoundary label="Business Intelligence"><BusinessIntelligence /></ErrorBoundary>
+          } />
+          <Route path="intelligence/results/:id" element={
+            <ErrorBoundary label="Extraction Results"><BusinessIntelligenceResults /></ErrorBoundary>
+          } />
+          <Route path="intelligence/audit/:id" element={
+            <ErrorBoundary label="Digital Audit"><DigitalAudit /></ErrorBoundary>
+          } />
+          <Route path="intelligence/strategy/:id" element={
+            <ErrorBoundary label="Strategy Intelligence"><StrategyIntelligence /></ErrorBoundary>
+          } />
+
+          {/* Website Generation */}
+          <Route path="websites" element={
+            <ErrorBoundary label="Website Generation"><WebsiteGeneration /></ErrorBoundary>
+          } />
+
+          {/* Operations & Infrastructure */}
+          <Route path="operations" element={
+            <ErrorBoundary label="Operations"><Operations /></ErrorBoundary>
+          } />
+
+          {/* Legacy routes - maintain backward compatibility */}
           <Route path="leads/new" element={
             <ErrorBoundary label="Lead analysis"><NewLead /></ErrorBoundary>
           } />
           <Route path="leads/:id" element={
             <ErrorBoundary label="Lead workspace"><LeadDetail /></ErrorBoundary>
           } />
-          <Route path="websites" element={
+          <Route path="generated-sites" element={
             <ErrorBoundary label="Generated websites"><GeneratedSites /></ErrorBoundary>
           } />
           <Route path="pricing" element={
