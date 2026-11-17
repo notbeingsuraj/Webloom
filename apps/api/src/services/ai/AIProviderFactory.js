@@ -60,11 +60,13 @@ export function createProvider(name, providerConfig, defaultTimeoutMs, probeMaxT
       message: `Unknown AI provider "${name}". Known providers: ${KNOWN_PROVIDERS.join(', ')}.`,
     });
   }
+  // Providers expect MercuryProvider format: { model, timeoutMs, apiKey, baseUrl, ... }
   return new ProviderClass({
-    name,
-    config: providerConfig,
-    defaultTimeoutMs,
-    probeMaxTokens,
+    model: providerConfig.model,
+    timeoutMs: providerConfig.timeoutMs ?? defaultTimeoutMs,
+    apiKey: providerConfig.apiKey,
+    baseUrl: providerConfig.baseUrl,
+    reasoningModel: providerConfig.operationModels?.reasoning,
   });
 }
 

@@ -10,18 +10,35 @@ import { OpenAICompatibleProvider } from '../../services/ai/providers/OpenAIComp
 import { AIError, AI_ERROR_CATEGORY } from '../../services/ai/AIError.js';
 
 export class MercuryProvider extends OpenAICompatibleProvider {
-  constructor({ model = null, timeoutMs = null, apiKey = null, baseUrl = null } = {}) {
-    super({
-      name: 'mercury',
-      config: {
+  constructor(options = {}) {
+    // Support both legacy format (model, timeoutMs, apiKey, baseUrl) and new AIProvider format (name, config, defaultTimeoutMs, probeMaxTokens)
+    const isNewFormat = options.name !== undefined || options.config !== undefined;
+    
+    let name, config, defaultTimeoutMs, probeMaxTokens;
+    
+    if (isNewFormat) {
+      // New AIProvider format
+      name = options.name || 'mercury';
+      config = options.config || {};
+      defaultTimeoutMs = options.defaultTimeoutMs || 30000;
+      probeMaxTokens = options.probeMaxTokens || 6000;
+    } else {
+      // Legacy format (model, timeoutMs, apiKey, baseUrl)
+      name = 'mercury';
+      const { model = null, timeoutMs = null, apiKey = null, baseUrl = null } = options;
+      config = {
         enabled: true,
         apiKey,
         model: model ?? 'mercury-3',
         baseUrl: baseUrl ?? 'https://api.inceptionlabs.ai/v1',
         timeoutMs: timeoutMs ?? 30000,
         requiresApiKey: true,
-      },
-    });
+      };
+      defaultTimeoutMs = timeoutMs ?? 30000;
+      probeMaxTokens = 6000;
+    }
+    
+    super({ name, config, defaultTimeoutMs, probeMaxTokens });
   }
 
   get label() {

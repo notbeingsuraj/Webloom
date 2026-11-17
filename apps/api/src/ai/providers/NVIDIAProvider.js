@@ -9,6 +9,25 @@ import { OpenAICompatibleProvider } from '../../services/ai/providers/OpenAIComp
 import { AIError, AI_ERROR_CATEGORY } from '../../services/ai/AIError.js';
 
 export class NVIDIAProvider extends OpenAICompatibleProvider {
+  constructor({ model = null, timeoutMs = null, apiKey = null, baseUrl = null, reasoningModel = null } = {}) {
+    super({
+      name: 'nvidia',
+      config: {
+        enabled: true,
+        apiKey,
+        model: model ?? 'nvidia/nemotron-3-ultra-550b-a55b',
+        baseUrl: baseUrl ?? 'https://integrate.api.nvidia.com/v1',
+        timeoutMs: timeoutMs ?? 60000,
+        requiresApiKey: true,
+        operationModels: {
+          reasoning: reasoningModel ?? 'nvidia/nemotron-3-ultra-550b-a55b',
+        },
+      },
+      defaultTimeoutMs: timeoutMs ?? 60000,
+      probeMaxTokens: 6000,
+    });
+  }
+
   get label() {
     return 'NVIDIA NIM';
   }
