@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Globe, Mail, MapPin, Phone, Sparkles, Trash2, Clock, Tag, ExternalLink, CheckCircle2, AlertCircle, Info, Search, RefreshCw, Eye, Shield, Wifi, BarChart2, Layers, FileText } from 'lucide-react';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import { Chip } from '../components/ui/Chip';
 import { AuditRow } from '../components/ui/AuditRow';
 import { cn } from '../lib/utils';
+import { cls, frac } from '../lib/cls';
 import usePageMetadata from '../hooks/usePageMetadata';
 import { leadService } from '../services/leadService';
 
@@ -107,7 +108,7 @@ export default function DigitalAudit() {
       <div className="rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-card p-5 transition-all hover:border-primary/30">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', `bg-${category.color}/12 text-${category.color}`)}>
+            <div className={cls('flex h-10 w-10 items-center justify-center rounded-lg', frac(`bg-${category.color}`, '12'), `text-${category.color}`)}>
               <category.icon className="h-5 w-5" />
             </div>
             <div>
@@ -150,7 +151,7 @@ export default function DigitalAudit() {
     return (
       <div className="wl-card p-5">
         <div className="flex items-center gap-2 mb-4">
-          <div className={cn('flex h-8 w-8 items-center justify-center rounded-lg', `bg-${color}/12 text-${color}`)}>
+          <div className={cls('flex h-8 w-8 items-center justify-center rounded-lg', frac(`bg-${color}`, '12'), `text-${color}`)}>
             {icon}
           </div>
           <h3 className="font-semibold text-foreground">{title}</h3>
@@ -160,16 +161,16 @@ export default function DigitalAudit() {
             const normalized = normalizeEntry(item);
             return (
               <li key={index} className="flex items-start gap-3 rounded-xl border border-border bg-gradient-to-br from-secondary via-card to-card p-4">
-                <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', `bg-${color}/12 text-${color}`)}>
+                <div className={cls('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', frac(`bg-${color}`, '12'), `text-${color}`)}>
                   {icon}
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">{normalized.description || normalized.area || 'Finding'}</p>
                   {normalized.severity && (
                     <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em]', 
-                      normalized.severity === 'high' ? 'bg-danger/10 text-danger' :
-                      normalized.severity === 'medium' ? 'bg-opportunity/10 text-opportunity' :
-                      'bg-primary/10 text-primary')}>
+                      normalized.severity === 'high' ? 'frac("bg-danger", "10") text-danger' :
+                      normalized.severity === 'medium' ? 'frac("bg-opportunity", "10") text-opportunity' :
+                      'frac("bg-primary", "10") text-primary')}>
                       {normalized.severity}
                     </span>
                   )}
@@ -239,11 +240,11 @@ export default function DigitalAudit() {
             </div>
           </div>
 
-          <div className="relative mt-6 flex flex-wrap gap-2 border-t border-border/70 pt-5">
+          <div className={cls('relative mt-6 flex flex-wrap gap-2 border-t', frac('border-border', '70'), 'pt-5')}>
             <button
               type="button"
               onClick={() => setActiveSection('overview')}
-              className={cn('rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200', activeSection === 'overview' ? 'bg-gradient-to-r from-primary to-ai text-white shadow-glow-blue' : 'bg-secondary text-muted-foreground hover:bg-secondary/70 hover:text-foreground')}
+              className={cls('rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200', activeSection === 'overview' ? 'bg-gradient-to-r from-primary to-ai text-white shadow-glow-blue' : cls('bg-secondary text-muted-foreground', frac('hover:bg-secondary', '70'), 'hover:text-foreground'))}
             >
               Overview
             </button>
@@ -251,7 +252,7 @@ export default function DigitalAudit() {
               const baseClasses = 'rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200';
               const activeClasses = 'bg-' + cat.color + ' text-' + cat.color + '-foreground shadow-glow-' + cat.color;
               const inactiveClasses = 'bg-secondary text-muted-foreground hover:bg-secondary hover:text-foreground';
-              const hoverClasses = inactiveClasses + ' hover:bg-secondary/70';
+              const hoverClasses = inactiveClasses + ' ' + frac('hover:bg-secondary', '70');
               return (
                 <button
                   key={cat.key}
@@ -264,9 +265,10 @@ export default function DigitalAudit() {
               );
             })}
           </div>
+        </div>
         </header>
 
-      {activeSection === 'overview' && (
+      {activeSection === 'overview' ? (
         <div style={{ display: 'contents' }}>
           {/* Score & Summary */}
           <div className="grid gap-6 xl:grid-cols-[1.03fr_0.97fr]">
@@ -338,8 +340,8 @@ export default function DigitalAudit() {
                   </h3>
                   <ul className="space-y-3">
                     {recommendations.slice(0, 5).map((rec, index) => (
-                      <li key={index} className="flex items-start gap-3 rounded-xl border border-border bg-gradient-to-br from-secondary via-card to-ai/5 p-4">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ai/12 text-ai">
+                      <li key={index} className={cls('flex items-start gap-3 rounded-xl border border-border bg-gradient-to-br from-secondary via-card', frac('to-ai', '5'), 'p-4')}>
+                        <div className={cls('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', frac('bg-ai', '12'), 'text-ai')}>
                           <Sparkles className="h-4 w-4" />
                         </div>
                         <p className="text-sm leading-6 text-foreground">{typeof rec === 'string' ? rec : rec.description || rec}</p>
@@ -350,10 +352,8 @@ export default function DigitalAudit() {
                 </div>
               )}
             </div>
-          </div>
         </div>
       </div>
-    ;
     ) : (
       <div style={{ display: 'contents' }}>
         <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
@@ -361,8 +361,7 @@ export default function DigitalAudit() {
         </div>
       </div>
     )}
-    </div>
-  );
+  </div>
+);
 }
 
-export default DigitalAudit;

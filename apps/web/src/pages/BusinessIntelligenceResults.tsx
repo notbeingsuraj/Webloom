@@ -81,8 +81,8 @@ export default function BusinessIntelligenceResults() {
     return (
       <div className="space-y-6" aria-busy="true" aria-label="Loading extraction results">
         <header className="wl-card wl-mesh relative overflow-hidden p-6 md:p-8">
-          <div className={`wl-shimmer h-12 w-3` + '/' + `4 rounded-lg`} />
-          <div className={`mt-4 wl-shimmer h-8 w-1` + '/' + `4 rounded-lg`} />
+          <div className={cls('wl-shimmer h-12 w-3', frac('3', '4'), 'rounded-lg')} />
+          <div className={cls('mt-4 wl-shimmer h-8 w-1', frac('1', '4'), 'rounded-lg')} />
         </header>
         <div className="wl-card p-6">
           <ProgressIndicator steps={SCRAPING_STEPS} currentStep={2} elapsedTime={45} showElapsed={true} />
@@ -95,12 +95,12 @@ export default function BusinessIntelligenceResults() {
     const message = isError ? (error as any)?.response?.data?.error || (error as any)?.message || 'The results could not be loaded.' : 'Job not found.';
     return (
       <div className="wl-card mx-auto max-w-xl p-10 text-center">
-        <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive` + '/' + `10 text-destructive`}>
+        <div className={cls('mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive', frac('bg-destructive', '10'), 'text-destructive')}>
           <AlertCircle className="h-7 w-7" />
         </div>
         <p className="mt-5 font-display text-xl font-bold text-foreground">Unable to load results</p>
         <p className="mt-2 text-sm text-muted-foreground">{message}</p>
-        <button type="button" onClick={() => refetch()} className={`mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-card transition-colors hover:bg-primary` + '/' + `90`}>Retry</button>
+        <button type="button" onClick={() => refetch()} className={cls('mt-6 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-card transition-colors hover:bg-primary', frac('hover:bg-primary', '90'))}>Retry</button>
         <Link to="/intelligence/business" className="mt-4 inline-block text-sm text-primary hover:underline">Back to Business Intelligence</Link>
       </div>
     );
@@ -170,7 +170,7 @@ export default function BusinessIntelligenceResults() {
             <AlertCircle className="h-5 w-5 shrink-0 text-danger mt-0.5" />
             <div>
               <p className="font-medium text-danger">Extraction error</p>
-              <p className={cls('mt-1 text-sm text-danger', frac('80'))}>{job.error}</p>
+              <p className={cls('mt-1 text-sm text-danger', frac('text-danger', '80'))}>{job.error}</p>
             </div>
           </div>
         </div>
@@ -191,26 +191,26 @@ export default function BusinessIntelligenceResults() {
           />
 
           <div className="grid gap-4 sm:grid-cols-4">
-            <div className={`rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-primary` + '/' + `5 p-4`}>
+            <div className={cls('rounded-2xl border border-border bg-gradient-to-br from-secondary via-card', frac('to-primary', '5'), 'p-4')}>
               <p className="wl-eyebrow">Total Places</p>
               <p className="mt-1 font-display text-2xl font-bold tabular-nums text-foreground">{job.totalPlaces}</p>
             </div>
-            <div className={`rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-verified` + '/' + `5 p-4`}>
+            <div className={cls('rounded-2xl border border-border bg-gradient-to-br from-secondary via-card', frac('to-verified', '5'), 'p-4')}>
               <p className="wl-eyebrow">Completed</p>
               <p className="mt-1 font-display text-2xl font-bold tabular-nums text-verified">{job.completedPlaces}</p>
             </div>
-            <div className={`rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-danger` + '/' + `5 p-4`}>
+            <div className={cls('rounded-2xl border border-border bg-gradient-to-br from-secondary via-card', frac('to-danger', '5'), 'p-4')}>
               <p className="wl-eyebrow">Failed</p>
               <p className="mt-1 font-display text-2xl font-bold tabular-nums text-danger">{job.failedPlaces}</p>
             </div>
-            <div className={`rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-ai` + '/' + `5 p-4`}>
+            <div className={cls('rounded-2xl border border-border bg-gradient-to-br from-secondary via-card', frac('to-ai', '5'), 'p-4')}>
               <p className="wl-eyebrow">Queries</p>
               <p className="mt-1 font-display text-2xl font-bold tabular-nums text-foreground">{job.queries.length}</p>
             </div>
           </div>
 
           {/* Timeline */}
-          <div className={`wl-card p-5 rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-secondary` + '/' + `50`}>
+          <div className={cls('wl-card p-5 rounded-2xl border border-border bg-gradient-to-br from-secondary via-card', frac('to-secondary', '50'))}>
             <p className="wl-eyebrow">Timeline</p>
             <div className="mt-3 space-y-2 text-sm">
               <div className="flex items-center gap-3 text-muted-foreground">
@@ -235,7 +235,7 @@ export default function BusinessIntelligenceResults() {
           {/* Extracted Businesses */}
           {job.results?.businesses?.length && (
             <section className="wl-card overflow-hidden">
-              <div className={`flex flex-wrap items-center justify-between gap-3 border-b border-border bg-gradient-to-r from-card via-secondary` + '/' + `60 to-ai${'/'}5 px-6 py-5`}>
+              <div className={cls('flex flex-wrap items-center justify-between gap-3 border-b border-border bg-gradient-to-r from-card via-secondary', frac('60', 'to-ai'), '5 px-6 py-5')}>
                 <div>
                   <p className="wl-eyebrow">Extracted businesses</p>
                   <h2 className="mt-1 font-display text-2xl font-bold tracking-[-0.04em] text-foreground">
@@ -266,8 +266,8 @@ export default function BusinessIntelligenceResults() {
                 ) : (
                   <div className="space-y-3 max-h-96 overflow-y-auto">
                     {job.results.businesses.map((biz: any, index: number) => (
-                      <div key={index} className={`flex items-start gap-4 rounded-xl border border-border bg-card p-4 transition-all hover:border-primary` + '/' + `30 hover:shadow-card-hover`}>
-                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-verified` + '/' + `12 text-verified`}>
+                      <div key={index} className={cls('flex items-start gap-4 rounded-xl border border-border bg-card p-4 transition-all hover:border-primary', frac('hover:border-primary', '30'), 'hover:shadow-card-hover')}>
+                        <div className={cls('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-verified', frac('bg-verified', '12'), 'text-verified')}>
                           <CheckCircle2 className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -315,7 +315,8 @@ export default function BusinessIntelligenceResults() {
                       <p className="mt-4 text-center text-sm text-muted-foreground">+{job.results.businesses.length - 10} more businesses</p>
                     )}
                   </div>
-                </div>
+                )
+              }
               </div>
             </section>
           )}
@@ -368,12 +369,12 @@ export default function BusinessIntelligenceResults() {
 
           {/* Error Display */}
           {job.error && (
-            <div className={`wl-card p-5 border-danger` + '/' + `25 bg-danger${'/'}5`} role="alert">
+            <div className={cls('wl-card p-5 border-danger', frac('25', '5'), 'bg-danger')} role="alert">
               <div className="flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 shrink-0 text-danger mt-0.5" />
                 <div>
                   <p className="font-medium text-danger">Error</p>
-                  <p className={`mt-1 text-sm text-danger` + '/' + `80`}>{job.error}</p>
+                  <p className={cls('mt-1 text-sm text-danger', frac('text-danger', '80'))}>{job.error}</p>
                 </div>
               </div>
             </div>
@@ -385,7 +386,7 @@ export default function BusinessIntelligenceResults() {
             <ul className="space-y-2">
               {job.queries.map((q: string, i: number) => (
                 <li key={i} className="flex items-center gap-2 rounded-xl border border-border bg-card p-3">
-                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary` + '/' + `12 text-primary`}>
+                  <span className={cls('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary', frac('bg-primary', '12'), 'text-primary')}>
                     {i + 1}
                   </span>
                   <p className="truncate text-sm text-foreground">{q}</p>
@@ -402,7 +403,7 @@ export default function BusinessIntelligenceResults() {
                 <button
                   type="button"
                   onClick={() => cancelMutation.mutate(job.jobId)}
-                  className={`w-full justify-start inline-flex items-center gap-2 rounded-full border border-destructive` + '/' + `25 bg-destructive${'/'}10 px-4 py-2 text-sm font-medium text-destructive transition hover:bg-destructive${'/'}20`}
+                  className={cls('w-full justify-start inline-flex items-center gap-2 rounded-full border', frac('border-destructive', '25'), 'bg-destructive', frac('bg-destructive', '10'), 'px-4 py-2 text-sm font-medium text-destructive transition', frac('hover:bg-destructive', '20'))}
                 >
                   <X className="h-4 w-4" />
                   Cancel Job
@@ -412,7 +413,7 @@ export default function BusinessIntelligenceResults() {
                 <button
                   type="button"
                   onClick={() => retryMutation.mutate(job.jobId)}
-                  className={`w-full justify-start inline-flex items-center gap-2 rounded-full border border-warning` + '/' + `25 bg-warning${'/'}10 px-4 py-2 text-sm font-medium text-warning-foreground transition hover:bg-warning${'/'}20`}
+                  className={cls('w-full justify-start inline-flex items-center gap-2 rounded-full border', frac('border-warning', '25'), 'bg-warning', frac('bg-warning', '10'), 'px-4 py-2 text-sm font-medium text-warning-foreground transition', frac('hover:bg-warning', '20'))}
                 >
                   <RefreshCw className="h-4 w-4" />
                   Retry Job
@@ -422,7 +423,7 @@ export default function BusinessIntelligenceResults() {
                 <button
                   type="button"
                   onClick={() => navigate(`/intelligence/business`)}
-                  className={`w-full justify-start inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow-blue transition hover:bg-primary` + '/' + `90`}
+                  className={cls('w-full justify-start inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow-blue transition', frac('hover:bg-primary', '90'))}
                 >
                   <Eye className="h-4 w-4" />
                   View in Business Intelligence
@@ -431,7 +432,7 @@ export default function BusinessIntelligenceResults() {
               <button
                 type="button"
                 onClick={() => navigate('/intelligence/business')}
-                className={`w-full justify-start inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-2 text-sm font-medium text-foreground transition hover:bg-secondary` + '/' + `80`}
+                className={cls('w-full justify-start inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-2 text-sm font-medium text-foreground transition', frac('hover:bg-secondary', '80'))}
               >
                 <Sparkles className="h-4 w-4" />
                 New Extraction
@@ -448,5 +449,3 @@ const formatTime = (dateString?: string) => {
   if (!dateString) return '—';
   return new Date(dateString).toLocaleString();
 }
-
-export default BusinessIntelligenceResults;

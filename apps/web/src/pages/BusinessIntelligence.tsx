@@ -202,6 +202,36 @@ export default function BusinessIntelligence() {
     ? Math.floor((new Date(currentJob.completedAt || new Date().toISOString()).getTime() - new Date(currentJob.startedAt).getTime()) / 1000)
     : 0;
 
+  // Extract job history list to reduce JSX nesting depth (esbuild workaround)
+  const jobHistoryList = showHistory
+    ? jobsHistory.length === 0
+      ? <p className="text-sm text-muted-foreground text-center py-8">No extraction history yet</p>
+      : jobsHistory.slice(0, 10).map((job) => (
+          <div key={job.jobId} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-foreground">
+                {job.queries[0]?.substring(0, 40) || 'Multi-query'}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {new Date(job.createdAt).toLocaleString()}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Chip variant={job.status === 'completed' ? 'verified' : job.status === 'failed' ? 'danger' : 'default'} size="sm">
+                {job.status}
+              </Chip>
+              <button
+                type="button"
+                onClick={() => handleViewResults(job.jobId)}
+                className="text-primary hover:underline text-sm"
+              >
+                View
+              </button>
+            </div>
+          </div>
+        ))
+    : null;
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="wl-card wl-mesh relative overflow-hidden p-6 md:p-8">
@@ -215,7 +245,7 @@ export default function BusinessIntelligence() {
               Single-business extraction or multi-business discovery. Verified data, field-level provenance, AI enrichment ready.
             </p>
           </div>
-          <div className={cls('inline-flex items-center gap-2 rounded-full border border-ai/25 bg-ai/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ai')}>
+          <div className={cls('inline-flex items-center gap-2 rounded-full border', frac('border-ai', '25'), frac('bg-ai', '10'), 'px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-ai')}>
             <Sparkles className="h-3.5 w-3.5" />
             Google Maps scraper
           </div>
@@ -259,7 +289,7 @@ export default function BusinessIntelligence() {
               <div>
                 <label htmlFor="single-url" className="mb-2 block text-sm font-semibold text-foreground">Google Maps place URL</label>
                 <div className="relative">
-                  <MapPin className={cls('pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-primary')} />
+                  <MapPin className={cls('pointer-events-none absolute left-4', frac('top-1', '2'), 'h-5 w-5', frac('-translate-y-1', '2'), 'text-primary')} />
                   <input
                     id="single-url"
                     type="url"
@@ -336,7 +366,7 @@ export default function BusinessIntelligence() {
               <div>
                 <label htmlFor="multi-location" className="mb-2 block text-sm font-semibold text-foreground">Location (optional)</label>
                 <div className="relative">
-                  <MapPin className={cls('pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground')} />
+                  <MapPin className={cls('pointer-events-none absolute left-4', frac('top-1', '2'), 'h-5 w-5', frac('-translate-y-1', '2'), 'text-muted-foreground')} />
                   <input
                     id="multi-location"
                     type="text"
@@ -423,7 +453,7 @@ export default function BusinessIntelligence() {
             <div className="wl-card p-6 space-y-4 border-l-4 border-primary">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className={cls('flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-primary')}>
+                  <div className={cls('flex h-10 w-10 items-center justify-center rounded-xl', frac('bg-primary', '12'), 'text-primary')}>
                     <Sparkles className="h-5 w-5" />
                   </div>
                   <div>
@@ -472,12 +502,12 @@ export default function BusinessIntelligence() {
               </div>
 
               {currentJob.results?.businesses?.length && (
-                <div className={cls('rounded-2xl border border-border bg-gradient-to-br from-secondary via-card to-verified', frac('5'), 'p-4')}>
+                <div className={cls('rounded-2xl border border-border bg-gradient-to-br from-secondary via-card', frac('to-verified', '5'), 'p-4')}>
                   <p className="wl-eyebrow">Extracted Businesses ({currentJob.results.totalCount})</p>
                   <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
                     {currentJob.results.businesses.slice(0, 5).map((biz, index) => (
                       <div key={index} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
-                        <div className={cls('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-verified', frac('12'), 'text-verified')}>
+                        <div className={cls('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', frac('bg-verified', '12'), 'text-verified')}>
                           <CheckCircle2 className="h-4 w-4" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -502,7 +532,7 @@ export default function BusinessIntelligence() {
                   <button
                     type="button"
                     onClick={handleCancel}
-                    cls(`inline-flex items-center gap-2 rounded-full border border-destructive/25 bg-destructive/10 px-4 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/20`)
+                    className={cls('inline-flex items-center gap-2 rounded-full border', frac('border-destructive', '25'), 'bg-destructive', frac('bg-destructive', '10'), 'px-4 py-2 text-sm font-medium text-destructive transition hover:bg-destructive', frac('20'))}
                   >
                     <X className="h-4 w-4" />
                     Cancel Job
@@ -512,7 +542,7 @@ export default function BusinessIntelligence() {
                   <button
                     type="button"
                     onClick={() => handleViewResults(currentJob.jobId)}
-                    cls(`inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow-blue transition hover:bg-primary/90`)
+                    className={cls('inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow-blue transition hover:bg-primary', frac('90'))}
                   >
                     <Eye className="h-4 w-4" />
                     View Results
@@ -522,7 +552,7 @@ export default function BusinessIntelligence() {
                   <button
                     type="button"
                     onClick={handleRetry}
-                    cls(`inline-flex items-center gap-2 rounded-full border border-warning/25 bg-warning/10 px-4 py-2 text-sm font-medium text-warning-foreground transition hover:bg-warning/20`)
+                    className={cls('inline-flex items-center gap-2 rounded-full border', frac('border-warning', '25'), 'bg-warning', frac('bg-warning', '10'), 'px-4 py-2 text-sm font-medium text-warning-foreground transition hover:bg-warning', frac('20'))}
                   >
                     <RefreshCw className="h-4 w-4" />
                     Retry Job
@@ -536,9 +566,9 @@ export default function BusinessIntelligence() {
         {/* Sidebar - History & Settings */}
         <aside className="space-y-6">
           {/* Scraper Worker Health */}
-          <div cls(`wl-card p-6 bg-gradient-to-br from-secondary via-card to-ai/5`)>
+          <div className={cls('wl-card p-6 bg-gradient-to-br from-secondary via-card', frac('to-ai', '5'))}>
             <div className="flex items-center gap-3 mb-4">
-              <div cls(`flex h-10 w-10 items-center justify-center rounded-xl bg-ai/12 text-ai`)>
+              <div className={cls('flex h-10 w-10 items-center justify-center rounded-xl', frac('bg-ai', '12'), 'text-ai')}>
                 <Settings className="h-5 w-5" />
               </div>
               <div>
@@ -580,43 +610,16 @@ export default function BusinessIntelligence() {
               <button
                 type="button"
                 onClick={() => setShowHistory(!showHistory)}
-                cls(`text-sm font-medium text-primary hover:text-primary/80`)
+                className={cls('text-sm font-medium text-primary hover:text-primary', frac('80'))}
               >
                 {showHistory ? 'Hide' : 'Show'} history
               </button>
             </div>
-            {showHistory && (
+            {showHistory ? (
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {jobsHistory.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">No extraction history yet</p>
-                ) : (
-                  jobsHistory.slice(0, 10).map((job) => (
-                    <div key={job.jobId} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {job.queries[0]?.substring(0, 40) || 'Multi-query'}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {new Date(job.createdAt).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Chip variant={job.status === 'completed' ? 'verified' : job.status === 'failed' ? 'danger' : 'default'} size="sm">
-                          {job.status}
-                        </Chip>
-                        <button
-                          type="button"
-                          onClick={() => handleViewResults(job.jobId)}
-                          className="text-primary hover:underline text-sm"
-                        >
-                          View
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                {jobHistoryList}
+              </div>
+            ) : null}
           </div>
 
           {/* Quick Actions */}
@@ -647,5 +650,3 @@ export default function BusinessIntelligence() {
 const stepMap: Record<string, number> = {
   pending: 0, queued: 1, scraping: 2, normalizing: 3, enriching: 4, completed: 5, failed: 5, partial: 5, cancelled: 5, retrying: 1
 };
-
-export default BusinessIntelligence;

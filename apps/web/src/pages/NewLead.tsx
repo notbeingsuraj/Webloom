@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import usePageMetadata from '../hooks/usePageMetadata';
 import analytics from '../services/analytics';
 import { leadService } from '../services/leadService';
+import { cls, frac } from '../lib/cls';
 
 const surface = 'wl-card relative p-6 md:p-8';
 const eyebrow = 'wl-eyebrow';
@@ -593,7 +594,7 @@ export default function NewLead() {
           </div>
         </form>
 
-        <aside className={`${surface} bg-gradient-to-br from-secondary via-card to-ai/5`}>
+        <aside className={cls(surface, 'bg-gradient-to-br from-secondary via-card', frac('to-ai', '5'))}>
           <p className={eyebrow}>Analysis status</p>
           <h2 className="mt-2 font-display text-2xl font-bold tracking-[-0.05em] text-foreground">
             {headerTitle}

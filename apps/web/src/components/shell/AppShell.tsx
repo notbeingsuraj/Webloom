@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Compass, Globe2, LayoutDashboard, Mail, Plus, Sparkles, Zap, Settings, Search, BarChart2, Shield, Network, FileText, Users, Zap as ZapIcon } from 'lucide-react';
+import { Compass, Globe2, LayoutDashboard, Mail, Plus, Sparkles, Zap, Settings, Search, BarChart2, Shield, Network, FileText, Users, Menu, ArrowRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import Button from '../ui/Button';
+import ThemeToggle from '../ThemeToggle';
+import analytics from '../../services/analytics';
 
 const NAV_SECTIONS = [
   {
@@ -236,7 +240,6 @@ export default function AppShell() {
                 </div>
               </div>
             </div>
-          </div>
         </aside>
 
         {/* Mobile sidebar overlay */}
@@ -313,6 +316,7 @@ export default function AppShell() {
           </main>
         </div>
       </div>
+    </div>
     </div>
   );
 }

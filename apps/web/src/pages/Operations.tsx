@@ -124,11 +124,11 @@ export default function Operations() {
     const label = name === 'mercury' ? 'Mercury 3' : name === 'nvidia' ? 'NVIDIA Nemotron 3 Ultra' : name;
 
     return (
-      <div className="wl-card p-5 transition-all hover:border-primary/30">
+      <div className={cls('wl-card', 'p-5', 'transition-all', frac('hover:border-primary', '30'))}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', 
-              name === 'mercury' ? 'bg-primary/12 text-primary' : 'bg-ai/12 text-ai')}>
+              name === 'mercury' ? cls(frac('bg-primary', '12'), 'text-primary') : cls(frac('bg-ai', '12'), 'text-ai'))}>
               {name === 'mercury' ? 'M3' : 'N3'}
             </div>
             <div>
@@ -186,7 +186,7 @@ export default function Operations() {
           </div>
         </div>
 
-        <div className="relative mt-8 flex flex-wrap gap-2 border-t border-border/70 pt-5">
+        <div className={cls('relative mt-8 flex flex-wrap gap-2 border-t pt-5', frac('border-border', '70'))}>
           {[
             { key: 'ai', label: 'AI Providers', icon: Sparkles },
             { key: 'scraper', label: 'Scraper Worker', icon: Search },
@@ -200,7 +200,7 @@ export default function Operations() {
               className={cn('flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200', 
                 activeSection === section.key 
                   ? 'bg-gradient-to-r from-primary to-ai text-white shadow-glow-blue' 
-                  : 'bg-secondary text-muted-foreground hover:bg-secondary/70 hover:text-foreground')}
+                  : cls(frac('hover:bg-secondary', '70')))}
               >
                 <section.icon className="h-4 w-4" />
                 {section.label}
@@ -212,10 +212,10 @@ export default function Operations() {
       {activeSection === 'ai' && (
         <div className="space-y-6">
           {/* Chain Overview */}
-          <div className="wl-card p-5 bg-gradient-to-br from-secondary via-card to-ai/5">
+          <div className={cls('wl-card', 'p-5', 'bg-gradient-to-br', 'from-secondary', 'via-card', frac('to-ai', '5'))}>
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-ai/12 text-ai">
+                <div className={cls('flex h-10 w-10 items-center justify-center rounded-lg', frac('bg-ai', '12'), 'text-ai')}>
                   <Sparkles className="h-5 w-5" />
                 </div>
                 <div>
@@ -232,7 +232,7 @@ export default function Operations() {
             </div>
 
             {/* Circuit Breaker Status */}
-            <div className="wl-card p-5 bg-gradient-to-br from-secondary via-card to-ai/5">
+            <div className={cls('wl-card', 'p-5', 'bg-gradient-to-br', 'from-secondary', 'via-card', frac('to-ai', '5'))}>
               <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                 <Shield className="h-5 w-5 text-ai" />
                 Circuit breaker status
@@ -246,9 +246,9 @@ export default function Operations() {
                       <div className="flex items-center gap-2 mb-2">
                         <span className="font-medium text-foreground">{name === 'mercury' ? 'Mercury 3' : 'NVIDIA Nemotron'}</span>
                         <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em]', 
-                          provider.circuitState === 'OPEN' ? 'bg-danger/10 text-danger' :
-                          provider.circuitState === 'HALF_OPEN' ? 'bg-warning/10 text-warning-foreground' :
-                          'bg-verified/10 text-verified')}>
+                          provider.circuitState === 'OPEN' ? cls(frac('bg-danger', '10'), 'text-danger') :
+                          provider.circuitState === 'HALF_OPEN' ? cls(frac('bg-warning', '10'), 'text-warning-foreground') :
+                          cls(frac('bg-verified', '10'), 'text-verified'))}>
                           {provider.circuitState ?? 'CLOSED'}
                         </span>
                       </div>
@@ -291,7 +291,7 @@ export default function Operations() {
                       { key: 'report_generation', label: 'Report generation', mercury: true, nvidia: true },
                       { key: 'structured_output', label: 'Structured output', mercury: true, nvidia: false },
                     ].map((row) => (
-                      <tr key={row.key} className="hover:bg-secondary/50">
+                      <tr key={row.key} className={cls(frac('hover:bg-secondary', '50'))}>
                         <td className="p-3 font-medium text-foreground">{row.label}</td>
                         <td className="text-center p-3">
                           {row.mercury ? <CheckCircle2 className="mx-auto h-4 w-4 text-verified" /> : <X className="mx-auto h-4 w-4 text-muted-foreground" />}
@@ -312,10 +312,10 @@ export default function Operations() {
       {activeSection === 'scraper' && (
         <div className="space-y-6">
           {/* Worker Status */}
-          <div className="wl-card p-5 bg-gradient-to-br from-secondary via-card to-ai/5">
+          <div className={cls('wl-card', 'p-5', 'bg-gradient-to-br', 'from-secondary', 'via-card', frac('to-ai', '5'))}>
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-ai/12 text-ai">
+                <div className={cls('flex h-10 w-10 items-center justify-center rounded-lg', frac('bg-ai', '12'), 'text-ai')}>
                   <Search className="h-5 w-5" />
                 </div>
                 <div>
@@ -380,7 +380,7 @@ export default function Operations() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ai/12 text-ai">
+                    <div className={cls('flex h-8 w-8 items-center justify-center rounded-lg', frac('bg-ai', '12'), 'text-ai')}>
                       <Search className="h-4 w-4" />
                     </div>
                     <div>
@@ -394,7 +394,7 @@ export default function Operations() {
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                    <div className={cls('flex h-8 w-8 items-center justify-center rounded-lg', frac('bg-primary', '12'), 'text-primary')}>
                       <Activity className="h-4 w-4" />
                     </div>
                     <div>
@@ -408,7 +408,7 @@ export default function Operations() {
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-verified/12 text-verified">
+                    <div className={cls('flex h-8 w-8 items-center justify-center rounded-lg', frac('bg-verified', '12'), 'text-verified')}>
                       <CheckCircle2 className="h-4 w-4" />
                     </div>
                     <div>
@@ -429,10 +429,10 @@ export default function Operations() {
       {activeSection === 'system' && (
         <div className="space-y-6">
           {/* System Overview */}
-          <div className="wl-card p-5 bg-gradient-to-br from-secondary via-card to-primary/5">
+          <div className={cls('wl-card', 'p-5', 'bg-gradient-to-br', 'from-secondary', 'via-card', frac('to-primary', '5'))}>
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                <div className={cls('flex h-10 w-10 items-center justify-center rounded-lg', frac('bg-primary', '12'), 'text-primary')}>
                   <Server className="h-5 w-5" />
                 </div>
                 <div>
@@ -441,7 +441,7 @@ export default function Operations() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-verified/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-verified">
+                <span className={cls('inline-flex items-center gap-1 rounded-full', frac('bg-verified', '10'), 'px-2', 'py-0.5', 'text-[10px]', 'font-semibold', 'uppercase', 'tracking-[0.1em]', 'text-verified')}>
                   <span className="h-1.5 w-1.5 rounded-full bg-verified" />
                   Healthy
                 </span>
@@ -450,9 +450,9 @@ export default function Operations() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mt-4">
-              <div className="rounded-xl border border-border bg-gradient-to-br from-secondary via-card to-primary/5 p-5">
+              <div className={cls('rounded-xl border border-border bg-gradient-to-br from-secondary via-card p-5', frac('to-primary', '5'))}>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/12 text-primary">
+                  <div className={cls('flex h-12 w-12 items-center justify-center rounded-xl', frac('bg-primary', '12'), 'text-primary')}>
                     <Cpu className="h-6 w-6" />
                   </div>
                   <div>
@@ -461,9 +461,9 @@ export default function Operations() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-border bg-gradient-to-br from-secondary via-card to-verified/5 p-5">
+              <div className={cls('rounded-xl border border-border bg-gradient-to-br from-secondary via-card p-5', frac('to-verified', '5'))}>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-verified/12 text-verified">
+                  <div className={cls('flex h-12 w-12 items-center justify-center rounded-xl', frac('bg-verified', '12'), 'text-verified')}>
                     <MemoryStick className="h-6 w-6" />
                   </div>
                   <div>
@@ -472,9 +472,9 @@ export default function Operations() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-border bg-gradient-to-br from-secondary via-card to-ai/5 p-5">
+              <div className={cls('rounded-xl border border-border bg-gradient-to-br from-secondary via-card p-5', frac('to-ai', '5'))}>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-ai/12 text-ai">
+                  <div className={cls('flex h-12 w-12 items-center justify-center rounded-xl', frac('bg-ai', '12'), 'text-ai')}>
                     <HardDrive className="h-6 w-6" />
                   </div>
                   <div>
@@ -483,9 +483,9 @@ export default function Operations() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-border bg-gradient-to-br from-secondary via-card to-opportunity/5 p-5">
+              <div className={cls('rounded-xl border border-border bg-gradient-to-br from-secondary via-card p-5', frac('to-opportunity', '5'))}>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-opportunity/12 text-opportunity">
+                  <div className={cls('flex h-12 w-12 items-center justify-center rounded-xl', frac('bg-opportunity', '12'), 'text-opportunity')}>
                     <Network className="h-6 w-6" />
                   </div>
                   <div>
@@ -582,7 +582,7 @@ export default function Operations() {
           {/* Log Controls */}
           <div className="wl-card p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
+              <div className={cls('flex h-10 w-10 items-center justify-center rounded-xl', frac('bg-primary', '12'), 'text-primary')}>
                 <Terminal className="h-5 w-5" />
               </div>
               <div>
@@ -630,7 +630,7 @@ export default function Operations() {
                     </tr>
                   ) : (
                     logs.map((log, index) => (
-                      <tr key={index} className="hover:bg-secondary/50">
+                      <tr key={index} className={cls(frac('hover:bg-secondary', '50'))}>
                         <td className="p-3 font-mono text-xs text-muted-foreground">
                           {new Date(log.timestamp).toLocaleString()}
                         </td>

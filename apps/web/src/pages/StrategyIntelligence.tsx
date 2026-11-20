@@ -302,7 +302,6 @@ export default function StrategyIntelligence() {
                     )}
                   </div>
                 </div>
-
                 {/* Visual Direction */}
                 {dna?.visualDirection && (
                   <div className="wl-card p-6">

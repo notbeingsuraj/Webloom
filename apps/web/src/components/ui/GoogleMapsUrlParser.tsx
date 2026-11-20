@@ -211,7 +211,7 @@ export function GoogleMapsUrlParser({
       </div>
 
       {parsed && (
-        <div className="mt-3 rounded-xl border border-border bg-gradient-to-br from-secondary via-card to-ai/5 p-4 animate-in fade-in-200 duration-300">
+        <div className={cn('mt-3 rounded-xl border border-border bg-gradient-to-br from-secondary via-card', 'to-ai/5', 'p-4 animate-in fade-in-200 duration-300')}>
           <p className="wl-eyebrow">URL analysis</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-3 text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">

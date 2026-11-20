@@ -8,6 +8,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import usePageMetadata from '../hooks/usePageMetadata';
 import websiteService, { type GeneratedSite, type GeneratePayload } from '../services/websiteService';
 import api from '../services/api';
+import { cls, frac } from '../lib/cls';
 
 interface AnalyzedBusiness {
   identity: { name: string | null; category?: string | null; description?: string | null };
@@ -176,7 +177,7 @@ export default function GeneratedSites() {
       </section>
 
       {generated && generated.url && (
-        <section className={`${styles.card} flex flex-wrap items-center justify-between gap-4 border-emerald-200 bg-verified/10`}>
+        <section className={cls(styles.card, 'flex flex-wrap items-center justify-between gap-4 border-emerald-200', frac('bg-verified', '10'))}>
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
               <Globe className="h-6 w-6" />
