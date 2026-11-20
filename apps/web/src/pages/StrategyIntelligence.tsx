@@ -5,6 +5,7 @@ import { Globe, Mail, MapPin, Phone, Sparkles, Trash2, Clock, Tag, ExternalLink,
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import { Chip } from '../components/ui/Chip';
+import { cls, frac } from '../lib/cls';
 import { cn } from '../lib/utils';
 import usePageMetadata from '../hooks/usePageMetadata';
 import { leadService } from '../services/leadService';
@@ -98,7 +99,7 @@ export default function StrategyIntelligence() {
                 <StatusBadge status={analysisState} />
               </div>
               {showDNA && dna?.positioning?.statement ? (
-                <div className="rounded-2xl border border-border border-l-4 border-l-primary bg-gradient-to-br from-secondary via-card to-primary/5 p-5">
+                <div className={cls('rounded-2xl border border-border border-l-4 border-l-primary bg-gradient-to-br from-secondary via-card p-5', frac('to-primary', '5'))}>
                   <p className="wl-eyebrow">Positioning statement</p>
                   <p className="mt-3 text-lg leading-7 text-foreground">{dna.positioning.statement}</p>
                   {dna.positioning.differentiation && (
@@ -149,7 +150,7 @@ export default function StrategyIntelligence() {
                     <Sparkles className="h-5 w-5 text-ai" />
                   </div>
                   <div className="grid gap-5 lg:grid-cols-2">
-                    <div className="rounded-2xl border border-border border-l-4 border-l-primary bg-gradient-to-br from-secondary via-card to-primary/5 p-5">
+                    <div className={cls('rounded-2xl border border-border border-l-4 border-l-primary bg-gradient-to-br from-secondary via-card p-5', frac('to-primary', '5'))}>
                       <div className="flex items-center gap-3 mb-4">
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/12 text-primary">
                           <Users className="h-5 w-5" />
@@ -198,7 +199,7 @@ export default function StrategyIntelligence() {
 
                     {/* Secondary Audiences */}
                     {dna.audience.secondary?.length && (
-                      <div className="rounded-2xl border border-border border-l-4 border-l-ai bg-gradient-to-br from-secondary via-card to-ai/5 p-5">
+                      <div className={cls('rounded-2xl border border-border border-l-4 border-l-ai bg-gradient-to-br from-secondary via-card p-5', frac('to-ai', '5'))}>
                         <p className="wl-eyebrow">Secondary segments</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {dna.audience.secondary.slice(0, 5).map((seg: any, i: number) => (
@@ -211,7 +212,7 @@ export default function StrategyIntelligence() {
               </div>
             </> ) : (
               <div className="wl-card p-6 text-center">
-                <Sparkles className="mx-auto h-12 w-12 text-ai/50" />
+                <Sparkles className={cls('mx-auto h-12 w-12', frac('text-ai', '50'))} />
                 <p className="mt-4 font-semibold text-foreground">Generate Brand DNA to unlock audience intelligence.</p>
                 <p className="mt-2 text-sm text-muted-foreground">Audience segments, demographics, and psychographics will be derived from the business profile.</p>
               </div>
@@ -239,7 +240,7 @@ export default function StrategyIntelligence() {
                   ) : <p className="text-muted-foreground">Not defined</p>}
                   {dna?.brandPersonality?.archetype && (
                     <div className="mt-4">
-                      <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary">
+                      <span className={cls('inline-flex items-center gap-2 rounded-full', frac('bg-primary', '10'), 'px-3 py-1.5 text-sm font-semibold text-primary')}>
                         Archetype: <span className="font-semibold">{dna.brandPersonality.archetype}</span>
                       </span>
                     </div>
@@ -301,7 +302,8 @@ export default function StrategyIntelligence() {
                       </div>
                     )}
                   </div>
-                </div>
+                )}
+
                 {/* Visual Direction */}
                 {dna?.visualDirection && (
                   <div className="wl-card p-6">
@@ -311,13 +313,13 @@ export default function StrategyIntelligence() {
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
                       {dna.visualDirection.mood && (
-                        <div className="rounded-2xl border border-border border-l-4 border-l-creative bg-gradient-to-br from-secondary via-card to-creative/5 p-5">
+                        <div className={cls('rounded-2xl border border-border border-l-4 border-l-creative bg-gradient-to-br from-secondary via-card p-5', frac('to-creative', '5'))}>
                           <p className="wl-eyebrow">Mood</p>
                           <p className="mt-2 text-base text-foreground">{dna.visualDirection.mood}</p>
                         </div>
                       )}
                       {dna.visualDirection.colorPalette?.primary && (
-                        <div className="rounded-2xl border border-border border-l-4 border-l-primary bg-gradient-to-br from-secondary via-card to-primary/5 p-5">
+                        <div className={cls('rounded-2xl border border-border border-l-4 border-l-primary bg-gradient-to-br from-secondary via-card p-5', frac('to-primary', '5'))}>
                           <p className="wl-eyebrow">Color palette</p>
                           <div className="mt-2 flex items-center gap-2">
                             <div className="flex h-8 w-16 rounded-lg" style={{ background: dna.visualDirection.colorPalette.primary }} />
@@ -335,7 +337,7 @@ export default function StrategyIntelligence() {
                         </div>
                       )}
                       {dna.visualDirection.typography?.style && (
-                        <div className="rounded-2xl border border-border border-l-4 border-l-ai bg-gradient-to-br from-secondary via-card to-ai/5 p-5">
+                        <div className={cls('rounded-2xl border border-border border-l-4 border-l-ai bg-gradient-to-br from-secondary via-card p-5', frac('to-ai', '5'))}>
                           <p className="wl-eyebrow">Typography</p>
                           <p className="mt-2 text-base text-foreground">{dna.visualDirection.typography.style}</p>
                           {dna.visualDirection.typography.reasoning && (
@@ -345,11 +347,11 @@ export default function StrategyIntelligence() {
                       )}
                     </div>
                   </div>
-                </div>
+                )}
               </>
             ) : (
               <div className="wl-card p-6 text-center">
-                <Sparkles className="mx-auto h-12 w-12 text-ai/50" />
+                <Sparkles className={cls('mx-auto h-12 w-12', frac('text-ai', '50'))} />
                 <p className="mt-4 font-semibold text-foreground">Generate Brand DNA to unlock brand intelligence.</p>
                 <p className="mt-2 text-sm text-muted-foreground">Brand personality, tone of voice, visual direction, and positioning will be derived from the business profile.</p>
               </div>
@@ -384,7 +386,7 @@ export default function StrategyIntelligence() {
               </>
             ) : (
               <div className="wl-card p-6 text-center">
-                <Sparkles className="mx-auto h-12 w-12 text-ai/50" />
+                <Sparkles className={cls('mx-auto h-12 w-12', frac('text-ai', '50'))} />
                 <p className="mt-4 font-semibold text-foreground">Generate Brand DNA to unlock competitive intelligence.</p>
                 <p className="mt-2 text-sm text-muted-foreground">Competitive advantages, market positioning, and differentiation will be derived from the business profile.</p>
               </div>
@@ -433,7 +435,7 @@ export default function StrategyIntelligence() {
               </>
             ) : (
               <div className="wl-card p-6 text-center">
-                <Sparkles className="mx-auto h-12 w-12 text-ai/50" />
+                <Sparkles className={cls('mx-auto h-12 w-12', frac('text-ai', '50'))} />
                 <p className="mt-4 font-semibold text-foreground">Generate Brand DNA to unlock website strategy.</p>
                 <p className="mt-2 text-sm text-muted-foreground">Website objectives, conversion strategy, and visual direction will be derived from the business profile.</p>
               </div>
@@ -539,7 +541,7 @@ export default function StrategyIntelligence() {
               </>
             ) : (
               <div className="wl-card p-6 text-center">
-                <Sparkles className="mx-auto h-12 w-12 text-ai/50" />
+                <Sparkles className={cls('mx-auto h-12 w-12', frac('text-ai', '50'))} />
                 <p className="mt-4 font-semibold text-foreground">Generate Brand DNA to unlock conversion intelligence.</p>
                 <p className="mt-2 text-sm text-muted-foreground">Customer intent, pain points, purchase triggers, and strategic recommendations will be derived from the business profile.</p>
               </div>
