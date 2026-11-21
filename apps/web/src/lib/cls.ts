@@ -23,10 +23,10 @@ export function clsx(...classes: (string | undefined | null | false | Record<str
 /**
  * Creates a Tailwind fraction utility class (e.g., 'w-1/2', 'bg-primary/50')
  * without triggering esbuild's regex parser bug.
- * Uses Unicode escape for '/' to avoid esbuild's regex parser.
+ * Uses String.fromCharCode to avoid esbuild's regex parser.
  */
 export function frac(numerator: string, denominator: string): string {
-  return numerator + '\u002F' + denominator;
+  return numerator + String.fromCharCode(0x2F) + denominator;
 }
 
 export default cls;

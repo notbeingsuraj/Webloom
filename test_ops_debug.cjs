@@ -4,11 +4,13 @@ const fs = require("fs");
 const file = "apps/web/src/pages/Operations.tsx";
 const source = fs.readFileSync(file, "utf8");
 
+// Try to transform with different options
 try {
   transform(source, {
     loader: "tsx",
     jsx: "automatic",
-    sourcefile: file
+    sourcefile: file,
+    logLevel: "debug"
   });
   console.log("PASS");
 } catch (error) {

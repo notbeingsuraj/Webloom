@@ -184,7 +184,7 @@ export function GoogleMapsUrlParser({
   return (
     <div className={cn('relative', className)}>
       <div className="relative">
-        <MapPin className={cls('pointer-events-none absolute left-4 h-5 w-5 -translate-y-1/2 text-muted-foreground', frac('top', '2'))} />
+        <MapPin className={cls('pointer-events-none absolute left-4 h-5 w-5 -translate-y-1/2 text-muted-foreground', 'top-1/2')} />
         <input
           type="url"
           required
@@ -201,13 +201,13 @@ export function GoogleMapsUrlParser({
           spellCheck={false}
         />
         {isValidating && (
-          <Loader2 className={cls('pointer-events-none absolute right-4 h-5 w-5 -translate-y-1/2 text-primary animate-spin', frac('top', '2'))} />
+          <Loader2 className={cls('pointer-events-none absolute right-4 h-5 w-5 -translate-y-1/2 text-primary animate-spin', 'top-1/2')} />
         )}
         {isValid && !isValidating && (
-          <CheckCircle2 className={cls('pointer-events-none absolute right-4 h-5 w-5 -translate-y-1/2 text-verified', frac('top', '2'))} />
+          <CheckCircle2 className={cls('pointer-events-none absolute right-4 h-5 w-5 -translate-y-1/2 text-verified', 'top-1/2')} />
         )}
         {!isValid && value && !isValidating && (
-          <X className={cls('pointer-events-none absolute right-4 h-5 w-5 -translate-y-1/2 text-destructive', frac('top', '2'))} />
+          <X className={cls('pointer-events-none absolute right-4 h-5 w-5 -translate-y-1/2 text-destructive', 'top-1/2')} />
         )}
       </div>
 
