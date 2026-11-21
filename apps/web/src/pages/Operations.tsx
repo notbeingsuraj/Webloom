@@ -5,10 +5,12 @@ import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import { Chip } from '../components/ui/Chip';
 import { ProgressIndicator, ProgressStep } from '../components/ui/ProgressIndicator';
+import { cls, frac } from '../lib/cls';
 import { cn } from '../lib/utils';
 import usePageMetadata from '../hooks/usePageMetadata';
 import { leadService } from '../services/leadService';
 import api from '../services/api';
+import { API_HEALTH_AI_URL, API_HEALTH_SCRAPER_URL, API_HEALTH_URL, API_JOBS_URL, API_JOB_QUEUE_URL, API_HEALTH_URL_V1, UI_POST_API_JOBS, UI_GET_API_JOBS, UI_GET_API_HEALTH } from '../lib/apiPaths';
 
 const AI_HEALTH_STEPS: ProgressStep[] = [
   { label: 'Checking provider configs', duration: 500 },
@@ -36,7 +38,7 @@ export default function Operations() {
 
   const checkAiHealth = useMutation({
     mutationFn: async () => {
-      const response = await api.get('/health/ai?force=1');
+      const response = await api.get(API_HEALTH_AI_URL);
       return response.data;
     },
     onSuccess: (data) => {
@@ -46,7 +48,7 @@ export default function Operations() {
 
   const checkScraperHealth = useMutation({
     mutationFn: async () => {
-      const response = await api.get('/health/scraper');
+      const response = await api.get(API_HEALTH_SCRAPER_URL);
       return response.data;
     },
     onSuccess: (data) => {
@@ -56,7 +58,7 @@ export default function Operations() {
 
   const checkSystemHealth = useMutation({
     mutationFn: async () => {
-      const response = await api.get('/health');
+      const response = await api.get(API_HEALTH_URL);
       return response.data;
     },
     onSuccess: (data) => {
@@ -220,7 +222,7 @@ export default function Operations() {
                 </div>
                 <div>
                   <p className="wl-eyebrow">Provider chain</p>
-                  <p className="font-medium text-foreground">{aiChain.join(' → ') || 'mercury → nvidia'}</p>
+                  <p className="font-medium text-foreground">{aiChain.join(' -> ') || 'mercury -> nvidia'}</p>
                 </div>
               </div>
               <StatusBadge status={aiStatus === 'healthy' ? 'verified' : aiStatus === 'degraded' ? 'warning' : 'danger'} />
@@ -385,7 +387,7 @@ export default function Operations() {
                     </div>
                     <div>
                       <p className="font-medium text-foreground">Submit extraction job</p>
-                      <p className="text-sm text-muted-foreground">POST /api/v1/jobs</p>
+                      <p className="text-sm text-muted-foreground">{UI_POST_API_JOBS}</p>
                     </div>
                   </div>
                   <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />}>
@@ -399,7 +401,7 @@ export default function Operations() {
                     </div>
                     <div>
                       <p className="font-medium text-foreground">View job queue</p>
-                      <p className="text-sm text-muted-foreground">GET /api/v1/jobs</p>
+                      <p className="text-sm text-muted-foreground">{UI_GET_API_JOBS}</p>
                     </div>
                   </div>
                   <Button variant="secondary" leadingIcon={<Activity className="h-4 w-4" />}>
@@ -413,7 +415,7 @@ export default function Operations() {
                     </div>
                     <div>
                       <p className="font-medium text-foreground">Worker health check</p>
-                      <p className="text-sm text-muted-foreground">GET /api/v1/health</p>
+                      <p className="text-sm text-muted-foreground">{UI_GET_API_HEALTH}</p>
                     </div>
                   </div>
                   <Button variant="secondary" leadingIcon={<CheckCircle2 className="h-4 w-4" />}>
@@ -628,23 +630,35 @@ export default function Operations() {
                         No events recorded yet. Run a health check to generate events.
                       </td>
                     </tr>
-                  ) : (
-                    logs.map((log, index) => (
-                      <tr key={index} className={cls(frac('hover:bg-secondary', '50'))}>
-                        <td className="p-3 font-mono text-xs text-muted-foreground">
-                          {new Date(log.timestamp).toLocaleString()}
-                        </td>
-                        <td className="p-3">
-                          <Chip 
-                            variant={log.level === 'error' ? 'danger' : log.level === 'warning' ? 'warning' : 'default'} 
-                            size="sm"
-                          >
-                            {log.level.toUpperCase()}
-                          </Chip>
-                        </td>
-                        <td className="p-3 font-mono text-sm text-foreground">{log.message}</td>
-                      </tr>
-                    ))}
+                  ) : (() => {
+                      const logRowClass = cls(frac('hover:bg-secondary', '50'));
+                      return logs.map((log, index) => {
+                        let variant;
+                        if (log.level === 'error') {
+                          variant = 'danger';
+                        } else if (log.level === 'warning') {
+                          variant = 'warning';
+                        } else {
+                          variant = 'default';
+                        }
+                        return (
+                          <tr key={index} className={logRowClass}>
+                            <td className="p-3 font-mono text-xs text-muted-foreground">
+                              {new Date(log.timestamp).toLocaleString()}
+                            </td>
+                            <td className="p-3">
+                              <Chip 
+                                variant={variant} 
+                                size="sm"
+                              >
+                                {log.level.toUpperCase()}
+                              </Chip>
+                            </td>
+                            <td className="p-3 font-mono text-sm text-foreground">{log.message}</td>
+                          </tr>
+                        );
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>

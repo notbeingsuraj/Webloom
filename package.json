@@ -23,7 +23,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "esbuild": "^0.28.2"
   },
   "dependencies": {
     "@nodelib/fs.stat": "^4.0.0",

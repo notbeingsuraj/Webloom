@@ -1,4 +1,5 @@
 import * as React from "react";
+import { cls, frac } from "../../lib/cls";
 import { cn } from "../../lib/utils";
 import { MapPin, Search, Link as LinkIcon, CheckCircle2, X, Loader2 } from "lucide-react";
 
@@ -20,15 +21,15 @@ export interface ParsedGoogleMapsUrl {
   nameFromPath: string | null;
 }
 
-const PLACE_URL_PATTERN = /maps\.google\.com\/maps\/place\/|maps\.google\.com\/place\/|google\.com\/maps\/place\//i;
-const SEARCH_URL_PATTERN = /maps\.google\.com\/maps\/search\/|maps\.google\.com\/search\/|google\.com\/maps\/search\//i;
-const SHORT_URL_PATTERN = /maps\.app\.goo\.gl\//i;
-const COORD_PATTERN = /@(-?\d+\.?\d*),(-?\d+\.?\d*)(?:,(\d+\.?\d*))?/;
-const CID_PATTERN = /[?&]cid=([^&]+)/i;
-const PLACE_ID_PATTERN = /[?&]place_id=([^&]+)/i;
-const QUERY_PATTERN = /[?&]q=([^&]+)/i;
-const QUERY_PATH_PATTERN = /\/search\/([^/?#]+)/i;
-const PLACE_NAME_PATTERN = /\/place\/([^/@?#]+)/i;
+const PLACE_URL_PATTERN = new RegExp('maps\\.google\\.com\\/maps\\/place\\/|maps\\.google\\.com\\/place\\/|google\\.com\\/maps\\/place\\/', 'i');
+const SEARCH_URL_PATTERN = new RegExp('maps\\.google\\.com\\/maps\\/search\\/|maps\\.google\\.com\\/search\\/|google\\.com\\/maps\\/search\\/', 'i');
+const SHORT_URL_PATTERN = new RegExp('maps\\.app\\.goo\\.gl\\/', 'i');
+const COORD_PATTERN = new RegExp('@(-?\\d+\\.?\\d*),(-?\\d+\\.?\\d*)(?:,(\\d+\\.?\\d*))?');
+const CID_PATTERN = new RegExp('[?&]cid=([^&]+)', 'i');
+const PLACE_ID_PATTERN = new RegExp('[?&]place_id=([^&]+)', 'i');
+const QUERY_PATTERN = new RegExp('[?&]q=([^&]+)', 'i');
+const QUERY_PATH_PATTERN = new RegExp('\\/search\\/([^/?#]+)', 'i');
+const PLACE_NAME_PATTERN = new RegExp('\\/place\\/([^/@?#]+)', 'i');
 
 export function parseGoogleMapsUrl(url: string): ParsedGoogleMapsUrl | null {
   if (!url || typeof url !== 'string') return null;
@@ -79,8 +80,8 @@ export function parseGoogleMapsUrl(url: string): ParsedGoogleMapsUrl | null {
     const nameMatch = url.match(PLACE_NAME_PATTERN);
     if (nameMatch) {
       result.nameFromPath = decodeURIComponent(nameMatch[1])
-        .replace(/\+/g, ' ')
-        .replace(/_/g, ' ')
+        .replace(new RegExp('\\+', 'g'), ' ')
+        .replace(new RegExp('_', 'g'), ' ')
         .trim();
       result.name = result.nameFromPath;
     }
@@ -101,14 +102,14 @@ export function parseGoogleMapsUrl(url: string): ParsedGoogleMapsUrl | null {
     const pathQueryMatch = url.match(QUERY_PATH_PATTERN);
     if (pathQueryMatch) {
       result.searchQuery = decodeURIComponent(pathQueryMatch[1])
-        .replace(/\+/g, ' ')
+        .replace(new RegExp('\\+', 'g'), ' ')
         .trim();
     }
     
     const queryMatch = url.match(QUERY_PATTERN);
     if (queryMatch) {
       result.query = decodeURIComponent(queryMatch[1])
-        .replace(/\+/g, ' ')
+        .replace(new RegExp('\\+', 'g'), ' ')
         .trim();
     }
     
@@ -183,14 +184,14 @@ export function GoogleMapsUrlParser({
   return (
     <div className={cn('relative', className)}>
       <div className="relative">
-        <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+        <MapPin className={cls('pointer-events-none absolute left-4 h-5 w-5 -translate-y-1/2 text-muted-foreground', frac('top', '2'))} />
         <input
           type="url"
           required
           aria-invalid={value && !isValid}
           className={cn(
             'wl-input py-4 pl-12 pr-4 text-base',
-            !isValid && value ? 'border-destructive/50 focus:border-destructive focus:ring-destructive/20' : ''
+            !isValid && value ? cls('border-destructive/50 focus:border-destructive', frac('focus:ring-destructive', '20')) : ''
           )}
           placeholder={placeholder}
           value={value}
@@ -200,50 +201,56 @@ export function GoogleMapsUrlParser({
           spellCheck={false}
         />
         {isValidating && (
-          <Loader2 className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-primary animate-spin" />
+          <Loader2 className={cls('pointer-events-none absolute right-4 h-5 w-5 -translate-y-1/2 text-primary animate-spin', frac('top', '2'))} />
         )}
         {isValid && !isValidating && (
-          <CheckCircle2 className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-verified" />
+          <CheckCircle2 className={cls('pointer-events-none absolute right-4 h-5 w-5 -translate-y-1/2 text-verified', frac('top', '2'))} />
         )}
         {!isValid && value && !isValidating && (
-          <X className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-destructive" />
+          <X className={cls('pointer-events-none absolute right-4 h-5 w-5 -translate-y-1/2 text-destructive', frac('top', '2'))} />
         )}
       </div>
 
-      {parsed && (
-        <div className={cn('mt-3 rounded-xl border border-border bg-gradient-to-br from-secondary via-card', 'to-ai/5', 'p-4 animate-in fade-in-200 duration-300')}>
-          <p className="wl-eyebrow">URL analysis</p>
-          <div className="mt-2 grid gap-2 sm:grid-cols-3 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span className={cn('flex h-6 w-6 items-center justify-center rounded-lg', 
-                parsed.isPlaceUrl ? 'bg-primary/12 text-primary' : 
-                parsed.isSearchUrl ? 'bg-ai/12 text-ai' : 
-                'bg-warning/12 text-warning')}>
-                {parsed.isPlaceUrl ? <MapPin className="h-3.5 w-3.5" /> : 
-                 parsed.isSearchUrl ? <Search className="h-3.5 w-3.5" /> : 
-                 <LinkIcon className="h-3.5 w-3.5" />}
-              </span>
-              <span>Mode: <span className="text-foreground capitalize">{parsed.isPlaceUrl ? 'Place URL' : parsed.isSearchUrl ? 'Search URL' : parsed.isShortUrl ? 'Short URL' : 'Unknown'}</span></span>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              {parsed.latitude !== null && parsed.longitude !== null ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5 text-verified" />
-                  <span>Coordinates: <span className="text-foreground">{parsed.latitude.toFixed(6)}, {parsed.longitude.toFixed(6)}</span></span>
-                </>
-              ) : (
-                <>
-                  <X className="h-3.5 w-3.5 text-destructive" />
-                  <span>Coordinates: <span className="text-foreground">Not found</span></span>
-                </>
-              )}
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span className="font-medium">Place ID:</span>
-              <span className="text-foreground font-mono text-xs">{parsed.placeId || parsed.cid || parsed.dataId || 'Not in URL'}</span>
+      {parsed && (() => {
+        const content = (
+          <div className={cn('mt-3 rounded-xl border border-border bg-gradient-to-br from-secondary via-card p-4 animate-in fade-in-200 duration-300', frac('to-ai', '5'))}>
+            <p className="wl-eyebrow">URL analysis</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span className={cn('flex h-6 w-6 items-center justify-center rounded-lg', 
+                  parsed.isPlaceUrl ? cls(frac('bg-primary', '12'), 'text-primary') : 
+                  parsed.isSearchUrl ? cls(frac('bg-ai', '12'), 'text-ai') : 
+                  cls(frac('bg-warning', '12'), 'text-warning'))}>
+                  {parsed.isPlaceUrl ? <MapPin className="h-3.5 w-3.5" /> : 
+                   parsed.isSearchUrl ? <Search className="h-3.5 w-3.5" /> : 
+                   <LinkIcon className="h-3.5 w-3.5" />}
+                </span>
+                <span>Mode: <span className="text-foreground capitalize">{parsed.isPlaceUrl ? 'Place URL' : (parsed.isSearchUrl ? 'Search URL' : (parsed.isShortUrl ? 'Short URL' : 'Unknown'))}</span></span>
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  {parsed.latitude !== null && parsed.longitude !== null ? (
+                    <div>
+                      <CheckCircle2 className="h-3.5 w-3.5 text-verified" />
+                      <span>Coordinates: <span className="text-foreground">{parsed.latitude.toFixed(6)}, {parsed.longitude.toFixed(6)}</span></span>
+                    </div>
+                  ) : (
+                    <div>
+                      <X className="h-3.5 w-3.5 text-destructive" />
+                      <span>Coordinates: <span className="text-foreground">Not found</span></span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <span className="font-medium">Place ID:</span>
+                  <span className="text-foreground font-mono text-xs">{parsed.placeId || parsed.cid || parsed.dataId || 'Not in URL'}</span>
+                </div>
+              </div>
             </div>
           </div>
-        )}
+        );
+        return content;
+      })()}
       </div>
     </div>
   );

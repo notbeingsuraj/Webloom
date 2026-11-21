@@ -467,7 +467,7 @@ export default function StrategyIntelligence() {
                       )}
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Pain Points */}
                 {dna?.painPoints?.length && (
@@ -488,7 +488,7 @@ export default function StrategyIntelligence() {
                       ))}
                     </ul>
                   </div>
-                </div>
+                )}
 
                 {/* Purchase Triggers */}
                 {dna?.purchaseTriggers && (
@@ -514,7 +514,7 @@ export default function StrategyIntelligence() {
                       <p className="text-foreground">{dna.purchaseTriggers}</p>
                     )}
                   </div>
-                </div>
+                )}
 
                 {/* Strategic Recommendations */}
                 {dna?.strategicRecommendations?.length && (
@@ -537,7 +537,7 @@ export default function StrategyIntelligence() {
                       ))}
                     </ul>
                   </div>
-                </div>
+                )}
               </>
             ) : (
               <div className="wl-card p-6 text-center">
@@ -631,5 +631,3 @@ export default function StrategyIntelligence() {
     </div>
   );
 }
-
-export default StrategyIntelligence;
